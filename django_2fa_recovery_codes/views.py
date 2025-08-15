@@ -19,4 +19,4 @@ def deactivate_recovery_code(request, code):
 
 
 def recovery_dashboard(request):
-    pass
+    return render(request, "django_2fa_recovery_codes/dashboard.html")

@@ -1,18 +1,1585 @@
-* {
- border: 0;
- margin: 0;
- padding: 0;
- 
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&display=swap');
+
+/* ------------------------------------------ */
+/*        GLOBAL RESET & CSS VARIABLES        */
+/* ------------------------------------------ */
+/*
+  Global reset and base styles to ensure consistent
+  box-sizing, margin, padding, border reset, and smooth scrolling
+  across all elements.
+*/
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    scroll-behavior: smooth;
 }
 
 
-.sr-only {
-      position: absolute !important;
-      width: 1px !important;
-      height: 1px !important;
-      padding: 0 !important;
-      margin: -1px !important;
-      overflow: hidden !important;
-      clip: rect(0, 0, 0, 0) !important;
-      border: 0 !important;
+/*
+  Root-level CSS variables for colours, spacing scales,
+  and common reusable values like shadows, used throughout the site.
+*/
+:root {
+    
+     /* Color palette */
+    --primary-gray: #dbdcde;
+    --blue-primary: #007bff;
+    --green-primary: #28a745;
+    --red-primary: #dc3545;
+    --warning-yellow: #FFC107;
+    --warning-text: #212121;
+    --dark-navy-blue-primary:  #121827;
+
+    /* label color */
+    --label-color: #333;
+
+    /* links color */
+    --link-primary-color: #17A2B8;
+
+    /* Font colors */
+    --warning-text-color: rgb(140, 95, 10);
+    --white-color: #ffffff;
+    --red-text-color: #D32F2F;
+    --white-color: #ffffff;
+   
+
+    /* Spacing scale */
+    --zero-spacing: 0px;
+    --xxs-spacing: 2px;
+    --xs-spacing: 4px;
+    --sm-spacing: 8px;
+    --md-spacing: 16px;
+    --lg-spacing: 24px;
+    --xlg-spacing: 32px;
+    --xxl-spacing: 48px;
+    --xxxl-spacing: 64px;
+
+    /* Shadows */
+    --box-shadow-primary: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
+
+    /* fixed sidebar width */
+    --fixed-sidebar-width: 280px;
+
+    /* primary text color */
+    --primary-text-color:  #212121;       
+
+}
+
+
+
+/* ------------------------------------------ */
+/*          HTML & TYPOGRAPHY DEFAULTS        */
+/* ------------------------------------------ */
+
+/* Base HTML reset and default styles for consistent typography & layout */
+
+/* Reset margins and paddings for common elements */
+h1,
+h2,
+h3,
+h4,
+h5,
+p,
+main {
+    margin: 0;
+    padding: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5 {
+    color: rgb(73, 74, 75);
+}
+
+/* Global body & html styles */
+body,
+html {
+    font-family: "Poppins", sans-serif;
+    font-weight: 300;
+    font-style: normal;
+    overflow-x: hidden;
+    transition: background-color 0.3s ease-in-out;
+}
+
+body,
+.container {
+    width: 100%;
+    max-width: 100%;
+}
+
+/* Google font for code blocks */
+.source-code-pro-codes {
+    font-family: "Source Code Pro", monospace;
+    font-optical-sizing: auto;
+    font-weight: 300;
+    font-style: normal;
+}
+
+
+/* ------------------------------------------ */
+/*                  MARGIN                    */
+/* ------------------------------------------ */
+/* 
+
+Margin scale for uniform spacing throughout the project 
+Values pulled from the :root spacing scale 
+
+sizes key
+------------
+
+xxs - 4px
+xs  - 2px
+xm  - 8px
+md  - 16px
+lg  - 24px
+xlg - 32px
+xxl - 48px
+xxxl - 64px 
+
+
+*/.margin-0 { margin: 0; }
+.margin-xxs { margin: var(--xxs-spacing); }
+.margin-xs { margin: var(--xs-spacing); }
+.margin-sm { margin: var(--sm-spacing); }
+.margin-md { margin: var(--md-spacing); }
+.margin-lg { margin: var(--lg-spacing); }
+.margin-xlg { margin: var(--xlg-spacing); }
+.margin-xxl { margin: var(--xxl-spacing); }
+.margin-xxxl { margin: var(--xxxl-spacing); }
+
+/* Margin - Top */
+.margin-top-0 { margin-top: 0; }
+.margin-top-xxs { margin-top: var(--xxs-spacing); }
+.margin-top-xs { margin-top: var(--xs-spacing); }
+.margin-top-sm { margin-top: var(--sm-spacing); }
+.margin-top-md { margin-top: var(--md-spacing); }
+.margin-top-lg { margin-top: var(--lg-spacing); }
+.margin-top-xlg { margin-top: var(--xlg-spacing); }
+.margin-top-xxl { margin-top: var(--xxl-spacing); }
+.margin-top-xxxl { margin-top: var(--xxxl-spacing); }
+
+/* Margin - Bottom */
+.margin-bottom-0 { margin-bottom: 0; }
+.margin-bottom-xxs { margin-bottom: 2px; }
+.margin-bottom-xs { margin-bottom: var(--xs-spacing); }
+.margin-bottom-sm { margin-bottom: var(--sm-spacing); }
+.margin-bottom-md { margin-bottom: var(--md-spacing); }
+.margin-bottom-lg { margin-bottom: var(--lg-spacing); }
+.margin-bottom-xlg { margin-bottom: var(--xlg-spacing); }
+.margin-bottom-xxl { margin-bottom: 96px; }
+.margin-bottom-xxxl { margin-bottom: 128px; }
+
+/* Margin - Left */
+.margin-left-0 { margin-left: 0; }
+.margin-left-xxs { margin-left: 2px; }
+.margin-left-xs { margin-left: var(--xs-spacing); }
+.margin-left-sm { margin-left: var(--sm-spacing); }
+.margin-left-md { margin-left: var(--md-spacing); }
+.margin-left-lg { margin-left: var(--lg-spacing); }
+.margin-left-xlg { margin-left: var(--xlg-spacing); }
+.margin-left-xxl { margin-left: 96px; }
+.margin-left-xxxl { margin-left: 128px; }
+
+/* Margin Right */
+.margin-right-0 { margin-right: 0; }
+.margin-right-xxs { margin-right: 2px; }
+.margin-right-xs { margin-right: var(--xs-spacing); }
+.margin-right-sm { margin-right: var(--sm-spacing); }
+.margin-right-md { margin-right: var(--md-spacing); }
+.margin-right-lg { margin-right: var(--lg-spacing); }
+.margin-right-xlg { margin-right: var(--xlg-spacing); }
+.margin-right-xxl { margin-right: var(--xxl-spacing); }
+.margin-right-xxxl { margin-right: var(--xxxl-spacing); }
+
+
+/* ------------------------------------------ */
+/*                 PADDING SCALE              */
+/* ------------------------------------------ */
+
+/* Padding scale: keeping spacing inside elements neat and consistent */
+/* Values pulled from the :root spacing scale */
+/* 
+sizes key
+------------
+xxs  - 2px
+xs   - 4px
+sm   - 8px
+md   - 16px
+lg   - 24px
+xlg  - 32px
+xxl  - 48px
+xxxl - 64px
+*/
+
+/* padding all sides are equal */
+
+.padding-0 {padding: 0;}
+.padding-xxs {padding: 2px;}
+.padding-xs {padding: var(--xs-spacing);}
+.padding-sm {padding: var(--sm-spacing);}
+.padding-md {padding: var(--md-spacing);}
+.padding-lg {padding: var(--lg-spacing);}
+.padding-xlg {padding: var(--xlg-spacing);}
+.padding-xxl {padding: var(--xxl-spacing);}
+.padding-xxxl {padding: var(--xxxl-spacing);}
+
+/* Padding - Top */
+.padding-top-0 { padding-top: 0; }
+.padding-top-xxs { padding-top: 2px; }
+.padding-top-xs { padding-top: var(--xs-spacing); }
+.padding-top-sm { padding-top: var(--sm-spacing); }
+.padding-top-md { padding-top: var(--md-spacing); }
+.padding-top-lg { padding-top: var(--lg-spacing); }
+.padding-top-xlg { padding-top: var(--xlg-spacing); }
+.padding-top-xxl { padding-top: 96px; }
+.padding-top-xxxl { padding-top: 128px; }
+
+/* Padding - Bottom */
+.padding-bottom-0 { padding-bottom: 0; }
+.padding-bottom-xxs { padding-bottom: 2px; }
+.padding-bottom-xs { padding-bottom: var(--xs-spacing); }
+.padding-bottom-sm { padding-bottom: var(--sm-spacing); }
+.padding-bottom-md { padding-bottom: var(--md-spacing); }
+.padding-bottom-lg { padding-bottom: var(--lg-spacing); }
+.padding-bottom-xlg { padding-bottom: var(--xlg-spacing); }
+.padding-bottom-xxl { padding-bottom: var(--xxl-spacing); }
+.padding-bottom-xxxl { padding-bottom: var(--xxxl-spacing); }
+
+/* Padding - Left */
+.padding-left-0 { padding-left: 0; }
+.padding-left-xxs { padding-left: 2px; }
+.padding-left-xs { padding-left: var(--xs-spacing); }
+.padding-left-sm { padding-left: var(--sm-spacing); }
+.padding-left-md { padding-left: var(--md-spacing); }
+.padding-left-lg { padding-left: var(--lg-spacing); }
+.padding-left-xlg { padding-left: var(--xlg-spacing); }
+.padding-left-xxl { padding-left: 96px; }
+.padding-left-xxxl { padding-left: 128px; }
+
+/* Padding - Right */
+.padding-right-0 { padding-right: 0; }
+.padding-right-xxs { padding-right: 2px; }
+.padding-right-xs { padding-right: var(--xs-spacing); }
+.padding-right-sm { padding-right: var(--sm-spacing); }
+.padding-right-md { padding-right: var(--md-spacing); }
+.padding-right-lg { padding-right: var(--lg-spacing); }
+.padding-right-xlg { padding-right: var(--xlg-spacing); }
+.padding-right-xxl { padding-right: var(--xxl-spacing); }
+.padding-right-xxxl { padding-right: var(--xxxl-spacing); }
+
+
+
+/* ------------------------------------------ */
+/*             BACKGROUND COLORS              */
+/* ------------------------------------------ */
+/* Utility classes for background colors,
+   including primary colors, subtle gray, and warning styles
+   with padding and border-radius for UI elements.
+*/
+
+.bg-blue {
+    background-color: var(--blue-primary);
+}
+
+.bg-green {
+    background-color: var(--green-primary);
+}
+
+.bg-red {
+    background-color: var(--red-primary);
+}
+
+
+.bg-subtle-gray-with-padding {
+    background: var(--primary-gray);
+    padding: 20px 15px;
+    border-radius: 3px;
+}
+
+.bg-warning-with-padding {
+    background-color: var(--warning-yellow);
+    color: var(--warning-text);
+    padding: 20px 15px;
+    border-radius: 3px;
+}
+
+
+
+/* ------------------------------------------ */
+/*                  FONT COLOR                */
+/* ------------------------------------------ */
+/* Text color utility classes for warnings,
+   white text, and red text with appropriate emphasis.
+*/
+
+.warning {
+    color: var(--warning-text-color);
+    font-weight: bold;
+}
+
+.text-white {
+    color: var(--white-color);
+}
+
+.text-red {
+    color: var(--red-text-color);
+}
+
+
+/* ------------------------------------------ */
+/*                 FONT WEIGHTS               */
+/* ------------------------------------------ */
+
+/* Utility classes for font weights */
+
+.font-weight-500 {font-weight: 500;}
+
+
+
+/* ------------------------------------------ */
+/*                  FLEX GRID                 */
+/* ------------------------------------------ */
+/* Grid layout utilities with flexible column setups:
+   - Single column with auto rows
+   - Two and four column grids
+   - Fractional column widths (e.g., 40-60, 20-80)
+*/
+
+
+/*
+Basic grid container with automatic row sizing.
+Combine with other grid classes to create flexible layouts.
+
+Example: This will create a two-column grid with automatic spacing.
+<div class="list-of-names flex-grid two-column-grid"></div>
+*/
+.flex-grid {
+    display: grid;
+    grid-template-rows: auto;
+}
+
+/* Two equal columns grid */
+.two-column-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+}
+
+/* Four equal columns grid with gaps */
+.fourth-column-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    column-gap: var(--md-spacing); /* 4px */
+    row-gap: var(--spacing-sm);    /* 8px */
+}
+
+/* Two columns grid with 40% / 60% width */
+.two-column-grid--40-60 {
+    display: grid;
+    grid-template-columns: 40% 60%;
+}
+
+/* Two columns grid with 20% / 80% width */
+.two-column-grid--20-80 {
+    display: grid;
+    grid-template-columns: 20% 80%;
+}
+
+
+
+/* ------------------------------------------ */
+/*                 FLEX ELEMENTS              */
+/* ------------------------------------------ */
+/* Flexbox utilities for layout alignment,
+   e.g., align items to the end of the container.
+*/
+
+/*
+Basic flex container to enable flexible box layout.
+To use any of the flex modifiers, you must add 'flex' first to activate flexbox.
+
+.flex sets display: flex to activate flexbox.
+
+.flex-center centers items both horizontally and vertically.
+
+.flex-end aligns items to the end (right side) of the main axis.
+
+Example: This will create a flex container with items aligned to the right 
+
+<div class="flex flex-end">
+  <button>Aligned to Right</button>
+</div>
+*/
+
+
+/* Base flex container */
+.flex {display: flex;}
+
+
+
+.flex-center {
+    justify-content: center;
+    align-items: center; 
+}
+
+.flex-end {justify-content: flex-end;}
+
+
+
+/* ------------------------------------------ */
+/*                 INPUT FIELDS               */
+/* ------------------------------------------ */
+/* Styles for input fields with centered text,
+   monospace font, and subtle letter spacing for readability.
+*/
+
+/* Basic styling for input elements */
+input {
+    text-align: center;
+    border: 1px solid black;
+    font-size: 1.25rem;
+    font-family: 'Fira Code', monospace;
+    letter-spacing: 0.1rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Focus state for accessibility and clarity */
+input:focus {
+    outline: none;
+    border-color: var(--blue-primary); 
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+}
+
+
+/* ------------------------------------------ */
+/*                 FORM FIELDS                */
+/* ------------------------------------------ */
+/* Inner form container spacing to separate elements neatly.
+*/
+
+/* Container inside forms to add right margin spacing */
+.form-inner {
+    margin-right: var(--md-spacing);
+}
+
+
+/* ------------------------------------------ */
+/*                  SIDEBAR                   */
+/* ------------------------------------------ */
+/* Sidebar styles:
+   - Fixed position with full viewport height
+   - Dark background with subtle box shadow
+   - Styled navigation links with hover and active states
+*/
+
+
+/* Fixed sidebar container */
+#sidebar {
+    background-color: #111827;
+    box-shadow: var(--box-shadow-primary);
+    width: var(--fixed-sidebar-width);
+    position: fixed;
+    height: 100vh;
+    top: 0;
+    left: 0;
+    overflow-y: auto;
+}
+
+/* Sidebar content area */
+.sidebar {
+    background-color: var(--dark-navy-blue-primary);
+    color: var(--white-color);
+    height: 100vh;
+    font-family: sans-serif;
+    padding: var(--md-spacing);
+}
+
+/* Sidebar navigation links */
+.sidebar-link {
+    display: block;
+    color: var(--primary-text-color);
+    background: var(--white-color);
+    text-decoration: none;
+    /* padding: 0.5rem; */
+    padding: 0.5rem 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: 12px;
+    transition: background-color 0.2s ease, color 0.2s ease;
+    font-weight: 500;
+    font-size: 0.9rem;
+    box-shadow: rgba(0, 0, 0, 0.25) 0px 54px 55px, rgba(0, 0, 0, 0.12) 0px -12px 30px, rgba(69, 55, 55, 0.12) 0px 4px 6px, rgba(0, 0, 0, 0.17) 0px 12px 13px, rgba(0, 0, 0, 0.09) 0px -3px 5px;;
+}
+
+ .logout-btn-link,
+ .invalidate-btn-link,
+ .remove-code-btn-link {
+        background: var(--red-primary);
+        color: var(--white-color);
+        font-weight: 400;
     }
+
+.view-generated-code-btn-link,
+.generate-code-link-btn {
+    background: var(--green-primary);
+    color: var(--white-color);
+    font-weight: 400;
+}
+
+/* Hover and focus states for links */
+.sidebar-link:hover,
+.sidebar-link:focus {
+    background-color: #1f2937;
+    color: var(--white-color);
+    outline: none;
+    border: 1px solid var(--white-color);
+    padding: 0.6rem 0.6rem;
+}
+
+/* Active link style */
+.sidebar-link.active {
+    background-color: #2563eb;
+    color: var(--white-color);
+}
+
+/* Additional hover effect for all links inside sidebar */
+.sidebar a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    font-weight: bold;
+    border-radius: 6px;
+}
+
+
+
+
+/* Tab when active */
+.active {
+    background-color:  #F5F7FA;
+}
+
+/* Optional smooth transition for dashboard margin */
+#recovery-dashboard {
+    transition: margin-top 0.3s ease;
+}
+
+
+/* ------------------------------------------ */
+/*              SECURITY TIP SECTION          */
+/* ------------------------------------------ */
+/* Highlighted security tips with a subtle gradient background,
+   left border accent, padding, and gentle shadow for emphasis.
+   Includes styles for title and list within the section.
+*/
+
+
+/* Container for security tips */
+#security-tip {
+    background: linear-gradient(145deg, #f5f7fa, #e4e7ec);
+    border-left: 6px solid #4cafef;
+    padding: 1rem 1.2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+    font-size: 0.95rem;
+    color: #333;
+}
+
+/* Title of security tip */
+#security-tip--title {
+    margin-top: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #2b6cb0;
+    display: flex;
+    align-items: center;
+}
+
+/* List container inside security tip */
+#security-tip--list {
+    margin: 0.5rem 0 0;
+    padding-left: 1.2rem;
+}
+
+/* Individual list items */
+#security-tip--list li {
+    margin-bottom: 0.4rem;
+    line-height: 1.4;
+}
+
+
+
+/* ------------------------------------------ */
+/*                  UTILITIES                  */
+/* ------------------------------------------ */
+/* Utility classes for common layout and styling:
+   - Centering elements with flexbox
+   - Text alignment helpers
+   - Label styling with capitalization
+   - Divider (hr) styling
+   - Section cursor pointer
+   - Width control classes
+   - Small notes and paragraph line height
+   - hiding elements
+*/
+
+/* center elements */
+.center {
+    text-align: center;
+    justify-content: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+
+/* centers only the text */
+.text-center {
+    text-align: center;
+}
+
+
+/* label elements */
+.label {
+    font-size: 1rem;
+    font-weight: 400;
+}
+
+.label p {
+    text-transform: capitalize;
+}
+
+
+/* hr element */
+.dividor {
+    border: 2px solid lavender;
+}
+
+
+/* section element */
+section {
+    cursor: pointer;
+}
+
+
+/* width */
+.width-80 {
+    width: 80%;
+    margin: auto;
+}
+
+
+/* Subtle notes for the user, informative without being overpowering */
+.small-note {
+    font-size: 0.85rem;
+    color: #6b7280;
+    margin-top: 0.5rem;
+    padding: var(--sm-spacing);
+}
+
+
+.box-display p {
+    line-height: 1.7;
+}
+
+
+/* Utility class to hide elements */
+.d-none {
+    display: none;
+}
+
+.bold {
+    font-weight: 500;
+}
+
+
+.rotate-360 {
+  transform: rotate(360deg);
+  transition: transform 0.5s ease;
+}
+
+
+/* ------------------------------------------ */
+/*                   TITLE                    */
+/* ------------------------------------------ */
+/* Styles for titles and headings:
+   - Capitalizes text for `.title`
+   - Medium and small size variations
+   - Page title with distinct background and padding for emphasis
+*/
+
+.title {
+    text-transform: capitalize;
+}
+
+.medium-title {
+    font-size: 1.1rem;
+}
+
+.small-title {
+    font-size: 0.95rem;
+}
+
+
+#page-title {
+    font-size: 1.8rem;
+    background: lavender;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    padding-left: 15px;
+}
+
+
+/* ------------------------------------------ */
+/*              TABLE ELEMENTS                 */
+/* ------------------------------------------ */
+/*
+  This section styles table elements for a clean,
+  responsive, and interactive table design.
+  It includes base table styling, headers, rows,
+  hover effects, and responsive wrappers to handle
+  overflow on smaller screens.
+*/
+
+
+/* Table container for horizontal scrolling on small screens */
+.table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 1rem;
+}
+
+/* Table base styles */
+table {
+    width: 100%;
+    min-width: 400px; /* ensures table won't shrink too small */
+    border-collapse: collapse;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Table header styles */
+thead {
+    background: #28a745;
+}
+
+th {
+    padding: 0.15rem 1rem;
+    text-align: left;
+    font-size: 1rem;
+    font-weight: 500;
+    color: white;
+    border-bottom: 1px solid #E5E7EB;
+    white-space: nowrap;
+}
+
+/* Table body styles */
+tbody {
+    background-color: #FFFFFF;
+}
+
+tbody tr {
+    border-top: 1px solid #E5E7EB;
+}
+
+/* Table rows */
+tr {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+tr:hover {
+    transform: scale(1.01);
+    background: lavender;
+    font-weight: bold;
+    color: white;
+}
+
+/* Table cells */
+td {
+    padding: 0.75rem 1rem;
+    font-size: 0.95rem;
+    color: #1F2937;
+    text-align: left;
+    font-family: "Source Code Pro", monospace;
+    font-optical-sizing: auto;
+    font-weight: 500;
+    font-style: normal;
+    white-space: nowrap;
+}
+
+/* ------------------------------------------ */
+/*                  PAGINATION                */
+/* ------------------------------------------ */
+/*
+  Pagination link styles including border, padding,
+  shadow effects, alternating background colours,
+  and hover scaling for user interaction feedback.
+*/
+
+
+.pagination-link {
+    border: 1px solid black;
+    padding: 10px;
+    text-decoration: none;
+    box-shadow: var(--box-shadow-primary);
+}
+
+.pagination-link:nth-child(even) {
+    background: black;
+    color: white;
+}
+
+.pagination-link:hover {
+    transform: scale(1.1);
+}
+
+
+
+/* ------------------------------------------ */
+/*                  BORDERS                   */
+/* ------------------------------------------ */
+/*
+  Border styles for visual emphasis,
+  such as a left red border to indicate danger or error.
+*/
+
+.border-danger {
+    border-left: 6px solid #c00;
+}
+
+
+
+/* ------------------------------------------ */
+/*         RECOVERY DASHBOARD SECTIONs        */
+/* ------------------------------------------ */
+/*
+  Styles for the Recovery Dashboard sections,
+  including layout, containers, and stat cards
+  to display key recovery metrics and info.
+*/
+
+#recovery-dashboard {
+    display: grid;
+
+}
+
+.dashboard-links h1 {
+    color: #FF6F00;
+}
+
+#recovery-dashboard>.container {
+
+    width: 80%;
+    margin: auto;
+    padding: 10px 25px;
+    border-radius: 5px;
+    background: white;
+    margin-left: var(--fixed-sidebar-width);
+
+}
+
+#recovery-code-dashboard {
+    box-shadow: rgba(99, 99, 99, 0.2) 0px 2px 8px 0px;
+    padding: 30px 40px;
+}
+
+#recovery-code-dashboard .container {
+    background: white;
+    display: grid;
+    grid-template-rows: auto;
+}
+
+#recovery-code-dashboard .container .value {
+    font-size: 1.7rem;
+    font-weight: 400;
+}
+
+
+/* Stat cards display key dashboard metrics, e.g., total issued, total used, etc. */
+.stat-card {
+    text-align: center;
+}
+
+.stat-card h2 {
+    font-size: 1rem;
+    font-weight: 500;
+}
+
+
+/* ------------------------------------------ */
+/*         Generate Code Section              */
+/* ------------------------------------------ */
+
+/* Container styles for the generate code functionality section */
+
+#generate-code {
+    border: 3px solid lavender;
+    padding: 30px 40px;
+}
+
+#expiry-date-span {
+    background: blue;
+    color: white;
+}
+
+
+
+/* ------------------------------------------ */
+/*         Invalidate Code Section            */
+/* ------------------------------------------ */
+
+/* Container styles for the invalidate code functionality */
+
+#invalidate-code {
+    border: 1px solid lavender;
+    padding: 30px 40px;
+    box-shadow: var(--box-shadow-primary);
+}
+
+
+
+/* ------------------------------------------ */
+/*                  Cards                     */
+/* ------------------------------------------ */
+
+/* Card container styling with shadow, spacing, and padding */
+
+.card {
+    box-shadow: var(--box-shadow-primary);
+    margin-top: 10px;
+    margin-bottom: 10px;
+    padding: 30px 40px;
+}
+
+/* Styling for paragraphs inside card body to emphasize text */
+.card-body p {
+    font-weight: bold;
+    padding-bottom: 2px;
+}
+
+
+/* ------------------------------------------ */
+/*                  BUTTONS                    */
+/* ------------------------------------------ */
+
+/* Contains the various width, sizes, etc for any button */
+
+
+/* Basic button styles with cursor and font settings */
+button {
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 400;
+}
+
+button {
+    box-shadow: rgba(50, 50, 93, 0.25) 0px 13px 27px -5px,
+                rgba(0, 0, 0, 0.3) 0px 8px 16px -8px;
+}
+
+.btn-medium {
+    width: 100%;
+}
+
+
+
+
+/* ------------------------------------------ */
+/*            STATS BOARD DISPLAY             */
+/* ------------------------------------------ */
+
+/* Small circular loader with rotation animation */
+
+
+#stats-displayboard {
+    background: ghostwhite;
+    border: 2px solid lavender;
+    padding-top: var(--sm-spacing);
+    padding-bottom: var(--sm-spacing);
+}
+
+
+
+/* ------------------------------------------ */
+/*               SPINNER (LOADER)             */
+/* ------------------------------------------ */
+
+/* Small circular loader with rotation animation */
+
+.loader {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    border-top: 5px solid var(--white-color);
+    border-right: 3px solid transparent;
+    box-sizing: border-box;
+    animation: rotation 1s linear infinite;
+    display: inline-block;
+    color: #2563eb;
+    display: none; /* Hidden by default */
+}
+
+
+/* Show spinner when active */
+.loader.show-spinner {
+    display: inline-block;
+}
+
+
+
+/* Keyframes for continuous rotation */
+@keyframes rotation {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* ------------------------------------------ */
+/*      FLOATING MESSAGE BOX FOR NOTIFICATIONS */
+/* ------------------------------------------ */
+
+#messages {
+    position: fixed;
+    left: 20px;
+    bottom: 0;
+    width: 30%;
+    background: #28a745;
+    color: white;
+    border: 1px solid black;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-weight: 400;
+    text-align: center;
+    transform: translateY(100%);
+    box-shadow:
+        rgba(0, 0, 0, 0.35) 0 5px 15px,
+        rgb(38, 57, 77) 0 20px 30px -10px;
+}
+
+/* Content wrapper inside the message box */
+.message-container {
+    padding: var(--sm-spacing);
+    background: #28a745;
+    border-left: 1px solid black;
+    color: white;
+    font-weight: 500;
+    text-align: left;
+}
+
+/* Variant for white background message */
+.message-check-message {
+    background: white;
+    color: black;
+}
+
+/* Show animation: float up, hold, then slide down */
+#messages.show {
+    animation: messageFloat 5s ease-in-out forwards;
+}
+
+@keyframes messageFloat {
+    0% {
+        transform: translateY(100%);
+        animation-timing-function: ease-out;
+    }
+    40%, 50%, 70% {
+        transform: translateY(-70px);
+        animation-timing-function: linear;
+    }
+    100% {
+        transform: translateY(100%);
+    }
+}
+
+
+/* ------------------------------------------ */
+/*          FONT AWESOME ICONS                 */
+/* ------------------------------------------ */
+/* Styles for Font Awesome icons, e.g., check marks,
+   with green color, padding, and adjusted font size */
+
+
+.fa-check {
+    color: green;
+    padding: var(--md-spacing);
+    font-size: 1.1rem;
+}
+
+.sidebar-close-icon {
+    font-size: 2rem;
+    display: none;
+    color: var(--white-color);
+}
+
+.x-icon {
+    display: none;
+}
+
+
+/* ------------------------------------------ */
+/*                 MEDIUM QUERIES             */
+/* ------------------------------------------ */
+/* Responsive styles for extra small devices (phones)
+   targeting screen widths up to 575px. Adjusts layout,
+   grid columns, padding, and visibility for better mobile
+   usability and readability 
+*/
+
+/* Mobile view */
+/* =======================
+   Extra Small Devices (Phones)
+   0px – 575px
+   ======================= */
+@media (max-width: 575px) {
+
+
+
+    #sidebar {
+        /* display: none; */
+        width: 100%;
+        height: 60px;
+        overflow: hidden;
+    }
+
+  
+    .sidebar__container {
+        display: none;
+    }
+
+     .hamburger {
+        display: block;
+        color: white;
+    }
+    
+    #recovery-dashboard {
+        margin-top: var(--xxxl-spacing);
+    }
+   
+
+    #recovery-dashboard>.container {
+
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    .fourth-column-grid {
+        display: grid;
+        grid-template-columns: repeat(1, 1fr);
+        grid-template-rows: auto;
+        column-gap: 4px;
+    }
+
+    #recovery-code-dashboard {
+
+        padding: 0px;
+    }
+
+    #generate-code {
+        border: 3px solid lavender;
+        padding: 0;
+    }
+
+    #invalidate-code {
+
+        padding: 0px;
+
+    }
+
+    .form-container {
+        display: grid;
+        grid-template-columns: repeat(1, 1fr);
+        grid-template-rows: auto;
+    }
+
+    .form-inner {
+        margin-right: 0;
+    }
+
+    .info-box {
+        display: grid;
+        grid-template-columns: repeat(1, 1fr);
+        grid-template-rows: auto;
+        padding-top: var(--md-spacing);
+        padding-bottom: var(--md-spacing);
+
+    }
+
+    .card {
+
+        margin-bottom: 10px;
+        padding: 30px 7px;
+    }
+
+    .info-box {
+        display: grid;
+        grid-template-columns: repeat(1, 1fr);
+        grid-template-rows: auto;
+        border-bottom: 2px solid lavender;
+    }
+
+    .info-box:last-child {
+        border-bottom: none;
+    }
+
+    .label {
+        margin-top: 10px;
+        font-weight: 500;
+
+    }
+
+    .label:first-child {
+        padding-top: 0;
+    }
+
+    .value {
+        margin-bottom: 10px;
+    }
+
+    th:nth-child(3),
+    td:nth-child(3),
+    th:nth-child(4),
+    td:nth-child(4) {
+        display: none;
+
+    }
+
+    button {
+        border: 1px solid black;
+    }
+
+}
+
+
+
+/* =======================
+   Small Devices (Large Phones)
+   576px – 767px
+   Responsive adjustments for larger phones and small tablets,
+   optimizing layout and UI elements for this screen size range 
+*/
+@media (min-width: 576px) and (max-width: 767px) {
+
+    #sidebar {
+        /* display: none; */
+        width: 100%;
+        height: 60px;
+        overflow: hidden;
+    }
+    
+    .sidebar__container {
+        display: none;
+    }
+
+    .hamburger {
+        display: block;
+        color: white;
+    }
+
+    #recovery-dashboard {
+        margin-top: var(--xxxl-spacing);
+    }
+   
+    #buttons-container,
+    #stats-displayboard {
+        display: grid;
+        grid-template-columns: repeat(1, 1fr);
+        grid-template-rows: auto;
+        column-gap: 4px;
+        row-gap: 12px;
+    }
+
+#buttons-container {
+    row-gap: 12px;
+    }
+
+
+ #stats-displayboard {
+        row-gap: var(--xxxl-spacing)
+    }
+
+
+.form-container {
+        display: grid;
+        grid-template-columns: repeat(1, 1fr);
+        grid-template-rows: auto;
+    }
+
+    #recovery-dashboard>.container {
+        width: 100%;
+        margin: 0 auto;
+    }
+
+    th:nth-child(3),
+    td:nth-child(3),
+    th:nth-child(4),
+    td:nth-child(4) {
+        display: none;
+
+    }
+
+     .info-box {
+        display: grid;
+        grid-template-columns: repeat(1, 1fr);
+        grid-template-rows: auto;
+        border-bottom: 2px solid lavender;
+        padding-top: var(--md-spacing);
+        padding-bottom: var(--md-spacing);
+    }
+
+     input {
+        font-size: 1rem;
+    };
+}
+
+
+
+/* =======================
+   Medium Devices (Tablets)
+   768px – 991px
+
+   Tablet styles optimized for medium-sized screens
+   Adjusts layout and UI for tablet devices
+   ======================= 
+*/
+@media (min-width: 768px) and (max-width: 991px) {
+    .hamburger {
+        display: block;
+    }
+
+   .sidebar__container {
+     height: 0;
+   }
+    #sidebar {
+        /* display: none; */
+        width: 100%;
+        height: 60px;
+        overflow: hidden;
+    }
+
+    .dashboard-links > h1, hr {
+        display:  none;
+    }
+    
+    .sidebar-link {
+        border: 1px solid black;
+        font-size: 1.375rem;
+    }
+    #sidebar {
+        height: auto;
+        padding: var(--sm-spacing);
+    }
+    .sidebar__container h1 {
+        display: none;
+    }
+
+   
+   
+    .dashboard-links {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        grid-template-rows: auto;
+        column-gap: var(--sm-spacing);
+        row-gap: var(--md-spacing);
+        text-align: center;
+        padding: 10px 25px;
+    }
+    
+    .nav-icon {
+         display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: white;
+  font-size: 1.2rem;
+    }
+
+    
+.nav-icon.blue { background: #1e6fd9; }
+.nav-icon.orange { background: #f68b2c; }
+.nav-icon.red { background: #e63946; }
+.nav-icon.teal { background: #2ca6a4; }
+.nav-icon.dark { background: #2f3640; }
+
+    .dashboard-links a {
+        text-align: center;
+    }
+
+    #recovery-dashboard {
+        margin-top: 65px;
+    }
+   
+    #recovery-dashboard>.container {
+        width: 100%;
+       
+        min-width: 540px;
+        margin: 0 auto;
+    }
+
+    .sidebar-link {
+        display: block;
+        color: var(--white-color);
+        background: white;
+        color: black;
+    
+        text-decoration: none;
+        margin-bottom: 0rem;
+        border-radius: 0;
+        transition: background-color 0.2s ease, color 0.2s ease;
+        font-weight: 500;
+        font-size: 1rem;
+        text-align: left;
+}
+    .info-box {
+        display: grid;
+        grid-template-columns: 40% 60%;
+        grid-template-rows: auto;
+    }
+
+    #stats-displayboard {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: auto;
+        column-gap: var(--sm-spacing);
+        row-gap: var(--lg-spacing);
+    }
+
+    #buttons-container {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);   
+        column-gap: var(--sm-spacing);
+        row-gap: var(--sm-spacing);
+    }
+   
+    input {
+        font-size: 1rem;
+    };
+
+  /* #recovery-dashboard {
+    margin-top: 350px;
+  } */
+
+
+   #invalidate-form-container {
+        display: grid;
+        grid-template-columns: repeat(1, 1fr);
+    }
+}
+
+
+/* =======================
+   Large Devices (Laptops)
+   992px – 1199px
+
+   Laptop and small desktop styles
+   Optimizes layout for larger screens
+   =======================
+ */
+@media (min-width: 992px) and (max-width: 1199px) {
+     #recovery-dashboard  {
+        padding-top: 0;
+
+    }
+    #recovery-dashboard>.container {
+
+        width: 73%;
+        max-width: 960px;
+
+    }
+
+    #stats-displayboard {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: auto;
+        row-gap: var(--md-spacing);
+        column-gap: var(--xs-spacing);
+    }
+
+    
+    #recovery-code-dashboard .container .value {
+        font-size: 2.5rem;
+    }
+
+    #buttons-container {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: auto;
+        column-gap: var(--sm-spacing);
+        row-gap: var(--sm-spacing);
+    }
+
+    #invalidate-form-container {
+        display: grid;
+        grid-template-columns: repeat(1, 1fr);
+    }
+
+}
+
+
+/* =======================
+   Extra Large Devices (Desktops)
+   1200px – 1399px
+
+   Desktop styles for large screens
+   Enhances layout for wider viewports
+   ======================= 
+   
+*/
+@media (min-width: 1200px) and (max-width: 1399px) {
+
+    /* Desktop styles */
+    #recovery-dashboard>.container {
+        width: 76%;
+        max-width: 1140px;
+    }
+}
+
+/* Tablets and up, no horizontal scroll for the table*/
+@media (min-width: 768px) {
+    .table-wrapper {
+        overflow-x: hidden;
+    }
+}
+
+
+
+
+/* =======================
+   XXL Devices (Wide Screens)
+   1400px and above
+
+   Styles for ultra-wide screens and large monitors
+   Adjusts layout container widths and grid templates
+   ======================= 
+*/
+@media (min-width: 1400px) {
+
+    /* Wide-screen styles */
+    #recovery-dashboard>.container {
+        width: 80%;
+
+    }
+
+   
+}
+
+
+@media (min-width: 1024px) {
+    .info-box {
+        display: grid;
+        grid-template-columns: 25% 75%;
+        grid-template-rows: auto;
+    }
+
+   
+}
