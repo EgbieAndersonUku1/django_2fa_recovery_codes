@@ -1,17 +1,20 @@
 import uuid
-import secrets
-from django.db import models
+
+from django.db import models, connections
 from django.contrib.auth.hashers import make_password, check_password
 from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
-from django_2fa_recovery_codes.utils.security.generator import generate_2fa_recovery_code_batch
-from django_2fa_recovery_codes.utils.security.security import identify_hasher
+from django_2fa_recovery_codes.utils.security.generator import generate_2fa_secure_recovery_code
+from django_2fa_recovery_codes.utils.security.security import is_already_hashed
 from django_2fa_recovery_codes.utils.utils import schedule_future_date
 
 
 User = get_user_model()
+
+
+
 
 class Status(models.TextChoices):
     ACTIVE         = "a", "Active"
@@ -50,24 +53,89 @@ class RecoveryCodeCleanUpScheduler(models.Model):
 
 
 class RecoveryCodesBatch(models.Model):
-    id                = models.UUIDField(unique=True, db_index=True)
+    id                = models.UUIDField(unique=True, db_index=True, primary_key=True, editable=False)
     number_issued     = models.PositiveBigIntegerField()
-    number_removed    = models.PositiveBigIntegerField()
-    user              = models.ForeignKey(User, on_delete=models.SET_NULL)
+    number_removed    = models.PositiveBigIntegerField(default=0)
+    user              = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name="recovery_batches")
     created_at        = models.DateTimeField(auto_now_add=True)
     modified_at       = models.DateTimeField(auto_now=True)
     status            = models.CharField(choices=Status, max_length=1, default=Status.ACTIVE)
     automatic_removal = models.BooleanField(default=True)
-    expiry_date       = models.DateTimeField()
+    expiry_date       = models.DateTimeField(blank=True, null=True)
+    deleted_at        = models.DateTimeField(null=True, blank=True)
+    deleted_by        = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_batches")
 
+    class Meta:
+        ordering = ["-created_at"]
 
     def __str__(self):
-        return f"{self.id}"
+        return f"Batch {self.id} for {self.user or 'Deleted User'}"
     
     @classmethod
-    def create_recovery_batch(cls, batch_number=10):
-        """"""
-        pass
+    def _if_async_supported_async_bulk_create_or_use_sync_bulk_crate(cls, batch: list):
+        async_supported = getattr(connections['default'], 'supports_async', False)
+        if async_supported:
+            import asyncio
+            async def async_create():
+                await RecoveryCode.objects.abulk_create(batch)  
+            asyncio.run(async_create())
+        else:
+            RecoveryCode.objects.bulk_create(batch)
+
+    @classmethod
+    def create_recovery_batch(cls, user, expiry_in_days: int = 0, batch_number: int = 10):
+        """
+        Creates a batch of recovery codes for a user, efficiently handling large batches.
+        Uses async bulk_create if supported by the database.
+
+        Returns a list of raw recovery codes.
+        """
+
+        # Type validations
+        if not isinstance(user, User):
+            raise TypeError(f"Expected User instance, got {type(user).__name__}")
+        if not isinstance(batch_number, int):
+            raise TypeError(f"Expected int for batch_number, got {type(batch_number).__name__}")
+        if expiry_in_days and not isinstance(expiry_in_days, int):
+            raise TypeError(f"Expected int for expiry_in_days, got {type(expiry_in_days).__name__}")
+
+        # Create batch instance
+        batch_instance = cls(user=user, number_issued=batch_number)
+        if expiry_in_days:
+            batch_instance.expiry_date = schedule_future_date(days=expiry_in_days)
+        batch_instance.save()
+
+        raw_codes = []
+        batch     = []
+       
+        CHUNK_SIZE = 50
+
+        for _ in range(batch_number):
+
+            raw_code      = generate_2fa_secure_recovery_code()
+            recovery_code = RecoveryCode(user=user, batch=batch_instance)
+            recovery_code.hash_raw_code(raw_code)
+
+            if expiry_in_days:
+                recovery_code.days_to_expiry = expiry_in_days
+
+            raw_codes.append(raw_code)
+            batch.append(recovery_code)
+
+            if len(batch) >= CHUNK_SIZE:
+                cls._if_async_supported_async_bulk_create_or_use_sync_bulk_crate(batch)
+                batch.clear()
+
+        # Insert any remaining codes
+        if batch:
+            cls._if_async_supported_async_bulk_create_or_use_sync_bulk_crate(batch)
+           
+        return raw_codes
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            self.id = uuid.uuid4()
+        super().save(*args, **kwargs)
 
     @classmethod
     def delete_recovery_batch(cls, batch_id):
@@ -78,9 +146,8 @@ class RecoveryCodesBatch(models.Model):
 
 
 class RecoveryCode(models.Model):
-    id                = models.UUIDField(unique=True, db_index=True)
+    id                = models.UUIDField(unique=True, db_index=True, primary_key=True, editable=False)
     hash_code         = models.CharField(max_length=128, unique=True, db_index=True)
-    is_active         = models.BooleanField(default=True)
     mark_for_deletion = models.BooleanField(default=False)
     created_at        = models.DateTimeField(auto_now_add=True)
     modified_at       = models.DateTimeField(auto_now=True)
@@ -89,7 +156,6 @@ class RecoveryCode(models.Model):
     batch             = models.ForeignKey(RecoveryCodesBatch, on_delete=models.CASCADE, related_name="recovery_codes")
     automatic_removal = models.BooleanField(default=True)
     days_to_expiry    = models.PositiveSmallIntegerField(default=0)
-
 
     def __str__(self):
         """Returns a string representation of the class"""
@@ -163,7 +229,7 @@ class RecoveryCode(models.Model):
             raise ValueError(f"The code parameter is not a string. Expected a string but got an object with type {type(code)}")
         return make_password(code)
     
-    def hash_code(self, code: str):
+    def hash_raw_code(self, code: str):
         if code:
             self.hash_code = make_password(code)
     
@@ -172,7 +238,7 @@ class RecoveryCode(models.Model):
             self.id = uuid.uuid4()
 
         # ensure that is code is always saved as hash and never as a plaintext
-        if self.hash_code and not identify_hasher(self.hash_code):
-            make_password(self.hash_code)
+        if self.hash_code and not is_already_hashed(self.hash_code):
+            self.hash_code = make_password(self.hash_code)
         super().save(*args, **kwargs)
 

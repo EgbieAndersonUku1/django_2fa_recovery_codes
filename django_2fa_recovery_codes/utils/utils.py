@@ -1,6 +1,7 @@
 from datetime import timedelta
 from django.utils import timezone
 
+
 def schedule_future_date(days: int = 0, hours: int = 0, minutes: int = 0):
     """
     Returns a datetime object representing a date in the future from now.

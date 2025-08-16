@@ -1,4 +1,5 @@
 from django.contrib.auth.hashers import identify_hasher
+from django.core.exceptions import ImproperlyConfigured
 
 
 def is_already_hashed(value):
@@ -20,5 +21,5 @@ def is_already_hashed(value):
     try:
         identify_hasher(value)
         return True
-    except ValueError:
+    except (ValueError, ImproperlyConfigured):
         return False

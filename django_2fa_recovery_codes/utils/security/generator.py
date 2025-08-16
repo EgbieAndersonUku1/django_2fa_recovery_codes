@@ -58,17 +58,3 @@ def generate_2fa_secure_recovery_code(code_length: int = 6, group_size: int = 6,
 
     return separator.join(secure_code)
 
-
-def generate_2fa_recovery_code_batch(code_per_batch: int = 10, 
-                                 code_length: int = 6, 
-                                 group_size: int = 6,
-                                 separator: str = "-") -> list:
-    """ 
-    
-    Takes an integer and creates a list containing x-numbers of 2FA
-    
-    """
-    if not isinstance(code_per_batch, str):
-        raise ValueError(f"The separtor must be a string. Expected a string but got object with type {type(code_per_batch)}")
-    return [generate_secure_recovery_code(code_length, group_size, separator) for _ in range(code_per_batch)]
-    
