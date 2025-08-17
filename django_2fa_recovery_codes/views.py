@@ -10,7 +10,7 @@ from django.core.cache import cache
 from django.db import IntegrityError
 
 from .models import RecoveryCodesBatch, Status
-from .views_helper import cache_lock, fetch_recovery_codes
+from .views_helper import fetch_recovery_codes
 from .utils.cache.safe_cache import get_cache, set_cache, delete_cache
 
 
