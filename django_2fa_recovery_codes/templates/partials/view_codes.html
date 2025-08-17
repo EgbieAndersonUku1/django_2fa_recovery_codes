@@ -98,6 +98,7 @@
 
     </div>
 
+    {% if recovery_state.is_generated %}
     <div id="code-actions">
         <div class="buttons flex-grid fourth-column-grid margin-top-lg" id="buttons-container">
             <button class="generate btn-medium padding-sm title bg-green text-white" type="button"
@@ -132,6 +133,8 @@
         </div>
 
     </div>
+
+    {% endif %}
 
 
 </section>

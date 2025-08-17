@@ -37,13 +37,13 @@ class RecoveryCodeAdmin(admin.ModelAdmin):
     list_display       = ["id", "status", "mark_for_deletion", "automatic_removal", "created_at", "modified_at"]
     list_display_links = ["id"]
     list_per_page      = 25
-    readonly_fields    = ["id", "created_at", "modified_at"]
+    readonly_fields    = ["id", "created_at", "modified_at", "hash_code", "days_to_expire"]
     list_filter        = ["automatic_removal", "status"]
     search_fields      = ["id", "status", "user__email", "user__username"]
 
     fieldsets = [
         ("Identification", {
-            "fields": ("id", "hash_code", "mark_for_deletion", "status", "days_to_expiry"),
+            "fields": ("id", "hash_code", "mark_for_deletion", "status", "days_to_expire"),
         }),
         ("Batch details", {
             "fields": ("batch", ),

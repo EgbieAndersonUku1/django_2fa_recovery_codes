@@ -1,13 +1,16 @@
 import { checkIfHTMLElement, 
-        showSpinnerFor, 
-        toggleSpinner,
+         showSpinnerFor, 
+         toggleSpinner,
          applyDashToInput, 
          sanitizeText, 
-         toggleButtonDisabled } from "./utils.js";
+         toggleButtonDisabled,
+         getCsrfToken } from "./utils.js";
 
 import { parseFormData } from "./form.js";
 import { AlertUtils } from "./alerts.js";
 import { logError, warnError } from "./logger.js";
+import fetchData from "./fetch.js";
+
 
 // Elements
 const recovryDashboardElement         = document.getElementById("recovery-dashboard");
@@ -15,7 +18,6 @@ const daysToExpiryGroupWrapperElement = document.getElementById("days-to-expiry-
 const navigationIconContainerElement  = document.getElementById("navigation-icon-elements");
 const generateCodeSectionElement      = document.getElementById("generate-code-section");
 
-console.log(generateCodeSectionElement)
 
 // spinner elements
 const generateCodeWithExirySpinnerElement    = document.getElementById("generate-code-loader");
@@ -102,6 +104,7 @@ const GENERATE_CODE_WITH_EXPIRY_BUTTON = "form-generate-code-btn";
 const GENERATE_CODE_WITH_NO_EXPIRY = "generate-code-with-no-expiry-btn";
 const OPEN_NAV_BAR_HAMBURGERR_ICON = "open-hamburger-nav-icon";
 const CLOSE_NAV_BAR_ICON = "close-nav-icon";
+const CSRF_TOKEN = getCsrfToken();
 
 
 
@@ -223,25 +226,34 @@ async function handleGenerateCodeWithExpiryClick(e) {
             };
 
 
-        const handleGenerateFetchApiWithExpiry = () => {
+       const handleGenerateFetchApiWithExpiry = async () => {
+             generateCodeWithExpiryFormElement.reset();
+            const url = "/2fa/recovery-codes/generate-with-expiry/";
 
-            // simulate fake fetch api - this will be handle by the backend
-            // for now we simuate a fake response and imagine it came from
-            // the backend
+            const resp = await fetchData({
+                url: url,
+                csrfToken: CSRF_TOKEN,
+                method: "POST",
+                body: {
+                    daysToExpiry: daysToExpiry
+                }
+            });
 
-            generateCodeWithExpiryFormElement.reset();
+            return resp; // or handle response here
+        
+           
 
-            const respData = {
-                TOTAL_ISSUED: 1,
-                TOTAL_USED: 0,
-                TOTAL_DEACTIVATED: 0,
-                TOTAL_REMOVED: 0,
-                TOTAL_DOWNLOADED: 0,
-                TOTAL_EMAILED: 0,
-                BATCH_REMOVED: 0,
-                SUCCESS: true,
-            }
-            return respData;
+            // const respData = {
+            //     TOTAL_ISSUED: 1,
+            //     TOTAL_USED: 0,
+            //     TOTAL_DEACTIVATED: 0,
+            //     TOTAL_REMOVED: 0,
+            //     TOTAL_DOWNLOADED: 0,
+            //     TOTAL_EMAILED: 0,
+            //     BATCH_REMOVED: 0,
+            //     SUCCESS: true,
+            // }
+            // return respData;
         }
        
         const resp = await handleButtonAlertClickHelper(e,
@@ -249,6 +261,9 @@ async function handleGenerateCodeWithExpiryClick(e) {
                                      generateCodeWithExirySpinnerElement,
                                      alertAttributes,
                                      handleGenerateFetchApiWithExpiry)
+
+        
+    
         if (resp.SUCCESS) {
             statsTotalCodesIssuedBoard.textContent = resp.TOTAL_ISSUED;
             toggleElement(generateCodeSectionElement);
@@ -961,7 +976,6 @@ function toggleSideBarIcon(navIconElement) {
 function toggleElement(element, hide = true) {
     if (hide) {
         element.classList.add("d-none");
-        console.log(element)
         return
     }
 

@@ -53,7 +53,8 @@ class RecoveryCodeCleanUpScheduler(models.Model):
 
 
 class RecoveryCodesBatch(models.Model):
-    id                = models.UUIDField(unique=True, db_index=True, primary_key=True, editable=False)
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True, db_index=True)
+
     number_issued     = models.PositiveBigIntegerField()
     number_removed    = models.PositiveBigIntegerField(default=0)
     user              = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name="recovery_batches")
@@ -65,11 +66,43 @@ class RecoveryCodesBatch(models.Model):
     deleted_at        = models.DateTimeField(null=True, blank=True)
     deleted_by        = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_batches")
 
+     # Action tracking
+    viewed            = models.BooleanField(default=False)
+    downloaded        = models.BooleanField(default=False)
+    emailed           = models.BooleanField(default=False)
+    generated         = models.BooleanField(default=False)
+
     class Meta:
         ordering = ["-created_at"]
 
     def __str__(self):
         return f"Batch {self.id} for {self.user or 'Deleted User'}"
+
+    def mark_viewed(self, save : bool = True):
+        self.viewed = True
+        self._update_field_helper(fields_list=['viewed'], save=save)
+
+    def mark_downloaded(self, save : bool = True):
+        self.downloaded = True
+        self._update_field_helper(fields_list=['downloaded'], save=save)
+
+    def mark_emailed(self, save: bool = True):
+        self.emailed = True
+        self._update_field_helper(fields_list=['emailed'], save=save)
+    
+    def mark_as_generated(self, save: bool = True):
+        self.generated = True
+        self._update_field_helper(fields_list=['generated'], save=save)
+    
+    def _update_field_helper(self, fields_list: list, save : bool = True):
+
+        if not isinstance(fields_list, list):
+            raise TypeError(f"Expected a list of fields but got {type(fields_list).__name__}")
+        if not isinstance(save, bool):
+            raise TypeError(f"Expected a bool object for save but got {type(save).__name__}")
+        
+        if save:
+            self.save(update_fields=fields_list)
     
     @classmethod
     def _if_async_supported_async_bulk_create_or_use_sync_bulk_crate(cls, batch: list):
@@ -83,7 +116,7 @@ class RecoveryCodesBatch(models.Model):
             RecoveryCode.objects.bulk_create(batch)
 
     @classmethod
-    def create_recovery_batch(cls, user, expiry_in_days: int = 0, batch_number: int = 10):
+    def create_recovery_batch(cls, user, days_to_expire: int = 0, batch_number: int = 10):
         """
         Creates a batch of recovery codes for a user, efficiently handling large batches.
         Uses async bulk_create if supported by the database.
@@ -96,13 +129,14 @@ class RecoveryCodesBatch(models.Model):
             raise TypeError(f"Expected User instance, got {type(user).__name__}")
         if not isinstance(batch_number, int):
             raise TypeError(f"Expected int for batch_number, got {type(batch_number).__name__}")
-        if expiry_in_days and not isinstance(expiry_in_days, int):
-            raise TypeError(f"Expected int for expiry_in_days, got {type(expiry_in_days).__name__}")
+        if days_to_expire and not isinstance(days_to_expire, int):
+            raise TypeError(f"Expected int for days_to_expire, got {type(days_to_expire).__name__}")
 
         # Create batch instance
         batch_instance = cls(user=user, number_issued=batch_number)
-        if expiry_in_days:
-            batch_instance.expiry_date = schedule_future_date(days=expiry_in_days)
+        if days_to_expire:
+            batch_instance.expiry_date = schedule_future_date(days=days_to_expire)
+        batch_instance.mark_as_generated(save=False)
         batch_instance.save()
 
         raw_codes = []
@@ -116,8 +150,8 @@ class RecoveryCodesBatch(models.Model):
             recovery_code = RecoveryCode(user=user, batch=batch_instance)
             recovery_code.hash_raw_code(raw_code)
 
-            if expiry_in_days:
-                recovery_code.days_to_expiry = expiry_in_days
+            if days_to_expire:
+                recovery_code.days_to_expire = days_to_expire
 
             raw_codes.append(raw_code)
             batch.append(recovery_code)
@@ -132,10 +166,10 @@ class RecoveryCodesBatch(models.Model):
            
         return raw_codes
 
-    def save(self, *args, **kwargs):
-        if not self.id:
-            self.id = uuid.uuid4()
-        super().save(*args, **kwargs)
+    # def save(self, *args, **kwargs):
+    #     if not self.id:
+    #         self.id = uuid.uuid4()
+    #     super().save(*args, **kwargs)
 
     @classmethod
     def delete_recovery_batch(cls, batch_id):
@@ -146,7 +180,8 @@ class RecoveryCodesBatch(models.Model):
 
 
 class RecoveryCode(models.Model):
-    id                = models.UUIDField(unique=True, db_index=True, primary_key=True, editable=False)
+    id                = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True, db_index=True)
+
     hash_code         = models.CharField(max_length=128, unique=True, db_index=True)
     mark_for_deletion = models.BooleanField(default=False)
     created_at        = models.DateTimeField(auto_now_add=True)
@@ -155,14 +190,17 @@ class RecoveryCode(models.Model):
     user              = models.ForeignKey(User, on_delete=models.CASCADE, related_name="recovery_codes")
     batch             = models.ForeignKey(RecoveryCodesBatch, on_delete=models.CASCADE, related_name="recovery_codes")
     automatic_removal = models.BooleanField(default=True)
-    days_to_expiry    = models.PositiveSmallIntegerField(default=0)
+    days_to_expire    = models.PositiveSmallIntegerField(default=0)
+    code_downloaded   = models.BooleanField(default=False)
+    code_emailed      = models.BooleanField(default=False)
+
 
     def __str__(self):
         """Returns a string representation of the class"""
 
         email = self.user.email
         return f"{email}" if self.user.email else self.id
-    
+  
     def mark_code_for_deletion(self, save: bool = True):
         """
         Marks this recovery code for deletion.

@@ -206,7 +206,17 @@ export function toggleButtonDisabled(buttonElement, disable = true) {
     if (!buttonElement || buttonElement.tagName !== "BUTTON") return; 
     
     buttonElement.disabled = disable;
-    
 }
 
+
+
+export function getCsrfToken() {
+    const csrfToken = document.getElementById("csrf_token");
+
+    if (csrfToken === null) {
+        return;
+    }
+
+    return csrfToken.content
+}
 
