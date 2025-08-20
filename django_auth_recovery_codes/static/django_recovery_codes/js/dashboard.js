@@ -13,14 +13,16 @@ import { AlertUtils } from "./alerts.js";
 import { logError, warnError } from "./logger.js";
 import fetchData from "./fetch.js";
 import { HTMLTableBuilder } from "./generateTable.js";
+import { generateCodeActionAButtons } from "./generateCodeActionButtons.js";
 
 
 // Elements
 const recovryDashboardElement = document.getElementById("recovery-dashboard");
 const daysToExpiryGroupWrapperElement = document.getElementById("days-to-expiry-group");
-const navigationIconContainerElement = document.getElementById("navigation-icon-elements");
-const generateCodeSectionElement = document.getElementById("generate-code-section");
-const codeTableElement = document.getElementById("table-code-view");
+const navigationIconContainerElement  = document.getElementById("navigation-icon-elements");
+const generateCodeSectionElement      = document.getElementById("generate-code-section");
+const codeTableElement             = document.getElementById("table-code-view");
+const codeActionContainerElement = document.getElementById("page-buttons");
 
 // spinner elements
 const generateCodeWithExirySpinnerElement = document.getElementById("generate-code-loader");
@@ -60,7 +62,29 @@ recovryDashboardElement.addEventListener("click", handleEventDelegation);
 
 
 // form elements event handlers
-generateCodeWithExpiryFormElement.addEventListener("submit", handleGenerateCodeWithExpiryFormSubmission);
+/**
+ * Prevents an error if the form is not present when the page loads.
+ * 
+ * Why this happens:
+ * The application behaves like a SPA (Single Page Application), 
+ * meaning parts of the page can be updated, changed, or removed 
+ * without a full page refresh.
+ * 
+ * How it affects this page:
+ * On initial load, a "generate code" form exists in the DOM and 
+ * allows the user to generate a recovery code with an expiry date. 
+ * After generating a code, the form is removed from the DOM via 
+ * Jinja template logic (if-statement) which takes into effect 
+ * when the page is refreshed. Since the form doesn't exist, 
+ * attempting to attach an event listener would cause an error.
+ */
+if (generateCodeSectionElement !== null) {
+    generateCodeWithExpiryFormElement.addEventListener("submit", 
+        handleGenerateCodeWithExpiryFormSubmission
+    );
+}
+
+
 invalidateInputFieldElement.addEventListener("input", handleInputFieldHelper);
 deleteInputFieldElement.addEventListener("input", handleInputFieldHelper);
 invalidateFormElement.addEventListener("click", handleInvalidateButtonClick)
@@ -1083,6 +1107,9 @@ function populateTableWithUserCodes(codes) {
             messageContainerElement.classList.remove("show");
             
             codeGenerationComplete();
+
+            // show the code action buttons
+            codeActionContainerElement.appendChild(generateCodeActionAButtons())
         }, MILLI_SECONDS)
 
     }
