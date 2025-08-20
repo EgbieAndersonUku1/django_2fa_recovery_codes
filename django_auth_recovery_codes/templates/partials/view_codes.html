@@ -61,26 +61,35 @@
 
     {% endif %}
 
-    {% if is_generated %}
+    <div id="page-buttons">
+
+    </div>
     
+    {% if is_generated %}
+
     <div id="code-actions">
         <div class="buttons flex-grid fourth-column-grid margin-top-lg" id="buttons-container">
-            <button class="generate btn-medium padding-sm title bg-green text-white" type="button"
-                id="regenerate-code-btn">
+
+            <button class="generate btn-medium padding-sm title bg-green text-white" type="button" id="regenerate-code-btn">
 
 
                 <span span class="loader" id="re-generate-code-loader"></span>
-                <span id="regennerate-code-span-text"> <i class="fa-solid fa-code"></i> Regenerate
-                    code</span>
+
+                <span id="regennerate-code-span-text"> 
+                    <i class="fa-solid fa-code"></i> Regenerate code
+                </span>
+
             </button>
+            
             <button class="generate btn-medium padding-sm title bg-green text-white" type="button" id="email-code-btn">
 
                 <span span class="loader" id="email-code-loader"></span>
-                <span id="email-code-span-text"> <i class="fa-solid fa-envelope"></i> Email code</span>
+                <span id="email-code-span-text"> 
+                    <i class="fa-solid fa-envelope"></i> Email code</span>
 
             </button>
-            <button class="generate btn-medium padding-sm title bg-red text-white" type="button"
-                id="delete-all-code-btn">
+
+            <button class="generate btn-medium padding-sm title bg-red text-white" type="button" id="delete-all-code-btn">
                 <span span class="loader" id="delete-all-code-loader"></span>
                 <span id="delete-code-span-text">
                     <i class="fa-solid fa-trash"></i>
@@ -88,11 +97,11 @@
                 </span>
 
             </button>
-            <button class="generate btn-medium padding-sm title bg-blue text-white" type="button"
-                id="download-code-btn">
+            <button class="generate btn-medium padding-sm title bg-blue text-white" type="button" id="download-code-btn">
                 <span span class="loader" id="download-code-loader"></span>
-                <span id="download-code-span-text"> <i class="fa-solid fa-envelope"></i> Download
-                    code</span>
+                <span id="download-code-span-text">
+                     <i class="fa-solid fa-envelope"></i> Download code
+                </span>
             </button>
         </div>
 
