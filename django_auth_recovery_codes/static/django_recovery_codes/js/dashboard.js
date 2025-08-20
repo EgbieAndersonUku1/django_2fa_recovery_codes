@@ -24,7 +24,6 @@ const generateCodeSectionElement      = document.getElementById("generate-code-s
 const codeTableElement             = document.getElementById("table-code-view");
 const codeActionContainerElement = document.getElementById("page-buttons");
 const tempGeneratedTableContainer = document.getElementById("generated-code-table");
-const buttonsContainerElement       = document.getElementById("buttons-container");
 
 
 // spinner elements
@@ -141,7 +140,7 @@ let alertMessage;
 
 
 // configuration
-const config = { CODE_IS_BEING_GENERATED: false };
+const config = { CODE_IS_BEING_GENERATED: false, generateCodeActionButtons: false };
 
 
 window.addEventListener("resize", handleResetDashboardState);
@@ -188,10 +187,12 @@ function handleEventDelegation(e) {
         case GENERATE_CODE_WITH_EXPIRY_BUTTON:
             codeIsBeingGenerated();
             handleGenerateCodeWithExpiryClick(e);
+            config.generateCodeActionButtons = true;
             break;
         case GENERATE_CODE_WITH_NO_EXPIRY:
             codeIsBeingGenerated();
             handleGenerateCodeWithNoExpiryClick(e);
+            config.generateCodeActionButtons = true;
             break;
         case EMAIL_BUTTON_ID:
             handleEmailCodeeButtonClick(e);
@@ -210,8 +211,10 @@ function handleEventDelegation(e) {
             }
     
             codeIsBeingGenerated();
-            toggleElement(alertMessage)
+            toggleElement(alertMessage);
             handleRegenerateCodeButtonClick(e);
+            config.REGENERATE_CODE_REQUEST = true;
+            
         case DELETE_CURRENT_CODE_BUTTON_ID:
             handleDeleteCodeeButtonClick(e);
             break;
@@ -1124,11 +1127,17 @@ function populateTableWithUserCodes(codes) {
             codeGenerationComplete();
 
             // show the code action buttons
+            if (config.generateCodeActionButtons) {
+                generateCodeActionAButtons();
+                codeActionContainerElement.appendChild(generateCodeActionAButtons());
+            }   
             console.log(generateCodeSectionElement);
 
             if (generateCodeSectionElement === null) {
                 codeActionContainerElement.innerHTML = "";
-                 codeActionContainerElement.appendChild(generateCodeActionAButtons());
+
+                 
+           
                  toggleElement(buttonsContainerElement );
                              
             }
@@ -1156,13 +1165,22 @@ async function markRecoveryCodesAsViewed(url = "/auth/recovery-codes/viewed/") {
 
 
 function pickRightDivAndPopulateTable(tableCodesElement) {
- 
-     if (codeTableElement) {
+    
+    if (config.generateCodeActionButtons) {
+        generateCodeActionAButtons();
+        codeActionContainerElement.appendChild(generateCodeActionAButtons());
+        config.generateCodeActionButtons = false;
+    }   
+    
+    if (codeTableElement) {
         codeTableElement.innerHTML = "";
         codeTableElement.appendChild(tableCodesElement);
         return;
     }
 
+
     tempGeneratedTableContainer.innerHTML = "";
     tempGeneratedTableContainer.appendChild(tableCodesElement);
+
+     
 }
