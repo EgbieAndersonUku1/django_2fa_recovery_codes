@@ -690,8 +690,17 @@ section {
 
 
 /* Utility class to hide elements */
+
+/* 
+  The `.is-hidden` utility class is a class-based selector applied via JS, rather than using inline styles. 
+  We use this approach instead of `element.style.display = "none"` so that the element's original display type 
+  (block, flex, inline-block, etc.) is preserved automatically when the class is removed.
+
+  The `!important` is included to ensure this rule takes precedence over any other conflicting 
+  CSS rules or inline styles, so the element is reliably hidden when required.
+*/
 .d-none {
-    display: none;
+    display: none!important;
 }
 
 .bold {

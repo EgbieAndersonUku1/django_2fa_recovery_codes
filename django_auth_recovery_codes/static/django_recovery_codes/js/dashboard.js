@@ -23,6 +23,9 @@ const navigationIconContainerElement  = document.getElementById("navigation-icon
 const generateCodeSectionElement      = document.getElementById("generate-code-section");
 const codeTableElement             = document.getElementById("table-code-view");
 const codeActionContainerElement = document.getElementById("page-buttons");
+const tempGeneratedTableContainer = document.getElementById("generated-code-table");
+const buttonsContainerElement       = document.getElementById("buttons-container");
+
 
 // spinner elements
 const generateCodeWithExirySpinnerElement = document.getElementById("generate-code-loader");
@@ -134,6 +137,9 @@ const OPEN_NAV_BAR_HAMBURGERR_ICON = "open-hamburger-nav-icon";
 const CLOSE_NAV_BAR_ICON = "close-nav-icon";
 
 
+let alertMessage;
+
+
 // configuration
 const config = { CODE_IS_BEING_GENERATED: false };
 
@@ -194,6 +200,17 @@ function handleEventDelegation(e) {
             handleIncludeExpiryDateCheckMark(e);
             break;
         case REGENERATE_BUTTON_ID:
+
+            // alert message is only generated when the first code is generated
+            // which means that it doesn't show up on initial load
+            // However, after it shows up we don't want recall from DOM
+            // if it already exists
+            if (!alertMessage) {
+                 alertMessage = document.getElementById("alert-message");
+            }
+    
+            codeIsBeingGenerated();
+            toggleElement(alertMessage)
             handleRegenerateCodeButtonClick(e);
         case DELETE_CURRENT_CODE_BUTTON_ID:
             handleDeleteCodeeButtonClick(e);
@@ -509,38 +526,28 @@ async function handleRegenerateCodeButtonClick(e) {
         text: "Doing this will remove your current codes. Are you sure you want to go ahead?",
         icon: "warning",
         cancelMessage: "No worries! Your codes are safe.",
-        messageToDisplayOnSuccess: "Awesome! Your new recovery codes are ready.",
+        messageToDisplayOnSuccess: `
+                Great! Your codes are being generated in the background and will be displayed in View Generated Codes section once ready.
+                You can continue using the app while we prepare them.
+                We’ll notify you once they’re ready.
+                Please, don't close the page.
+            `,
         confirmButtonText: "Yes, regenerate",
         denyButtonText: "No, keep my existing codes"
     }
 
+    toggleElement(alertMessage)
 
-    const handleGenerateCodeWithNoExpiryClickFetchAPI = () => {
-        const respData = {
-            TOTAL_ISSUED: 1,
-            TOTAL_USED: 0,
-            TOTAL_DEACTIVATED: 0,
-            TOTAL_REMOVED: 0,
-            TOTAL_DOWNLOADED: 0,
-            TOTAL_EMAILED: 0,
-            BATCH_REMOVED: 0,
-            SUCCESS: true,
-        }
-        return respData;
+    handleRecoveryCodesAction({
+            e:e,
+            generateCodeBtn: REGENERATE_BUTTON_ID,
+            generateCodeBtnSpinnerElement: generateCodeWithNoExpirySpinnerElement,
+            alertAttributes: alertAttributes,
+            url: "/auth/recovery-codes/regenerate/",
+           
+        })
+   
 
-
-    }
-    const resp = await handleButtonAlertClickHelper(e,
-        REGENERATE_BUTTON_ID,
-        regenerateButtonSpinnerElement,
-        alertAttributes,
-        handleGenerateCodeWithNoExpiryClickFetchAPI
-    )
-
-    if (resp.SUCCESS) {
-        statsTotalCodesIssuedBoard.textContent = resp.TOTAL_ISSUED;
-        toggleElement(generateCodeSectionElement)
-    }
 }
 
 
@@ -928,6 +935,7 @@ async function handleRecoveryCodesAction({e,
           
             statsTotalCodesIssuedBoard.textContent = resp.TOTAL_ISSUED;
             toggleElement(generateCodeSectionElement);
+           
             const isPopulated = populateTableWithUserCodes(resp.CODES);
            
             if (isPopulated) {
@@ -1067,6 +1075,12 @@ function toggleSideBarIcon(navIconElement) {
 
 
 function toggleElement(element, hide = true) {
+
+    if (!element || element === undefined || element === null) {
+        console.log("there is no elemnent")
+        return;
+    }
+
     if (hide) {
         element.classList.add("d-none");
         return
@@ -1090,8 +1104,9 @@ function populateTableWithUserCodes(codes) {
     const colHeaders = ["status", "codes"];
 
     const tableElement = HTMLTableBuilder(colHeaders, codes, tableObjectData);
-    codeTableElement.innerHTML = "";
-
+    
+   
+  
 
     if (tableElement) {
         messageContainerElement.classList.add("show");
@@ -1103,13 +1118,21 @@ function populateTableWithUserCodes(codes) {
             tableCoderSpinnerElement.style.display = "none"
 
             toggleSpinner(tableCoderSpinnerElement, false);
-            codeTableElement.appendChild(tableElement);
+            pickRightDivAndPopulateTable(tableElement)
             messageContainerElement.classList.remove("show");
             
             codeGenerationComplete();
 
             // show the code action buttons
-            codeActionContainerElement.appendChild(generateCodeActionAButtons())
+            console.log(generateCodeSectionElement);
+
+            if (generateCodeSectionElement === null) {
+                codeActionContainerElement.innerHTML = "";
+                 codeActionContainerElement.appendChild(generateCodeActionAButtons());
+                 toggleElement(buttonsContainerElement );
+                             
+            }
+           
         }, MILLI_SECONDS)
 
     }
@@ -1132,3 +1155,14 @@ async function markRecoveryCodesAsViewed(url = "/auth/recovery-codes/viewed/") {
 }
 
 
+function pickRightDivAndPopulateTable(tableCodesElement) {
+ 
+     if (codeTableElement) {
+        codeTableElement.innerHTML = "";
+        codeTableElement.appendChild(tableCodesElement);
+        return;
+    }
+
+    tempGeneratedTableContainer.innerHTML = "";
+    tempGeneratedTableContainer.appendChild(tableCodesElement);
+}

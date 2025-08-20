@@ -19,7 +19,7 @@ from django.conf import settings
 CACHE_KEY           = 'recovery_codes_generated_{}'
 MINUTES_IN_SECONDS  = 300
 
-TTL = getattr(settings, 'RECOVERY_CODES_CACHE_TTL', MINUTES_IN_SECONDS)
+TTL = getattr(settings, 'DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL', MINUTES_IN_SECONDS)
 TTL = TTL if isinstance(TTL, int) else MINUTES_IN_SECONDS
 
 
@@ -29,8 +29,15 @@ def recovery_codes_list(request):
     return HttpRequest("I am here")
 
 
+@require_http_methods(['POST'])
+@csrf_protect
+@login_required
 def recovery_codes_regenerate(request):
-    pass
+    """
+    When called by the fetch api it issues the user a new set of codes and invalidates their previous codes
+    """
+    return generate_recovery_code_fetch_helper(request, CACHE_KEY)
+   
 
 
 def recovery_codes_verify(request, code):
