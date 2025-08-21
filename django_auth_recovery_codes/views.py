@@ -1,4 +1,6 @@
-import json
+
+from logging import getLogger
+from django_q.tasks import async_task, result
 
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -6,12 +8,14 @@ from django.http import HttpRequest
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
-from django.core.cache import cache
-from django.db import IntegrityError
 
-from .models import RecoveryCodesBatch, Status
+from django.conf import settings
+
+
+from .models import RecoveryCodesBatch, RecoveryCodeEmailLog
 from .views_helper import fetch_recovery_codes, generate_recovery_code_fetch_helper
 from .utils.cache.safe_cache import get_cache, set_cache, delete_cache
+from .tasks import send_recovery_codes_email
 
 
 from django.conf import settings
@@ -22,11 +26,10 @@ MINUTES_IN_SECONDS  = 300
 TTL = getattr(settings, 'DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL', MINUTES_IN_SECONDS)
 TTL = TTL if isinstance(TTL, int) else MINUTES_IN_SECONDS
 
-
+SENDER_EMAIL =  settings.DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL
 # Create your views here.
 
-def recovery_codes_list(request):
-    return HttpRequest("I am here")
+logger = getLogger()
 
 
 @require_http_methods(['POST'])
@@ -47,6 +50,58 @@ def recovery_codes_verify(request, code):
 def deactivate_recovery_code(request, code):
     pass
 
+
+@require_http_methods(['POST'])
+@csrf_protect
+@login_required
+def email_recovery_codes(request):
+   
+    cache_data = get_cache(CACHE_KEY, fetch_func=lambda: fetch_recovery_codes(request.user), ttl=TTL)
+    resp       = {"SUCCESS": False, "MESSAGE": ""}
+
+    if cache_data and cache_data.get("emailed"):
+        resp.update({
+            "MESSAGE": "You have already emailed yourself a copy only copy is allowed by recovery batch",
+            "SUCCESS": True,
+        })
+        return JsonResponse(resp, status=200)
+
+    raw_codes = request.session.get("recovery_codes_state", {}).get("codes")
+    resp      = {"SUCCESS": False, "MESSAGE": ""}
+
+    if not raw_codes:
+        resp.update({
+            "MESSAGE": "Something went wrong and recovery codes weren't generated"
+        })
+        return JsonResponse(resp, status=400)
+
+    user = request.user
+    async_task(
+        send_recovery_codes_email,
+        SENDER_EMAIL,
+        user,
+        raw_codes,
+        hooks="django_auth_recovery_codes.hooks.is_email_sent"
+    )
+
+    recovery_batch = RecoveryCodesBatch.get_by_user(request.user)
+    recovery_batch.mark_as_emailed()
+
+    values_to_save_in_cache = {
+        "generated": recovery_batch.generated,
+        "downloaded": recovery_batch.downloaded,
+        "emailed": recovery_batch.emailed,
+        "viewed": recovery_batch.viewed
+    }
+
+    set_cache(CACHE_KEY, list(values_to_save_in_cache), TTL)
+
+    resp.update({
+        "MESSAGE": "Recovery codes email has been queued. We will notify you once they have been sent",
+        "SUCCESS": True,
+    })
+    return JsonResponse(resp, status=200)
+    
 
 
 @require_http_methods(['POST'])

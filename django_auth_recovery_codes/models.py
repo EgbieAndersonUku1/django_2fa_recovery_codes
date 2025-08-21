@@ -5,6 +5,7 @@ from django.contrib.auth.hashers import make_password, check_password
 from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django_email_sender.models import EmailBaseLog
 
 from django_auth_recovery_codes.utils.security.generator import generate_2fa_secure_recovery_code
 from django_auth_recovery_codes.utils.security.security import is_already_hashed
@@ -86,7 +87,7 @@ class RecoveryCodesBatch(models.Model):
         self.downloaded = True
         return self._update_field_helper(fields_list=['downloaded'], save=save)
 
-    def mark_emailed(self, save: bool = True):
+    def mark_as_emailed(self, save: bool = True):
         self.emailed = True
         return self._update_field_helper(fields_list=['emailed'], save=save)
     
@@ -302,3 +303,7 @@ class RecoveryCode(models.Model):
             self.hash_code = make_password(self.hash_code)
         super().save(*args, **kwargs)
 
+
+
+class RecoveryCodeEmailLog(EmailBaseLog):
+    pass

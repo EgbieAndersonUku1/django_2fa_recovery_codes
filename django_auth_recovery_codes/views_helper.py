@@ -87,8 +87,14 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
                     }
         
         # update the cache
+        values_to_save_in_cache = {
+            "generated": True,
+            "downloaded": False,
+            "emailed": False,
+            "viewed": False
+        }
         set_cache(cache_key.format(user.id),
-                  value=fetch_recovery_codes(user)
+                  value=list(values_to_save_in_cache)
                   )
 
     except IntegrityError as e:
