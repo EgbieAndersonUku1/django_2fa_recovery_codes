@@ -1,4 +1,6 @@
-import json
+
+from logging import getLogger
+from django_q.tasks import async_task, result
 
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -6,12 +8,14 @@ from django.http import HttpRequest
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
-from django.core.cache import cache
-from django.db import IntegrityError
 
-from .models import RecoveryCodesBatch, Status
+from django.conf import settings
+
+
+from .models import RecoveryCodesBatch, RecoveryCodeEmailLog
 from .views_helper import fetch_recovery_codes, generate_recovery_code_fetch_helper
 from .utils.cache.safe_cache import get_cache, set_cache, delete_cache
+from .tasks import send_recovery_codes_email
 
 
 from django.conf import settings
@@ -22,11 +26,10 @@ MINUTES_IN_SECONDS  = 300
 TTL = getattr(settings, 'DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL', MINUTES_IN_SECONDS)
 TTL = TTL if isinstance(TTL, int) else MINUTES_IN_SECONDS
 
-
+SENDER_EMAIL =  settings.DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL
 # Create your views here.
 
-def recovery_codes_list(request):
-    return HttpRequest("I am here")
+logger = getLogger()
 
 
 @require_http_methods(['POST'])
@@ -46,6 +49,29 @@ def recovery_codes_verify(request, code):
 
 def deactivate_recovery_code(request, code):
     pass
+
+
+
+@require_http_methods(['POST'])
+@csrf_protect
+@login_required
+def email_code(request):
+
+    raw_codes = request.session.get("recovery_codes_state").get("codes", None)
+    if not raw_codes:
+        # add something here
+        return 
+
+    user = request.user
+    task_id = async_task(send_recovery_codes_email,
+               SENDER_EMAIL,
+               user,
+               raw_codes,
+               hooks="django_auth_recovery_codes.hooks.is_email_sent"
+
+               )
+    
+
 
 
 
