@@ -572,32 +572,30 @@ async function handleEmailCodeeButtonClick(e) {
         text: "Would you like to email yourself the recovery codes?",
         icon: "info",
         cancelMessage: "No worries! Just make sure to copy or download the codes.",
-        messageToDisplayOnSuccess: "Awesome! Your new recovery codes have been emailed.",
+        messageToDisplayOnSuccess: "Awesome! Your request is being processed, please wait...",
         confirmButtonText: "Yes, email me",
         denyButtonText: "No, don't email"
     }
 
 
-    const handleEmailFetchApiSend = () => {
-        console.log("Fetching data...");
-        const respData = {
-            TOTAL_ISSUED: 1,
-            TOTAL_USED: 0,
-            TOTAL_DEACTIVATED: 0,
-            TOTAL_REMOVED: 0,
-            TOTAL_DOWNLOADED: 0,
-            TOTAL_EMAILED: 1,
-            BATCH_REMOVED: 0,
-            SUCCESS: true,
+    const handleEmailFetchApiSend = async () => {
+            const url = "/auth/recovery-codes/email/"
+            return  await sendPostFetchWithoutBody(url, "The email wasn't sent")
         }
-        return respData;
+      
+    const MILLI_SECONDS = 6000;
+    const resp = await handleButtonAlertClickHelper(e, EMAIL_BUTTON_ID, emailButtonSpinnerElement, alertAttributes, handleEmailFetchApiSend);
+
+    if (resp.SUCCESS) {
+        
+        showTemporaryMessage(messageContainerElement, resp.MESSAGE, MILLI_SECONDS)
+      
+    } else {
+           showTemporaryMessage(messageContainerElement, resp.MESSAGE, MILLI_SECONDS);
+         
 
     }
-    const resp = await handleButtonAlertClickHelper(e, EMAIL_BUTTON_ID, emailButtonSpinnerElement, alertAttributes, handleEmailFetchApiSend)
-    if (resp.SUCCESS) {
-        statsTotalCodesEmailedBoard.textContent = resp.TOTAL_EMAILED
-    }
-    console.log(resp)
+ 
 }
 
 
@@ -942,7 +940,9 @@ async function handleRecoveryCodesAction({e,
             const isPopulated = populateTableWithUserCodes(resp.CODES);
            
             if (isPopulated) {
-              markRecoveryCodesAsViewed();
+              sendPostFetchWithoutBody(url = "/auth/recovery-codes/viewed/",
+                                        msg = "Failed to mark code as viewed "
+              );
             }
            return true;
 
@@ -1150,16 +1150,28 @@ function populateTableWithUserCodes(codes) {
 }
 
 
-async function markRecoveryCodesAsViewed(url = "/auth/recovery-codes/viewed/") {
+
+/**
+ * Sends a POST request using fetch without a request body.
+ *
+ * This is useful for endpoints where the act of sending the request 
+ * itself is the trigger (e.g., logging out, sending recovery codes, 
+ * invalidating tokens), and no payload is required.
+ *
+ * @param {string} url - The target URL for the request.
+ * @param {string} [msg=""] - Optional message prefix to display in console warnings on error.
+ * @returns {Promise<void>} Resolves when the request completes, logs a warning on error.
+ */
+async function sendPostFetchWithoutBody(url, msg = "") {
    try {
-        await fetchData({
+        return await fetchData({
             url: url,
             csrfToken: getCsrfToken(),
             method: "POST",
             body: {}             // fetchData will handle stringifying and headers
         });
     } catch (error) {
-        console.warn("Failed to mark codes as viewed:", error);
+        console.warn(msg, error);
     }
 }
 
@@ -1183,4 +1195,24 @@ function pickRightDivAndPopulateTable(tableCodesElement) {
     tempGeneratedTableContainer.appendChild(tableCodesElement);
 
      
+}
+
+
+/**
+ * Shows a temporary message inside a container element and hides it after a specified duration.
+ *
+ * @param {HTMLElement} container - The container element that holds the message (e.g., a div).
+ * @param {string} message - The text content to display inside the container.
+ * @param {number} [duration=MILLI_SECONDS] - Optional. The time in milliseconds before the message is hidden. Defaults to MILLI_SECONDS.
+ *
+ * @example
+ * showTemporaryMessage(messageContainerElement, "Operation successful!", 3000);
+ */
+function showTemporaryMessage(container, message, duration = MILLI_SECONDS) {
+    container.classList.add("show");
+    container.querySelector("p").textContent = message;
+
+    setTimeout(() => {
+        container.classList.remove("show");
+    }, duration);
 }

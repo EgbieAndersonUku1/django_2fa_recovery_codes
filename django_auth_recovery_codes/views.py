@@ -51,28 +51,57 @@ def deactivate_recovery_code(request, code):
     pass
 
 
-
 @require_http_methods(['POST'])
 @csrf_protect
 @login_required
-def email_code(request):
+def email_recovery_codes(request):
+   
+    cache_data = get_cache(CACHE_KEY, fetch_func=lambda: fetch_recovery_codes(request.user), ttl=TTL)
+    resp       = {"SUCCESS": False, "MESSAGE": ""}
 
-    raw_codes = request.session.get("recovery_codes_state").get("codes", None)
+    if cache_data and cache_data.get("emailed"):
+        resp.update({
+            "MESSAGE": "You have already emailed yourself a copy only copy is allowed by recovery batch",
+            "SUCCESS": True,
+        })
+        return JsonResponse(resp, status=200)
+
+    raw_codes = request.session.get("recovery_codes_state", {}).get("codes")
+    resp      = {"SUCCESS": False, "MESSAGE": ""}
+
     if not raw_codes:
-        # add something here
-        return 
+        resp.update({
+            "MESSAGE": "Something went wrong and recovery codes weren't generated"
+        })
+        return JsonResponse(resp, status=400)
 
     user = request.user
-    task_id = async_task(send_recovery_codes_email,
-               SENDER_EMAIL,
-               user,
-               raw_codes,
-               hooks="django_auth_recovery_codes.hooks.is_email_sent"
+    async_task(
+        send_recovery_codes_email,
+        SENDER_EMAIL,
+        user,
+        raw_codes,
+        hooks="django_auth_recovery_codes.hooks.is_email_sent"
+    )
 
-               )
+    recovery_batch = RecoveryCodesBatch.get_by_user(request.user)
+    recovery_batch.mark_as_emailed()
+
+    values_to_save_in_cache = {
+        "generated": recovery_batch.generated,
+        "downloaded": recovery_batch.downloaded,
+        "emailed": recovery_batch.emailed,
+        "viewed": recovery_batch.viewed
+    }
+
+    set_cache(CACHE_KEY, list(values_to_save_in_cache), TTL)
+
+    resp.update({
+        "MESSAGE": "Recovery codes email has been queued. We will notify you once they have been sent",
+        "SUCCESS": True,
+    })
+    return JsonResponse(resp, status=200)
     
-
-
 
 
 @require_http_methods(['POST'])

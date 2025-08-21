@@ -87,7 +87,7 @@ class RecoveryCodesBatch(models.Model):
         self.downloaded = True
         return self._update_field_helper(fields_list=['downloaded'], save=save)
 
-    def mark_emailed(self, save: bool = True):
+    def mark_as_emailed(self, save: bool = True):
         self.emailed = True
         return self._update_field_helper(fields_list=['emailed'], save=save)
     
