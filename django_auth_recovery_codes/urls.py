@@ -1,7 +1,11 @@
 from django.urls import path
 from django_auth_recovery_codes import views
 
+from .sse import sse_notifications
+
 urlpatterns = [
+   
+    path("auth/recovery-codes/sse/notifications/", sse_notifications, name="recovery_codes_sse"),
     path("auth/recovery-codes/regenerate/", views.recovery_codes_regenerate, name="recovery_codes_regenerate"),
     path("recovery-codes/verify/", views.recovery_codes_verify, name="recovery_codes_verify"),
     path("auth/recovery-codes/email/", views.email_recovery_codes, name="email_recovery_codes"),

@@ -1087,9 +1087,10 @@ button {
 /*      FLOATING MESSAGE BOX FOR NOTIFICATIONS */
 /* ------------------------------------------ */
 
-#messages {
+#messages,
+#notification {
     position: fixed;
-    left: 20px;
+    left: 10px;
     bottom: 0;
     width: 30%;
     background: #28a745;
@@ -1100,6 +1101,9 @@ button {
     font-weight: 400;
     text-align: center;
     transform: translateY(100%);
+    border-left: 4px solid var(--red-primary);
+    box-shadow: var(--box-shadow-primary);
+    border-right: 2px solid var(--red-primary);
     box-shadow:
         rgba(0, 0, 0, 0.35) 0 5px 15px,
         rgb(38, 57, 77) 0 20px 30px -10px;
@@ -1122,8 +1126,17 @@ button {
 }
 
 /* Show animation: float up, hold, then slide down */
+#notification.show,
 #messages.show {
     animation: messageFloat 5s ease-in-out forwards;
+}
+
+
+
+.notification-status {
+    margin-right: var(--md-spacing);
+    border-right: 2px solid black;
+   
 }
 
 @keyframes messageFloat {

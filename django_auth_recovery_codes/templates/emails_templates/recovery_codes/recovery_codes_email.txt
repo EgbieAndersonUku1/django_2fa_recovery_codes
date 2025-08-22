@@ -1,0 +1,9 @@
+Hello {{ username }},
+
+Here are your recovery codes. Keep them safe, remember each one can only be used once:
+
+{% for status, value in codes %}
+- {{ value }}
+{% endfor %}
+
+If you did not request these codes, please ignore this message.

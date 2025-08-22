@@ -5,7 +5,9 @@ import {
     applyDashToInput,
     sanitizeText,
     toggleButtonDisabled,
-    getCsrfToken
+    getCsrfToken,
+    showTemporaryMessage,
+    showEnqueuedMessages,
 } from "./utils.js";
 
 import { parseFormData } from "./form.js";
@@ -14,6 +16,8 @@ import { logError, warnError } from "./logger.js";
 import fetchData from "./fetch.js";
 import { HTMLTableBuilder } from "./generateTable.js";
 import { generateCodeActionAButtons } from "./generateCodeActionButtons.js";
+import { notify_user } from "./notify.js";
+
 
 
 // Elements
@@ -105,7 +109,7 @@ deleteFormElement.addEventListener("blur", handleDeleteFormSubmission);
 
 // messages elements
 const messageContainerElement = document.getElementById("messages");
-const messagePTag = document.getElementById("message-p-tag");
+const messagePTag             = document.getElementById("message-p-tag");
 
 
 // navigation icon
@@ -134,6 +138,11 @@ const GENERATE_CODE_WITH_EXPIRY_BUTTON = "form-generate-code-btn";
 const GENERATE_CODE_WITH_NO_EXPIRY = "generate-code-with-no-expiry-btn";
 const OPEN_NAV_BAR_HAMBURGERR_ICON = "open-hamburger-nav-icon";
 const CLOSE_NAV_BAR_ICON = "close-nav-icon";
+const enqueueMessages = [];
+
+document.addEventListener("DOMContentLoaded", () => {
+    notify_user(enqueueMessages);
+});
 
 
 let alertMessage;
@@ -188,6 +197,7 @@ function handleEventDelegation(e) {
             codeIsBeingGenerated();
             handleGenerateCodeWithExpiryClick(e);
             config.generateCodeActionButtons = true;
+          
             break;
         case GENERATE_CODE_WITH_NO_EXPIRY:
             codeIsBeingGenerated();
@@ -587,11 +597,14 @@ async function handleEmailCodeeButtonClick(e) {
     const resp = await handleButtonAlertClickHelper(e, EMAIL_BUTTON_ID, emailButtonSpinnerElement, alertAttributes, handleEmailFetchApiSend);
 
     if (resp.SUCCESS) {
-        
-        showTemporaryMessage(messageContainerElement, resp.MESSAGE, MILLI_SECONDS)
+        enqueueMessages.push(resp.MESSAGE);
+        showEnqueuedMessages(enqueueMessages, messageContainerElement)
+        // showTemporaryMessage(messageContainerElement, resp.MESSAGE, MILLI_SECONDS)
       
     } else {
-           showTemporaryMessage(messageContainerElement, resp.MESSAGE, MILLI_SECONDS);
+        enqueueMessages.push(resp.MESSAGE)
+        showEnqueuedMessages(enqueueMessages, messageContainerElement)
+        // showTemporaryMessage(messageContainerElement, resp.MESSAGE, MILLI_SECONDS);
          
 
     }
@@ -940,8 +953,8 @@ async function handleRecoveryCodesAction({e,
             const isPopulated = populateTableWithUserCodes(resp.CODES);
            
             if (isPopulated) {
-              sendPostFetchWithoutBody(url = "/auth/recovery-codes/viewed/",
-                                        msg = "Failed to mark code as viewed "
+                sendPostFetchWithoutBody("/auth/recovery-codes/viewed/",
+                                             "Failed to mark code as viewed "
               );
             }
            return true;
@@ -949,7 +962,6 @@ async function handleRecoveryCodesAction({e,
         } else {
             messageContainerElement.classList.add("show");
             messageContainerElement.textContent = "Something went wrong and we couldn't generate your recovery codes"
-
             tableCoderSpinnerElement.style.display = "none";
             return false;
         }
@@ -1135,10 +1147,6 @@ function populateTableWithUserCodes(codes) {
 
             if (generateCodeSectionElement === null) {
                 codeActionContainerElement.innerHTML = "";
-
-                 
-           
-                 toggleElement(buttonsContainerElement );
                              
             }
            
@@ -1198,21 +1206,5 @@ function pickRightDivAndPopulateTable(tableCodesElement) {
 }
 
 
-/**
- * Shows a temporary message inside a container element and hides it after a specified duration.
- *
- * @param {HTMLElement} container - The container element that holds the message (e.g., a div).
- * @param {string} message - The text content to display inside the container.
- * @param {number} [duration=MILLI_SECONDS] - Optional. The time in milliseconds before the message is hidden. Defaults to MILLI_SECONDS.
- *
- * @example
- * showTemporaryMessage(messageContainerElement, "Operation successful!", 3000);
- */
-function showTemporaryMessage(container, message, duration = MILLI_SECONDS) {
-    container.classList.add("show");
-    container.querySelector("p").textContent = message;
 
-    setTimeout(() => {
-        container.classList.remove("show");
-    }, duration);
-}
+
