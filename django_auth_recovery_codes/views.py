@@ -1,3 +1,4 @@
+import threading
 
 from logging import getLogger
 from django_q.tasks import async_task, result
@@ -76,13 +77,21 @@ def email_recovery_codes(request):
         return JsonResponse(resp, status=400)
 
     user = request.user
-    async_task(
-        send_recovery_codes_email,
-        SENDER_EMAIL,
-        user,
-        raw_codes,
-        hooks="django_auth_recovery_codes.hooks.is_email_sent"
-    )
+
+    if settings.DEBUG:
+        # Development: uses threading for speed
+        threading.Thread(
+            target=send_recovery_codes_email,
+            args=(SENDER_EMAIL, user, raw_codes)
+        ).start()
+    else:
+        # Production: uses Django Q for reliability
+        async_task(
+            send_recovery_codes_email,
+            SENDER_EMAIL,
+            user,
+            raw_codes,
+        )
 
     recovery_batch = RecoveryCodesBatch.get_by_user(request.user)
     recovery_batch.mark_as_emailed()
@@ -94,7 +103,7 @@ def email_recovery_codes(request):
         "viewed": recovery_batch.viewed
     }
 
-    set_cache(CACHE_KEY, list(values_to_save_in_cache), TTL)
+    set_cache(CACHE_KEY, values_to_save_in_cache, TTL)
 
     resp.update({
         "MESSAGE": "Recovery codes email has been queued. We will notify you once they have been sent",
@@ -116,13 +125,18 @@ def marked_code_as_viewed(request):
     recovery_batch = RecoveryCodesBatch.get_by_user(user)
     resp           = {'SUCCESS': False, 'ERROR': ''}
 
-    print(recovery_batch)
     if recovery_batch:
-        is_marked = recovery_batch.mark_as_viewed()
-        print(is_marked)
-        if is_marked:
+        recovery_batch = recovery_batch.mark_as_viewed()
+      
+        if recovery_batch.viewed:
+            values_to_cache = {
+                "viewed": recovery_batch.viewed,
+                "downloaded": recovery_batch.downloaded,
+                "emailed": recovery_batch.emailed,
+                "generated": recovery_batch.generated,
+            }
             set_cache(CACHE_KEY.format(user.id),
-                    value=fetch_recovery_codes(user)[0]
+                    value=values_to_cache
                     )
             resp["SUCCESS"] = True
    

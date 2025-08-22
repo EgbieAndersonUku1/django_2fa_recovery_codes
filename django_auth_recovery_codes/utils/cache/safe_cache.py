@@ -1,5 +1,6 @@
 from django.core.cache import cache
 from contextlib import contextmanager
+from types import FunctionType, MethodType
 import time
 
 @contextmanager
@@ -23,7 +24,7 @@ def cache_lock(key: str, timeout: int = 5):
             cache.delete(lock_key)
 
 
-def get_cache(key: str, fetch_func, ttl: int = 300):
+def get_cache(key: str, fetch_func = None, ttl: int = 300):
     """
     Retrieve a value from cache, and populate it if missing using a fetch function.
 
@@ -35,24 +36,30 @@ def get_cache(key: str, fetch_func, ttl: int = 300):
     Returns:
         Any: The cached or freshly fetched value.
     """
-    value = cache.get(fetch_func())
+    if fetch_func and callable(fetch_func):
+        value = cache.get(fetch_func())
+    else:
+        value = cache.get(key)
 
     if value is None:
-        print("new request")
+      
         with cache_lock(key) as locked:
 
             if locked:
-                value = fetch_func()
 
-                if value and isinstance(value, list):
-                    value = value[0]
-                cache.set(key, value, ttl)
+                if fetch_func:
+                    value = fetch_func()
+
+                    if value and isinstance(value, list):
+                        value = value[0]
+                    cache.set(key, value, ttl)
             else:
                 # Another process is populating cache: try retrieving if not fallback
-                value = cache.get(key) or fetch_func()
-    else:
-        print("getting from the cache")
-        print(value)
+                if fetch_func:
+                    value = cache.get(key) or fetch_func()[0] 
+                else:
+                    value = cache.get(key) 
+   
     return value
 
 
