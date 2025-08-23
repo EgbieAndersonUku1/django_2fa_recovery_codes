@@ -13,7 +13,7 @@ from django.views.decorators.http import require_http_methods
 from django.conf import settings
 
 
-from .models import RecoveryCodesBatch, RecoveryCodeEmailLog
+from .models import RecoveryCodesBatch, RecoveryCodeEmailLog, Status
 from .views_helper import fetch_recovery_codes, generate_recovery_code_fetch_helper
 from .utils.cache.safe_cache import get_cache, set_cache, delete_cache
 from .tasks import send_recovery_codes_email
@@ -33,6 +33,7 @@ SENDER_EMAIL =  settings.DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL
 logger = getLogger()
 
 
+
 @require_http_methods(['POST'])
 @csrf_protect
 @login_required
@@ -50,6 +51,46 @@ def recovery_codes_verify(request, code):
 
 def deactivate_recovery_code(request, code):
     pass
+
+
+
+
+
+@require_http_methods(['POST'])
+@csrf_protect
+@login_required
+def mark_all_recovery_codes_as_pending_delete(request):
+    
+
+    resp   = RecoveryCodesBatch.delete_recovery_batch(request.user)
+    status = None
+    data   = { "SUCCESS": False, "MESSAGE": ""}
+    
+    # reset the cache values
+    if resp:
+        values_to_save_in_cache = {
+            "generated": False,
+            "downloaded": False,
+            "emailed": False,
+            "viewed": False,
+        }
+        
+        set_cache(CACHE_KEY, values_to_save_in_cache, TTL)
+
+        data.update({
+            "SUCCESS": True,
+            "MESSAGE": "Your recovery codes was successfully deleted"
+        })
+        status = 201
+       
+    else:
+    
+        data.update({
+            "MESSAGE": "Failed to delete recovery codes"
+        })
+        status = 400
+
+    return JsonResponse(data, status=status)
 
 
 @require_http_methods(['POST'])
@@ -128,7 +169,7 @@ def marked_code_as_viewed(request):
     if recovery_batch:
         recovery_batch = recovery_batch.mark_as_viewed()
       
-        if recovery_batch.viewed:
+        if recovery_batch and recovery_batch.viewed:
             values_to_cache = {
                 "viewed": recovery_batch.viewed,
                 "downloaded": recovery_batch.downloaded,
