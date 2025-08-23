@@ -104,8 +104,8 @@ class RecoveryCodesBatch(models.Model):
         
         if save:
             self.save(update_fields=fields_list)
-            return self # return the object itself 
-        return None
+            return self
+        return False
     
     @classmethod
     def _if_async_supported_async_bulk_create_or_use_sync_bulk_crate(cls, batch: list):
@@ -176,9 +176,34 @@ class RecoveryCodesBatch(models.Model):
 
 
     @classmethod
-    def delete_recovery_batch(cls, batch_id):
-        """"""
-        pass
+    def delete_recovery_batch(cls, user: "User"):
+        """
+        Marks all active recovery codes for the user's batch(es) as pending delete.
+        Returns True if at least one batch was updated, False otherwise.
+
+        Parameters:
+        user (User): The user associated with the recovery codes.
+
+        Notes:
+            This does not delete the recovery codes immediately.
+            They are marked for deletion and will be removed in batches
+            by a background task handled by django-q if needed.
+        """
+        
+        try:
+            recovery_batch = RecoveryCodesBatch.objects.prefetch_related('recovery_codes').get(user=user, status=Status.ACTIVE)
+        except cls.DoesNotExist:
+            return False
+        
+        recovery_batch.recovery_codes.update(status=Status.PENDING_DELETE)
+
+        recovery_batch.status=Status.PENDING_DELETE
+        recovery_batch.deleted_at=timezone.now()
+        recovery_batch.deleted_by=user
+        recovery_batch.number_removed = 10
+        recovery_batch.save()
+                                                
+        return recovery_batch
     
     @classmethod
     def get_by_user(cls, user, status=Status.ACTIVE):

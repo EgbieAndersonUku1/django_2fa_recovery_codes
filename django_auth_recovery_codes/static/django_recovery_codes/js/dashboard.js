@@ -43,7 +43,7 @@ const invalidateSpinnerElement = document.getElementById("invalidate-code-loader
 const tableCoderSpinnerElement = document.getElementById("table-loader");
 
 // button elements
-const generateButtonElement = document.getElementById("generate-code-button-wrapper");
+const generateButtonElement             = document.getElementById("generate-code-button-wrapper");
 
 
 
@@ -592,21 +592,17 @@ async function handleEmailCodeeButtonClick(e) {
             const url = "/auth/recovery-codes/email/"
             return  await sendPostFetchWithoutBody(url, "The email wasn't sent")
         }
-      
-    const MILLI_SECONDS = 6000;
+
     const resp = await handleButtonAlertClickHelper(e, EMAIL_BUTTON_ID, emailButtonSpinnerElement, alertAttributes, handleEmailFetchApiSend);
 
     if (resp.SUCCESS) {
         enqueueMessages.push(resp.MESSAGE);
         showEnqueuedMessages(enqueueMessages, messageContainerElement)
-        // showTemporaryMessage(messageContainerElement, resp.MESSAGE, MILLI_SECONDS)
       
     } else {
         enqueueMessages.push(resp.MESSAGE)
         showEnqueuedMessages(enqueueMessages, messageContainerElement)
-        // showTemporaryMessage(messageContainerElement, resp.MESSAGE, MILLI_SECONDS);
-         
-
+        
     }
  
 }
@@ -631,27 +627,22 @@ async function handlDeleteAllCodeButtonClick(e) {
         cancelMessage: "No worries! Your codes are safe.",
         messageToDisplayOnSuccess: "All your recovery codes have been deleted.",
         confirmButtonText: "Yes, delete existing codes",
-        denyButtonText: "No, don't delete my codes"
+        denyButtonText: "No, take me back"
     }
 
-    const handleDeleteAllCodeFetchApi = () => {
-        console.log("Deleted all codes")
-    }
+   
 
 
-    const handleDeleteAllCodesApiRequest = () => {
-        console.log("Fetching data...");
-        const respData = {
-            TOTAL_ISSUED: 1,
-            TOTAL_USED: 0,
-            TOTAL_DEACTIVATED: 0,
-            TOTAL_REMOVED: 1,
-            TOTAL_DOWNLOADED: 0,
-            TOTAL_EMAILED: 0,
-            BATCH_REMOVED: 0,
-            SUCCESS: true,
-        }
-        return respData;
+    const handleDeleteAllCodesApiRequest = async () => {
+       
+        const resp = await fetchData({
+                url: "/auth/recovery-codes/mark-batch-as-deleted/",
+                csrfToken: getCsrfToken(),
+                method: "POST",
+                body: {},
+            });
+
+            return resp;
 
     }
     const resp = await handleButtonAlertClickHelper(e,
@@ -661,9 +652,29 @@ async function handlDeleteAllCodeButtonClick(e) {
         handleDeleteAllCodesApiRequest,
     )
 
-    if (resp) {
+    if (resp.SUCCESS) {
         statsBatchCodesRemovedBoard.textContent = resp.TOTAL_REMOVED;
+        const codeActionButtons = document.getElementById("code-actions");
+        const tableCodes        = document.getElementById("table-code-view")
+        if (checkIfHTMLElement(codeActionButtons) && checkIfHTMLElement(tableCodes)) {
+            codeActionButtons.classList.add("d-none");
+            tableCodes.classList.add("d-none");
+
+           AlertUtils.showAlert({
+                title: "Code deletion successful",
+                text: "Your codes have been deleted. Refresh the page to generate new ones.",
+                icon: "success",
+                confirmButtonText: "OK"
+            })
+
+        } else {
+            warnError("handleDeleteAllCodeButtonClick", "The button container element wasn't found")
+        }
+        console.log(resp.MESSAGE)
+    } else {
+        console.log(resp.MESSAGE)
     }
+    console.log(resp)
 
 }
 
