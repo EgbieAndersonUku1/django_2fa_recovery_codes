@@ -91,9 +91,9 @@ def download_code(request):
     file_name      = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME", "recovery_codes")
 
     # Default filename and content
-    file_name        = "recovery_codes.txt"
-    response_content = b""
-    content_type     = "text/plain"
+    defaault_file_name = "recovery_codes.txt"
+    response_content   = b""
+    content_type       = "text/plain"
 
     match format_to_save:
 
@@ -112,6 +112,9 @@ def download_code(request):
             content_type     = "application/pdf"
    
 
+    if not file_name:
+        file_name = defaault_file_name
+        
     response = HttpResponse(response_content, content_type=content_type)
     response["Content-Disposition"] = f'attachment; filename="{file_name}"'
     response["X-Success"]           = "true"

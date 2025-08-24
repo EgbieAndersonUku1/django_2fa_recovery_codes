@@ -79,6 +79,7 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
         
         request.session["is_emailed"] = False
         request.session["is_downloaded"] = False
+
         # update the cache
         values_to_save_in_cache = {
             "generated": True,
@@ -91,10 +92,6 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
                   value=values_to_save_in_cache,
                   )
         
-
-       
-        # from django_auth_recovery_codes.utils.cache.safe_cache import get_cache_or_set
-        # print(get_cache_or_set(cache_key))
     except IntegrityError as e:
         resp["ERROR"] = str(e)
     except json.JSONDecodeError:
