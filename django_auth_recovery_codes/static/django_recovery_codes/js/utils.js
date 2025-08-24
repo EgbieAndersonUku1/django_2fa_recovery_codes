@@ -273,10 +273,11 @@ export async function showEnqueuedMessages(enqueueMessages, container, duration 
         return false;
     }
 
-
-    while (enqueueMessages.length) {
-   
+  
+    while (enqueueMessages.length > 0) {
+       
         const message = enqueueMessages.shift();
+     
         showTemporaryMessage(container, message,  duration);
         await sleep(stagger); // small stagger for animation
            
@@ -306,6 +307,61 @@ export function showTemporaryMessage(container, message, duration = 6000) {
     }, duration);
 
      return true;
+}
 
+
+/**
+ * Download a file from a Fetch Response object, with content-type validation.
+ *
+ * Also checks the `X-Success` header to determine if the server operation succeeded.
+ * Throws an error if the response is HTML, preventing accidental download of error pages.
+ *
+ * @param {Response} resp - The Fetch Response object from the server.
+ *
+ * @returns {Promise<{success: boolean, filename: string}>} Resolves with an object containing:
+ *   - success: boolean indicating whether the server reported success via `X-Success` header.
+ *   - filename: the name of the downloaded file.
+ *
+ * @throws {Error} If the response Content-Type is HTML, indicating a potential error page.
+ *
+ * @example
+ * const resp = await fetchData({ url: "/download-code/", returnRawResponse: true });
+ * const { success, filename } = await downloadFromResponse(resp);
+ * console.log("Download success:", success, "Filename:", filename);
+ */
+export async function downloadFromResponse(resp) {
+
+
+    const contentType = resp.headers.get("Content-Type") || "";
+
+    // Prevent downloading HTML pages which would likely result in error pages
+    if (contentType.includes("text/html")) {
+        const text = await resp.text();
+        throw new Error(`Unexpected HTML response detected:\n${text}`);
+    }
+
+    // Extract filename from headers
+    const disposition = resp.headers.get("Content-Disposition");
+    let filename      = "downloaded_file";
+
+    if (disposition && disposition.includes("filename=")) {
+        filename = disposition.split("filename=")[1].replace(/['"]/g, "");
+    }
+
+  
+    const success = resp.headers.get("X-Success") === "true";
+
+    // Convert response to Blob which would enable it to be downloaded
+    const blob = await resp.blob();
     
+    // Trigger download
+    const url  = window.URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = filename;
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+
+    return { success, filename };
 }

@@ -54,6 +54,8 @@ class RecoveryCodeCleanUpScheduler(models.Model):
 
 
 class RecoveryCodesBatch(models.Model):
+    CACHE_KEYS = ["generated", "downloaded", "emailed", "viewed"]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True, db_index=True)
 
     number_issued     = models.PositiveBigIntegerField()
@@ -78,12 +80,25 @@ class RecoveryCodesBatch(models.Model):
 
     def __str__(self):
         return f"Batch {self.id} for {self.user or 'Deleted User'}"
+    
+    def get_cache_values(self) -> dict:
+        """
+        Returns the current state of this batch for caching.
+        """
+        return {key: getattr(self, key) for key in self.CACHE_KEYS}
+
+    def reset_cache_values(self):
+        """
+        Resets all cache-related values to False.
+        """
+        for key in self.CACHE_KEYS:
+            setattr(self, key, False)
 
     def mark_as_viewed(self, save : bool = True):
         self.viewed = True
         return self._update_field_helper(fields_list=['viewed'], save=save)
 
-    def mark_downloaded(self, save : bool = True):
+    def mark_as_downloaded(self, save : bool = True):
         self.downloaded = True
         return self._update_field_helper(fields_list=['downloaded'], save=save)
 

@@ -36,10 +36,10 @@
 import { warnError } from "./logger.js";
 
 // Factory function to create button config
-function createButtonConfig({ idPrefix, color, icon, text }) {
+export function createButtonConfig({ idPrefix, color, icon, text }) {
   return {
     button: {
-      buttonClassList: ["generate", "btn-medium",  "padding-sm", "title", `bg-${color}`, "text-white"],
+      buttonClassList: ["generate", "btn-medium", "padding-sm", "title", `bg-${color}`, "text-white"],
       id: `${idPrefix}-btn`,
     },
     loader: { id: `${idPrefix}-loader`, class: "loader" },
@@ -53,7 +53,7 @@ function createButtonConfig({ idPrefix, color, icon, text }) {
 
 
 // Define all buttons// Define all buttons
-const buttons = {
+export const buttons = {
   regenerateCode: createButtonConfig({
     idPrefix: "regenerate-code",
     color: "green",
@@ -83,78 +83,114 @@ const buttons = {
 
 
 export function generateCodeActionAButtons() {
-    const divElement = document.createElement("div");
-    divElement.id    = "code-actions";
-    divElement.classList.add("buttons",  "flex-grid",  "fourth-column-grid",  "margin-top-lg")
+  const divElement = document.createElement("div");
+  divElement.id = "code-actions";
+  divElement.classList.add("buttons", "flex-grid", "fourth-column-grid", "margin-top-lg")
 
-    for (let button in buttons) {
-      const btnCode       = buttons[button];
-      const buttonElement = createCodeActionButton(btnCode);
-      divElement.appendChild(buttonElement);
-    
-    }
-    
-    return divElement;
+  for (let button in buttons) {
+    const btnCode = buttons[button];
+    const buttonElement = createCodeActionButton(btnCode);
+    divElement.appendChild(buttonElement);
+
+  }
+
+  return divElement;
 }
 
 
-function createCodeActionButton(buttonObject) {
-  
-    const buttonElement   = createButton(buttonObject)
-    const loaderElement   = createLoader(buttonObject);
-    const spanElement     = createSpanText(buttonObject);
-  
-    buttonElement.appendChild(loaderElement);
-    buttonElement.appendChild(spanElement);
-    return buttonElement
+export function createCodeActionButton(buttonObject) {
+
+  const buttonElement = createButton(buttonObject)
+  const loaderElement = createLoader(buttonObject);
+  const spanElement = createSpanText(buttonObject);
+
+  buttonElement.appendChild(loaderElement);
+  buttonElement.appendChild(spanElement);
+  return buttonElement
 }
 
 
-function createButton(buttonObject) {
-     const buttonElement   = document.createElement("button");
-     buttonElement.id      = buttonObject.button.id;
-     addClassesToElement(buttonElement, buttonObject.button.buttonClassList);
-     return buttonElement
+export function createButton(buttonObject) {
+  const buttonElement = document.createElement("button");
+  buttonElement.id = buttonObject.button.id;
+  addClassesToElement(buttonElement, buttonObject.button.buttonClassList);
+  return buttonElement
 
 }
 
 function createLoader(buttonObject) {
-   const loaderElement     = document.createElement("span");
-   loaderElement.id        = buttonObject.loader.id 
-   loaderElement.className = buttonObject.loader.class;
-   return loaderElement
+  const loaderElement = document.createElement("span");
+  loaderElement.id = buttonObject.loader.id
+  loaderElement.className = buttonObject.loader.class;
+  return loaderElement
 }
 
-function createSpanText(buttonObject) {
-    const spanElement        = document.createElement("span");
-    const fontAwesomIElement = document.createElement("i");
+export function createSpanText(buttonObject) {
+  const spanElement = document.createElement("span");
+  const fontAwesomIElement = document.createElement("i");
 
-    addClassesToElement(fontAwesomIElement, buttonObject.iconSpan.fontAwesomIElement);
-    spanElement.id = buttonObject.iconSpan.id;
+  addClassesToElement(fontAwesomIElement, buttonObject.iconSpan.fontAwesomIElement);
+  spanElement.id = buttonObject.iconSpan.id;
 
-    spanElement.appendChild(fontAwesomIElement);
-    spanElement.appendChild(document.createTextNode(buttonObject.iconSpan.textContent))
+  spanElement.appendChild(fontAwesomIElement);
+  spanElement.appendChild(document.createTextNode(buttonObject.iconSpan.textContent))
 
-    return spanElement;
+  return spanElement;
 }
 
 
 function addClassesToElement(element, selectorList) {
-    if (!element) {
-        warnError("addClassesToElement: The element provided is null or undefined.");
-        return;
-    }
+  if (!element) {
+    warnError("addClassesToElement: The element provided is null or undefined.");
+    return;
+  }
 
-    if (!Array.isArray(selectorList) || selectorList === undefined) {
-        warnError(`addClassesToElement: The selectorList provided is not an array, got ${typeof selectorList}`);
-        return;
-    }
+  if (!Array.isArray(selectorList) || selectorList === undefined) {
+    warnError(`addClassesToElement: The selectorList provided is not an array, got ${typeof selectorList}`);
+    return;
+  }
 
-    console.log("Adding selector elements to element");
-    selectorList.forEach((classSelector) => {
-        element.classList.add(classSelector);
-    });
+  console.log("Adding selector elements to element");
+  selectorList.forEach((classSelector) => {
+    element.classList.add(classSelector);
+  });
 }
 
 
 
+
+export const buttonStates = {
+  emailed: createButtonConfig({
+    idPrefix: "email-code",
+    color: "blue",
+    icon: "fa-ban",
+    text: "Emailed",
+  }),
+
+  downloaded: createButtonConfig({
+    idPrefix: "download-code",
+    color: "orange",
+    icon: "fa-ban",
+    text: "Downloaded",
+  }),
+
+  failed: createButtonConfig({
+    idPrefix: "failed-code",
+    color: "red",
+    icon: "fa-times",
+    text: "Failed",
+  }),
+};
+
+
+export function updateButtonFromConfig(btn, config, btnTitleMsg) {
+
+  btn.className = ""; // reset old classes
+  btn.classList.add(...config.button.buttonClassList);
+
+  btn.id = config.button.id;
+
+  btn.innerHTML = `<i class="${config.iconSpan.fontAwesomeClassSelector.join(' ')}"></i> ${config.iconSpan.textContent}`;
+  btn.title     = btnTitleMsg
+
+}

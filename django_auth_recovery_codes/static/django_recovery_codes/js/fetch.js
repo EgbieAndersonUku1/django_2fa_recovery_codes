@@ -9,13 +9,43 @@
  * @param {?string}  [params.csrfToken] - Optional CSRF token to include in the request headers.
  * @param {?Object}  [params.body]      - Request payload for POST method. Must be an object.
  * @param {string}   [params.method="POST"] - HTTP method to use ("POST" or "GET").
+ * @param {boolean}  [params.returnRawResponse=false] - If true, returns the raw fetch Response object 
+ *                                                     instead of parsing JSON. Useful for file downloads.
+ * 
  * 
  * @throws {Error} Throws if an invalid method is used, or if POST body is invalid, 
  *                 or if the server response is not ok.
  * 
  * @returns {Promise<Object>} Resolves with the parsed JSON data from the server response.
+ * 
+ * @example
+ * // JSON API call
+ * const data = await fetchData({
+ *     url: "/api/get-user/",
+ *     method: "POST",
+ *     body: { userId: 123 }
+ * });
+ * console.log(data); // Parsed JSON response
+ * 
+ * @example
+ * // File download
+ * const response = await fetchData({
+ *     url: "/download-code/",
+ *     method: "POST",
+ *     returnRawResponse: true
+ * });
+ * 
+ * const blob = await response.blob();
+ * const filename = response.headers.get("Content-Disposition")
+ *     .split("filename=")[1].replace(/['"]/g, "");
+ * 
+ * const a    = document.createElement("a");
+ * a.href     = URL.createObjectURL(blob);
+ * a.download = filename;
+ * 
+ * a.click();
  */
-export default async function fetchData({ url, csrfToken = null, body = null, method = "POST" }) {
+export default async function fetchData({ url, csrfToken = null, body = null, method = "POST", returnRawResponse = false }) {
 
     try {
 
@@ -51,7 +81,12 @@ export default async function fetchData({ url, csrfToken = null, body = null, me
         };
 
         const response = await fetch(url, options);
-        const data     = await response.json();
+
+        if (returnRawResponse) {
+            return response;
+        }
+
+        const data = await response.json();
 
         if (!response.ok) {
             console.log(`HTTP error! Status: ${response.status}`);

@@ -15,7 +15,7 @@ def send_recovery_codes_email(sender_email, user, codes, subject= "Your account 
         
             email_sender_logger.create() 
                 .add_email_sender_instance(EmailSender.create()) 
-                .start_logging_session()
+                # .start_logging_session()
                 .config_logger(logger, log_level=LoggerType.INFO)
                 .from_address(sender_email) 
                 .to(user.username) 
@@ -26,6 +26,7 @@ def send_recovery_codes_email(sender_email, user, codes, subject= "Your account 
                 .send()
             )
         notify_user(user.id, "Recovery codes email sent successfully!")
+        print("i am here inwie3 h343")
 
     except Exception as e:
         logger.error(f"Failed to send recovery codes: {e}")

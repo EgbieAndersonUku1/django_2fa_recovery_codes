@@ -8,6 +8,7 @@ import {
     getCsrfToken,
     showTemporaryMessage,
     showEnqueuedMessages,
+    downloadFromResponse
 } from "./utils.js";
 
 import { parseFormData } from "./form.js";
@@ -15,7 +16,7 @@ import { AlertUtils } from "./alerts.js";
 import { logError, warnError } from "./logger.js";
 import fetchData from "./fetch.js";
 import { HTMLTableBuilder } from "./generateTable.js";
-import { generateCodeActionAButtons } from "./generateCodeActionButtons.js";
+import { generateCodeActionAButtons, buttonStates, updateButtonFromConfig } from "./generateCodeActionButtons.js";
 import { notify_user } from "./notify.js";
 
 
@@ -23,9 +24,9 @@ import { notify_user } from "./notify.js";
 // Elements
 const recovryDashboardElement = document.getElementById("recovery-dashboard");
 const daysToExpiryGroupWrapperElement = document.getElementById("days-to-expiry-group");
-const navigationIconContainerElement  = document.getElementById("navigation-icon-elements");
-const generateCodeSectionElement      = document.getElementById("generate-code-section");
-const codeTableElement             = document.getElementById("table-code-view");
+const navigationIconContainerElement = document.getElementById("navigation-icon-elements");
+const generateCodeSectionElement = document.getElementById("generate-code-section");
+const codeTableElement = document.getElementById("table-code-view");
 const codeActionContainerElement = document.getElementById("page-buttons");
 const tempGeneratedTableContainer = document.getElementById("generated-code-table");
 
@@ -43,7 +44,7 @@ const invalidateSpinnerElement = document.getElementById("invalidate-code-loader
 const tableCoderSpinnerElement = document.getElementById("table-loader");
 
 // button elements
-const generateButtonElement             = document.getElementById("generate-code-button-wrapper");
+const generateButtonElement = document.getElementById("generate-code-button-wrapper");
 
 
 
@@ -85,7 +86,7 @@ recovryDashboardElement.addEventListener("click", handleEventDelegation);
  * attempting to attach an event listener would cause an error.
  */
 if (generateCodeSectionElement !== null) {
-    generateCodeWithExpiryFormElement.addEventListener("submit", 
+    generateCodeWithExpiryFormElement.addEventListener("submit",
         handleGenerateCodeWithExpiryFormSubmission
     );
 }
@@ -109,7 +110,7 @@ deleteFormElement.addEventListener("blur", handleDeleteFormSubmission);
 
 // messages elements
 const messageContainerElement = document.getElementById("messages");
-const messagePTag             = document.getElementById("message-p-tag");
+const messagePTag = document.getElementById("message-p-tag");
 
 
 // navigation icon
@@ -140,8 +141,10 @@ const OPEN_NAV_BAR_HAMBURGERR_ICON = "open-hamburger-nav-icon";
 const CLOSE_NAV_BAR_ICON = "close-nav-icon";
 const enqueueMessages = [];
 
+
 document.addEventListener("DOMContentLoaded", () => {
     notify_user(enqueueMessages);
+
 });
 
 
@@ -167,9 +170,9 @@ function codeGenerationComplete() {
 
 
 window.addEventListener("beforeunload", function (event) {
-  if (config.CODE_IS_BEING_GENERATED) {
+    if (config.CODE_IS_BEING_GENERATED) {
         event.preventDefault();
-        event.returnValue = ""; 
+        event.returnValue = "";
         return "";
     }
 });
@@ -190,14 +193,14 @@ function handleEventDelegation(e) {
     // Decide which element's ID to use:
     // Prefer buttonElement's id if it exists, otherwise use inputElement's id if exists, if not use the navigation elements id
     const elementID = buttonElement ? buttonElement.id : (inputElement ? inputElement.id : navigationIconElement.id);
- 
+
 
     switch (elementID) {
         case GENERATE_CODE_WITH_EXPIRY_BUTTON:
             codeIsBeingGenerated();
             handleGenerateCodeWithExpiryClick(e);
             config.generateCodeActionButtons = true;
-          
+
             break;
         case GENERATE_CODE_WITH_NO_EXPIRY:
             codeIsBeingGenerated();
@@ -217,14 +220,14 @@ function handleEventDelegation(e) {
             // However, after it shows up we don't want recall from DOM
             // if it already exists
             if (!alertMessage) {
-                 alertMessage = document.getElementById("alert-message");
+                alertMessage = document.getElementById("alert-message");
             }
-    
+
             codeIsBeingGenerated();
             toggleElement(alertMessage);
             handleRegenerateCodeButtonClick(e);
             config.REGENERATE_CODE_REQUEST = true;
-            
+
         case DELETE_CURRENT_CODE_BUTTON_ID:
             handleDeleteCodeeButtonClick(e);
             break;
@@ -315,7 +318,7 @@ async function handleGenerateCodeWithExpiryClick(e) {
 
 
         handleRecoveryCodesAction({
-            e:e,
+            e: e,
             generateCodeBtn: GENERATE_CODE_WITH_EXPIRY_BUTTON,
             generateCodeBtnSpinnerElement: generateCodeWithExirySpinnerElement,
             alertAttributes: alertAttributes,
@@ -357,14 +360,14 @@ async function handleGenerateCodeWithNoExpiryClick(e) {
     };
 
     handleRecoveryCodesAction({
-            e:e,
-            generateCodeBtn: GENERATE_CODE_WITH_NO_EXPIRY,
-            generateCodeBtnSpinnerElement: generateCodeWithNoExpirySpinnerElement,
-            alertAttributes: alertAttributes,
-            url: "/auth/recovery-codes/generate-without-expiry/",
-           
-        })
-   
+        e: e,
+        generateCodeBtn: GENERATE_CODE_WITH_NO_EXPIRY,
+        generateCodeBtnSpinnerElement: generateCodeWithNoExpirySpinnerElement,
+        alertAttributes: alertAttributes,
+        url: "/auth/recovery-codes/generate-without-expiry/",
+
+    })
+
 }
 
 
@@ -379,38 +382,58 @@ async function handleGenerateCodeWithNoExpiryClick(e) {
  */
 async function handleDownloadButtonClick(e) {
 
-    const MILLI_SECONDS = 5000;
-    const buttonElement = e.target
+    const buttonElement = e.target;
+    const MILLI_SECONDS = 3000;
 
-    showSpinnerFor(downloadCodeButtonElementSpinner, MILLI_SECONDS);
+    toggleSpinner(downloadCodeButtonElementSpinner);
     messageContainerElement.classList.add("show");
 
     toggleButtonDisabled(buttonElement)
 
     messagePTag.textContent = "Preparing your download... just a moment!";
 
-    setTimeout(() => {
+    const handleDownloadCodesApiRequest = async () => {
 
-        toggleButtonDisabled(buttonElement, false)
-        messageContainerElement.classList.remove("show");
+        const resp = await fetchData({
+            url: "/auth/recovery-codes/download-codes/",
+            csrfToken: getCsrfToken(),
+            method: "POST",
+            body: {},
+            returnRawResponse: true,
+        });
 
-        // fetch ap1
+        return resp;
 
-        // simulate fetch api
-        const respData = {
-            TOTAL_ISSUED: 0,
-            TOTAL_USED: 0,
-            TOTAL_DEACTIVATED: 0,
-            TOTAL_REMOVED: 0,
-            TOTAL_DOWNLOADED: 1,
-            TOTAL_EMAILED: 0,
-            BATCH_REMOVED: 0,
-            SUCCESS: true,
-        }
+    }
+    const resp = await handleButtonAlertClickHelper(e,
+        DOWNLOAD_CODE_BTN_ID,
+        {},
+        downloadCodeButtonElementSpinner,
+        handleDownloadCodesApiRequest,
+    )
 
-        statsTotalCodesDownloadedBoard.textContent = respData.TOTAL_DOWNLOADED;
+    const respData = await downloadFromResponse(resp)
 
-    }, MILLI_SECONDS)
+    if (respData.success) {
+
+        toggleButtonDisabled(buttonElement, false);
+        toggleSpinner(downloadCodeButtonElementSpinner, false)
+        showTemporaryMessage(messageContainerElement, "Your recovery codes have successfully been downloaded");
+
+        const btn = e.target.closest("button");
+        updateButtonFromConfig(btn, buttonStates.downloaded, "You have already downloaded this code");
+        toggleButtonDisabled(btn)
+
+     
+    } else {
+        warnError("handleDownloadButtonClick", "The button container element wasn't found");
+
+        toggleSpinner(downloadCodeButtonElementSpinner, false)
+        showTemporaryMessage(messageContainerElement, "Failed to download your recovery codes")
+
+    }
+
+
 
 
 }
@@ -552,14 +575,14 @@ async function handleRegenerateCodeButtonClick(e) {
     toggleElement(alertMessage)
 
     handleRecoveryCodesAction({
-            e:e,
-            generateCodeBtn: REGENERATE_BUTTON_ID,
-            generateCodeBtnSpinnerElement: generateCodeWithNoExpirySpinnerElement,
-            alertAttributes: alertAttributes,
-            url: "/auth/recovery-codes/regenerate/",
-           
-        })
-   
+        e: e,
+        generateCodeBtn: REGENERATE_BUTTON_ID,
+        generateCodeBtnSpinnerElement: generateCodeWithNoExpirySpinnerElement,
+        alertAttributes: alertAttributes,
+        url: "/auth/recovery-codes/regenerate/",
+
+    })
+
 
 }
 
@@ -576,35 +599,42 @@ async function handleRegenerateCodeButtonClick(e) {
  */
 async function handleEmailCodeeButtonClick(e) {
 
-
     const alertAttributes = {
-        title: "Email codes?",
+        title: "Email Recovery Codes?",
         text: "Would you like to email yourself the recovery codes?",
         icon: "info",
         cancelMessage: "No worries! Just make sure to copy or download the codes.",
-        messageToDisplayOnSuccess: "Awesome! Your request is being processed, please wait...",
+        messageToDisplayOnSuccess: "Awesome! Your recovery codes are on their way. We’ll notify you once the email is sent.",
         confirmButtonText: "Yes, email me",
-        denyButtonText: "No, don't email"
-    }
+        denyButtonText: "No, thanks"
+}
+
+
 
 
     const handleEmailFetchApiSend = async () => {
-            const url = "/auth/recovery-codes/email/"
-            return  await sendPostFetchWithoutBody(url, "The email wasn't sent")
-        }
+        const url = "/auth/recovery-codes/email/"
+        return await sendPostFetchWithoutBody(url, "The email wasn't sent")
+    }
 
     const resp = await handleButtonAlertClickHelper(e, EMAIL_BUTTON_ID, emailButtonSpinnerElement, alertAttributes, handleEmailFetchApiSend);
 
     if (resp.SUCCESS) {
+
+        const btn = e.target.closest("button");
+        updateButtonFromConfig(btn, buttonStates.emailed, "You have already emailed yourself this code");
+        toggleButtonDisabled(btn);
+
         enqueueMessages.push(resp.MESSAGE);
         showEnqueuedMessages(enqueueMessages, messageContainerElement)
-      
+
+     
     } else {
         enqueueMessages.push(resp.MESSAGE)
         showEnqueuedMessages(enqueueMessages, messageContainerElement)
-        
+
     }
- 
+
 }
 
 
@@ -630,19 +660,17 @@ async function handlDeleteAllCodeButtonClick(e) {
         denyButtonText: "No, take me back"
     }
 
-   
-
 
     const handleDeleteAllCodesApiRequest = async () => {
-       
-        const resp = await fetchData({
-                url: "/auth/recovery-codes/mark-batch-as-deleted/",
-                csrfToken: getCsrfToken(),
-                method: "POST",
-                body: {},
-            });
 
-            return resp;
+        const resp = await fetchData({
+            url: "/auth/recovery-codes/mark-batch-as-deleted/",
+            csrfToken: getCsrfToken(),
+            method: "POST",
+            body: {},
+        });
+
+        return resp;
 
     }
     const resp = await handleButtonAlertClickHelper(e,
@@ -657,12 +685,13 @@ async function handlDeleteAllCodeButtonClick(e) {
         const codeActionButtons = document.getElementById("code-actions");
         const tableCodes        = document.getElementById("table-code-view")
         if (checkIfHTMLElement(codeActionButtons) && checkIfHTMLElement(tableCodes)) {
-            codeActionButtons.classList.add("d-none");
-            tableCodes.classList.add("d-none");
-
+           
+            toggleElement(codeActionButtons);
+            toggleElement(tableCodes);
+         
            AlertUtils.showAlert({
-                title: "Code deletion successful",
-                text: "Your codes have been deleted. Refresh the page to generate new ones.",
+                title: "Codes Deleted",
+                text: "All your codes have been deleted. Refresh the page to generate new ones.",
                 icon: "success",
                 confirmButtonText: "OK"
             })
@@ -670,11 +699,8 @@ async function handlDeleteAllCodeButtonClick(e) {
         } else {
             warnError("handleDeleteAllCodeButtonClick", "The button container element wasn't found")
         }
-        console.log(resp.MESSAGE)
-    } else {
-        console.log(resp.MESSAGE)
-    }
-    console.log(resp)
+    
+    } 
 
 }
 
@@ -918,64 +944,63 @@ function handleInputFieldHelper(e) {
  * Throws:
  *   Error: If the fetch request fails unexpectedly.
  */
-async function handleRecoveryCodesAction({e,
-                                        generateCodeBtn,
-                                        generateCodeBtnSpinnerElement,
-                                        alertAttributes,   
-                                        url,
-                                        daysToExpiry = null
-                                        }) 
-        {
-        
-        const body = {};
+async function handleRecoveryCodesAction({ e,
+    generateCodeBtn,
+    generateCodeBtnSpinnerElement,
+    alertAttributes,
+    url,
+    daysToExpiry = null
+}) {
 
-        if (daysToExpiry !== null && typeof daysToExpiry === "number") {
-             body.daysToExpiry = daysToExpiry
+    const body = {};
+
+    if (daysToExpiry !== null && typeof daysToExpiry === "number") {
+        body.daysToExpiry = daysToExpiry
+    }
+
+
+    const handleGenerateCodeFetchApi = async () => {
+
+        const resp = await fetchData({
+            url: url,
+            csrfToken: getCsrfToken(),
+            method: "POST",
+            body: body,
+        });
+
+        return resp;
+    }
+
+    tableCoderSpinnerElement.style.display = "inline-block"
+    toggleSpinner(tableCoderSpinnerElement);
+
+    const resp = await handleButtonAlertClickHelper(e,
+        generateCodeBtn,
+        generateCodeBtnSpinnerElement,
+        alertAttributes,
+        handleGenerateCodeFetchApi
+    )
+
+    if (resp.SUCCESS) {
+
+        statsTotalCodesIssuedBoard.textContent = resp.TOTAL_ISSUED;
+        toggleElement(generateCodeSectionElement);
+
+        const isPopulated = populateTableWithUserCodes(resp.CODES);
+
+        if (isPopulated) {
+            sendPostFetchWithoutBody("/auth/recovery-codes/viewed/",
+                "Failed to mark code as viewed "
+            );
         }
-       
+        return true;
 
-        const handleGenerateCodeFetchApi = async () => {
-          
-            const resp = await fetchData({
-                url: url,
-                csrfToken: getCsrfToken(),
-                method: "POST",
-                body: body,
-            });
-
-            return resp;
-        }
-
-        tableCoderSpinnerElement.style.display = "inline-block"
-        toggleSpinner(tableCoderSpinnerElement);
-
-        const resp = await handleButtonAlertClickHelper(e,
-                                                        generateCodeBtn,
-                                                        generateCodeBtnSpinnerElement,
-                                                         alertAttributes,
-                                                        handleGenerateCodeFetchApi
-                                                       )
-
-        if (resp.SUCCESS) {
-          
-            statsTotalCodesIssuedBoard.textContent = resp.TOTAL_ISSUED;
-            toggleElement(generateCodeSectionElement);
-           
-            const isPopulated = populateTableWithUserCodes(resp.CODES);
-           
-            if (isPopulated) {
-                sendPostFetchWithoutBody("/auth/recovery-codes/viewed/",
-                                             "Failed to mark code as viewed "
-              );
-            }
-           return true;
-
-        } else {
-            messageContainerElement.classList.add("show");
-            messageContainerElement.textContent = "Something went wrong and we couldn't generate your recovery codes"
-            tableCoderSpinnerElement.style.display = "none";
-            return false;
-        }
+    } else {
+        messageContainerElement.classList.add("show");
+        messageContainerElement.textContent = "Something went wrong and we couldn't generate your recovery codes"
+        tableCoderSpinnerElement.style.display = "none";
+        return false;
+    }
 }
 
 
@@ -1025,16 +1050,20 @@ async function handleButtonAlertClickHelper(e, buttonElementID, buttonSpinnerEle
     await new Promise(requestAnimationFrame);
 
     try {
-        const resp = await AlertUtils.showConfirmationAlert({
-            title: alertAttributes.title,
-            text: alertAttributes.text,
-            icon: alertAttributes.icon,
-            cancelMessage: alertAttributes.cancelMessage,
-            messageToDisplayOnSuccess: alertAttributes.messageToDisplayOnSuccess,
-            confirmButtonText: alertAttributes.confirmButtonText,
-            denyButtonText: alertAttributes.denyButtonText
-        });
-
+        let resp;
+        if (alertAttributes !== null && Object.keys(alertAttributes).length > 0) {
+            resp = await AlertUtils.showConfirmationAlert({
+                title: alertAttributes.title,
+                text: alertAttributes.text,
+                icon: alertAttributes.icon,
+                cancelMessage: alertAttributes.cancelMessage,
+                messageToDisplayOnSuccess: alertAttributes.messageToDisplayOnSuccess,
+                confirmButtonText: alertAttributes.confirmButtonText,
+                denyButtonText: alertAttributes.denyButtonText
+            });
+        } else {
+            resp = true;
+        }
         if (resp) {
             if (func) {
                 return func()
@@ -1118,7 +1147,7 @@ function toggleElement(element, hide = true) {
 
 function populateTableWithUserCodes(codes) {
 
-   
+
 
     const tableObjectData = {
         classList: ["margin-top-lg"],
@@ -1130,9 +1159,9 @@ function populateTableWithUserCodes(codes) {
     const colHeaders = ["status", "codes"];
 
     const tableElement = HTMLTableBuilder(colHeaders, codes, tableObjectData);
-    
-   
-  
+
+
+
 
     if (tableElement) {
         messageContainerElement.classList.add("show");
@@ -1146,21 +1175,21 @@ function populateTableWithUserCodes(codes) {
             toggleSpinner(tableCoderSpinnerElement, false);
             pickRightDivAndPopulateTable(tableElement)
             messageContainerElement.classList.remove("show");
-            
+
             codeGenerationComplete();
 
             // show the code action buttons
             if (config.generateCodeActionButtons) {
                 generateCodeActionAButtons();
                 codeActionContainerElement.appendChild(generateCodeActionAButtons());
-            }   
+            }
             console.log(generateCodeSectionElement);
 
             if (generateCodeSectionElement === null) {
                 codeActionContainerElement.innerHTML = "";
-                             
+
             }
-           
+
         }, MILLI_SECONDS)
 
     }
@@ -1182,7 +1211,7 @@ function populateTableWithUserCodes(codes) {
  * @returns {Promise<void>} Resolves when the request completes, logs a warning on error.
  */
 async function sendPostFetchWithoutBody(url, msg = "") {
-   try {
+    try {
         return await fetchData({
             url: url,
             csrfToken: getCsrfToken(),
@@ -1196,13 +1225,13 @@ async function sendPostFetchWithoutBody(url, msg = "") {
 
 
 function pickRightDivAndPopulateTable(tableCodesElement) {
-    
+
     if (config.generateCodeActionButtons) {
         generateCodeActionAButtons();
         codeActionContainerElement.appendChild(generateCodeActionAButtons());
         config.generateCodeActionButtons = false;
-    }   
-    
+    }
+
     if (codeTableElement) {
         codeTableElement.innerHTML = "";
         codeTableElement.appendChild(tableCodesElement);
@@ -1213,7 +1242,7 @@ function pickRightDivAndPopulateTable(tableCodesElement) {
     tempGeneratedTableContainer.innerHTML = "";
     tempGeneratedTableContainer.appendChild(tableCodesElement);
 
-     
+
 }
 
 
