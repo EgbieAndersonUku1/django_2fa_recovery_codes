@@ -1,3 +1,4 @@
+import json
 import threading
 
 from logging import getLogger
@@ -9,9 +10,10 @@ from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
 from django.http import HttpResponse
 from django.conf import settings
+from typing import Tuple
 
-from .models import RecoveryCodesBatch, RecoveryCodeEmailLog, Status
-from .views_helper import  generate_recovery_code_fetch_helper
+from .models import RecoveryCodesBatch, RecoveryCode
+from .views_helper import  generate_recovery_code_fetch_helper, recovery_code_operation_helper
 from .utils.cache.safe_cache import get_cache_or_set, set_cache, get_with_retry, set_cache_with_retry
 from .tasks import send_recovery_codes_email
 from .utils.exporters.file_converters import to_csv, to_pdf, to_text
@@ -49,6 +51,57 @@ def deactivate_recovery_code(request, code):
     pass
 
 
+@require_http_methods(['POST'])
+@csrf_protect
+@login_required
+def invalidate_user_code(request):
+    """
+    Deactivate a recovery code for the currently logged-in user.
+
+    This view expects a POST request containing a JSON body with a 'code' key.
+    It uses a generic helper (`recovery_code_operation_helper`) to handle the
+    operation, including JSON parsing, error handling, and response formatting.
+
+    The internal function `invalidate_code` defines the operation logic:
+        - Retrieves the recovery code using `RecoveryCode.get_by_code`.
+        - If the code exists, it invalidates the code and updates the batch.
+        - Returns a tuple (success: bool, response_data: dict) indicating the result.
+
+    The `operation_name` attribute is set to "Deactivate" so the helper can
+    automatically generate meaningful success or failure messages if the internal
+    function does not provide one.
+
+    Returns:
+        JsonResponse: JSON response indicating whether the code was successfully
+        deactivated. The response contains 'SUCCESS' and may include additional
+        messages or errors.
+    """
+
+    def invalidate_code(plaintext_code: str) -> Tuple[bool, dict]:
+
+        response_data = {'SUCCESS': False}
+
+        recovery_code  = RecoveryCode.get_by_code(plaintext_code)
+
+        if not recovery_code:
+            return False, response_data
+
+        recovery_code.invalidate_code()
+        
+        recovery_batch = recovery_code.batch
+        recovery_batch.update_invalidate_code_count(save=True)
+
+        response_data.update({'SUCCESS': True})
+        
+        return True, response_data
+    
+    invalidate_code.operation_name = "Deactivate"  # Assign a custom attribute to the function for the helper to use
+    return recovery_code_operation_helper(request, invalidate_code)
+
+
+
+
+
 
 
 @require_http_methods(['POST'])
@@ -78,7 +131,6 @@ def download_code(request):
     raw_codes = request.session.get("recovery_codes_state", {}).get("codes", [])
 
     if raw_codes:
-        # request.session.get("recovery_codes_state").pop("codes")
         request.session["is_downloaded"] = True     # set to the session to be able to hide download button in the UI
 
     recovery_batch = RecoveryCodesBatch.get_by_user(user)
@@ -190,19 +242,13 @@ def email_recovery_codes(request):
     user = request.user
 
     if settings.DEBUG:
+
         # Development: uses threading for speed
-        threading.Thread(
-            target=send_recovery_codes_email,
-            args=(SENDER_EMAIL, user, raw_codes)
-        ).start()
+        threading.Thread(target=send_recovery_codes_email,args=(SENDER_EMAIL, user, raw_codes) ).start()
     else:
+
         # Production: uses Django Q for reliability
-        async_task(
-            send_recovery_codes_email,
-            SENDER_EMAIL,
-            user,
-            raw_codes,
-        )
+        async_task(send_recovery_codes_email, SENDER_EMAIL, user, raw_codes)
 
     recovery_batch = RecoveryCodesBatch.get_by_user(request.user)
     recovery_batch.mark_as_emailed()

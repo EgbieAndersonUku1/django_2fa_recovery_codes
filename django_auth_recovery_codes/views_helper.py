@@ -1,7 +1,8 @@
 import json
 from django.http import JsonResponse
 from django.db import IntegrityError
-from django.http import HttpRequest
+from django.http import HttpRequest 
+from typing import Callable, Tuple, Dict, Any
 
 
 
@@ -99,5 +100,57 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
     except Exception as e:
         resp["ERROR"] = str(e)
 
+
+
+
+def recovery_code_operation_helper(
+                                    request: HttpRequest,
+                                    func: Callable[[str], Tuple[bool, Dict[str, Any]]]
+                                ) -> JsonResponse:
+    """
+    Perform a generic operation on a recovery code (e.g., invalidate or remove).
+    
+    If the internal function does not provide a 'MESSAGE', this helper
+    will automatically create a default one using the function's
+    'operation_name' attribute (if set) or fallback to 'Code operation'.
+    """
+    
+    resp = {'SUCCESS': False, 'ERROR': '', 'MESSAGE': 'Code operation failed'}
+
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+    except json.JSONDecodeError:
+        resp["ERROR"] = "Invalid JSON body"
+        return JsonResponse(resp, status=400)
+
+    plaintext_code = data.get("code")
+    
+    if not plaintext_code:
+        resp["MESSAGE"] = "The plaintext code wasn't found in the JSON body"
+        return JsonResponse(resp, status=400)
+
+    if not callable(func):
+        raise ValueError("The function must be callable and take one parameter: (str)")
+
+    operation_name = getattr(func, "operation_name", "Code operation")  # Retrieve the operation name from the function, or use a default
+
+    try:
+        success, response_data = func(plaintext_code)
+
+        resp.update(response_data)
+        resp["SUCCESS"] = success
+
+        # Auto-generate MESSAGE if not provided
+        if "MESSAGE" not in resp or not resp["MESSAGE"]:
+            resp["MESSAGE"] = f"{operation_name} succeeded" if success else f"{operation_name} failed"
+
+    except IntegrityError as e:
+        resp["ERROR"] = str(e)
+    except Exception as e:
+        resp["ERROR"] = str(e)
+
     return JsonResponse(resp, status=201 if resp["SUCCESS"] else 400)
 
+
+
+ 
