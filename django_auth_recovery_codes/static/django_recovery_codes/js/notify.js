@@ -7,9 +7,11 @@ export function notify_user(enqueueMessages) {
    const es = new EventSource("/auth/recovery-codes/sse/notifications/");
 
 es.onmessage = (evt) => {
-  
-    enqueueMessages.push(evt.data);
-    showEnqueuedMessages(enqueueMessages, notificationContainer)
+    
+    if (evt.data) {
+        enqueueMessages.push(evt.data);
+        showEnqueuedMessages(enqueueMessages, notificationContainer);
+}
     
 };
 

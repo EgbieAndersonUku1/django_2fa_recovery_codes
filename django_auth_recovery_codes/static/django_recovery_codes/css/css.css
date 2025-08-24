@@ -296,6 +296,9 @@ xxxl - 64px
     background-color: var(--red-primary);
 }
 
+.bg-orange {
+     background-color: rgb(251, 146, 60); 
+}
 
 .bg-subtle-gray-with-padding {
     background: var(--primary-gray);

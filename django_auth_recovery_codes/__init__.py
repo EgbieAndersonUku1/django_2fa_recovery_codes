@@ -1,5 +1,4 @@
-from django_auth_recovery_codes.utils.cache.safe_cache import get_cache, set_cache
-
+from django_auth_recovery_codes.utils.cache.safe_cache import get_cache_or_set, set_cache
 
 
 def notify_user(user_id: int, message: str):
@@ -8,6 +7,13 @@ def notify_user(user_id: int, message: str):
     Stores messages in a queue so multiple notifications are preserved.
     """
     key = f"sse_user_{user_id}"
-    messages = get_cache(key, [])
-    messages.append(message)
-    set_cache(key, messages, timeout=60)
+
+    # Get existing messages or initialize empty list
+    messages = get_cache_or_set(key, lambda: [])
+
+    if message:
+        messages.append(message)
+
+    set_cache(key, messages, ttl=60)
+
+   

@@ -79,40 +79,48 @@
         You have already viewed these codes and cannot view them again.
     </p>
 
-  
-     {% endif %}
+
+    {% endif %}
 
 
     <div id="page-buttons">
 
     </div>
-    
+
     {% if is_generated %}
 
     <div id="code-actions">
         <div class="buttons flex-grid fourth-column-grid margin-top-lg" id="buttons-container">
 
-            <button class="generate btn-medium padding-sm title bg-green text-white" type="button" id="regenerate-code-btn">
+            <button class="generate btn-medium padding-sm title bg-green text-white" type="button"
+                id="regenerate-code-btn">
 
 
                 <span span class="loader" id="re-generate-code-loader"></span>
 
-                <span id="regennerate-code-span-text"> 
+                <span id="regennerate-code-span-text">
                     <i class="fa-solid fa-code"></i> Regenerate code
                 </span>
 
             </button>
-            
-            <button class="generate btn-medium padding-sm title bg-green text-white" type="button" id="email-code-btn">
 
-                <span span class="loader" id="email-code-loader"></span>
-                <span id="email-code-span-text"> 
-                    <i class="fa-solid fa-envelope"></i> Email code</span>
-
+            <button class="generate btn-medium padding-sm title 
+                     {% if request.session.is_emailed %} bg-blue {% else %} bg-green {% endif %} 
+                        text-white" type="button" id="email-code-btn" {% if request.session.is_emailed %} disabled
+                title="You have already emailed your recovery codes." {% endif %}>
+                <span class="loader" id="email-code-loader"></span>
+                <span id="email-code-span-text">
+                    {% if request.session.is_emailed %}
+                    <i class="fa-solid fa-ban"></i> Emailed
+                    {% else %}
+                    <i class="fa-solid fa-envelope"></i> Email code
+                    {% endif %}
+                </span>
             </button>
 
-        
-            <button class="generate btn-medium padding-sm title bg-red text-white" type="button" id="delete-all-code-btn">
+
+            <button class="generate btn-medium padding-sm title bg-red text-white" type="button"
+                id="delete-all-code-btn">
                 <span span class="loader" id="delete-all-code-loader"></span>
                 <span id="delete-code-span-text">
                     <i class="fa-solid fa-trash"></i>
@@ -120,14 +128,24 @@
                 </span>
 
             </button>
-        
 
-            <button class="generate btn-medium padding-sm title bg-blue text-white" type="button" id="download-code-btn">
-                <span span class="loader" id="download-code-loader"></span>
+            <button class="generate btn-medium padding-sm title 
+                    {% if request.session.is_downloaded %} bg-orange {% else %} bg-blue {% endif %}
+                    text-white" type="button" id="download-code-btn"
+                {% if request.session.is_downloaded %} disabled title="You have already downloaded your recovery codes."
+                {% endif %}
+                >
+                <span class="loader" id="download-code-loader"></span>
                 <span id="download-code-span-text">
-                     <i class="fa-solid fa-envelope"></i> Download code
+                    {% if request.session.is_downloaded %}
+                    <i class="fa-solid fa-ban"></i> Downloaded
+                    {% else %}
+                    <i class="fa-solid fa-envelope"></i> Download code
+                    {% endif %}
                 </span>
             </button>
+
+
         </div>
 
     </div>

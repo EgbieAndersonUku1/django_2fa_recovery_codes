@@ -3,20 +3,11 @@ from django.http import JsonResponse
 from django.db import IntegrityError
 from django.http import HttpRequest
 
+
+
 from .models import RecoveryCodesBatch, Status
-from .utils.cache.safe_cache import set_cache
+from .utils.cache.safe_cache import set_cache_with_retry,  get_cache_or_set
 
-
-
-def fetch_recovery_codes(user):
-    """Query database for active recovery codes."""
-
-    return list(RecoveryCodesBatch.objects.filter(user=user,   
-                                                  status=Status.ACTIVE).values("generated", 
-                                                                               "downloaded",
-                                                                                "emailed", 
-                                                                                 "viewed",))
- 
 
  
 def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  generate_with_expiry_date: bool = False):
@@ -86,6 +77,9 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
                         "codes": raw_codes,
                     }
         
+        request.session["is_emailed"] = False
+        request.session["is_downloaded"] = False
+
         # update the cache
         values_to_save_in_cache = {
             "generated": True,
@@ -93,10 +87,11 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
             "emailed": False,
             "viewed": False
         }
-        set_cache(cache_key.format(user.id),
-                  value=values_to_save_in_cache
+        
+        set_cache_with_retry(cache_key.format(user.id),
+                  value=values_to_save_in_cache,
                   )
-
+        
     except IntegrityError as e:
         resp["ERROR"] = str(e)
     except json.JSONDecodeError:
