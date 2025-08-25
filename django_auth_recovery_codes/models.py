@@ -58,16 +58,17 @@ class RecoveryCodesBatch(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True, db_index=True)
 
-    number_issued     = models.PositiveBigIntegerField()
-    number_removed    = models.PositiveBigIntegerField(default=0)
-    user              = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name="recovery_batches")
-    created_at        = models.DateTimeField(auto_now_add=True)
-    modified_at       = models.DateTimeField(auto_now=True)
-    status            = models.CharField(choices=Status, max_length=1, default=Status.ACTIVE)
-    automatic_removal = models.BooleanField(default=True)
-    expiry_date       = models.DateTimeField(blank=True, null=True)
-    deleted_at        = models.DateTimeField(null=True, blank=True)
-    deleted_by        = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_batches")
+    number_issued      = models.PositiveSmallIntegerField(default=10)
+    number_removed     = models.PositiveSmallIntegerField(default=0)
+    number_invalidated = models.PositiveSmallIntegerField(default=0)
+    user               = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name="recovery_batches")
+    created_at         = models.DateTimeField(auto_now_add=True)
+    modified_at        = models.DateTimeField(auto_now=True)
+    status             = models.CharField(choices=Status, max_length=1, default=Status.ACTIVE)
+    automatic_removal  = models.BooleanField(default=True)
+    expiry_date        = models.DateTimeField(blank=True, null=True)
+    deleted_at         = models.DateTimeField(null=True, blank=True)
+    deleted_by         = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_batches")
 
      # Action tracking
     viewed            = models.BooleanField(default=False)
@@ -81,6 +82,63 @@ class RecoveryCodesBatch(models.Model):
     def __str__(self):
         return f"Batch {self.id} for {self.user or 'Deleted User'}"
     
+    def update_invalidate_code_count(self, save = False) -> "RecoveryCode":
+        """
+        Increment the count of invalidated codes by 1.
+
+        This method ensures consistent updates to the invalidated code count.
+        Optionally, it can save the instance immediately if `save` is True; 
+        otherwise, the update is deferred, allowing additional operations before saving.
+
+        Parameters
+        ----------
+        save (bool), default=False
+            If True, saves the instance immediately after incrementing.  
+            If False, the update is performed in memory and can be saved later.
+
+        Raises
+
+        TypeError
+            If `save` is not a boolean.
+
+        Returns
+       
+        RecoveryCode
+            Returns self to allow method chaining.
+
+        Notes
+        -----
+        This can also be done in the views like this:
+
+            # views.py
+
+            >>> recovery_code_batch = RecoveryCodeBatch.get_by_user(user='eu')
+            >>> recovery_code_batch.number_invalidated += 1
+            >>> recovery_code.save()
+
+        However this can also introduce errors because anyone working in the views can introduce errors e.g
+            >>> recovery_code.number_invalidated += 2  # mistake
+            >>> recovery_code.save()
+
+        - Using this method prevents accidental mis-increments in views (e.g., adding 2 instead of 1).  
+        - Encourages encapsulation of business logic in the model rather than in views.
+
+        Example
+        -------
+        >>> recovery_code.update_invalidate_code_count(save=True)  # increments by 1 safely
+        >>> recovery_code.update_invalidate_code_count().save()   # deferred save, also increments by 1 and not increase accidently
+        """
+       
+        if not isinstance(save, bool):
+            raise TypeError(f"Expected the save parameter to be a boolean instance but got object with type {type(save).__name__}")
+        
+        self.number_invalidated += 1
+
+        if save:
+            self.save()
+
+        return self
+
     def get_cache_values(self) -> dict:
         """
         Returns the current state of this batch for caching.
@@ -325,10 +383,42 @@ class RecoveryCode(models.Model):
         return True
 
     @classmethod
-    def get_by_code(cls, code: str) -> str:
+    def get_by_code(cls, code: str) -> "RecoveryCode":
+        """
+        Retrieve the RecoveryCode instance associated with a given plaintext code.
+
+        The model stores only hashed codes. This method hashes the provided plaintext code
+        and uses it to looks up the corresponding model instance.
+
+        :Parameters
+            code (str):  The plaintext code to be hashed and checked against the database.
+
+        :Returns
+            
+            RecoveryCode or None
+                Returns the corresponding RecoveryCode instance if found, or None if no matching code exists.
+
+        Notes
+           
+            - The lookup is performed using the hashed code, not the plaintext.
+            - If the provided `code` is not a string, a ValueError is raised.
+            - Uses `select_related('batch')` to efficiently fetch the related batch in the same query.
+
+         Example
+            -------
+            >>> recovery_code = RecoveryCode.get_by_code("ABC123")  # Fetches the code and batch in one query
+            >>> if recovery_code:
+            >>>     print(recovery_code.batch)  # No additional query; batch is already loaded
+        """
         if not isinstance(code, str):
             raise ValueError(f"The code parameter is not a string. Expected a string but got an object with type {type(code)}")
-        return make_password(code)
+        
+        hashed_code = make_password(code.strip())
+
+        try:
+            return cls.objects.select_related("batch").get(hash_code=hashed_code)
+        except cls.DoesNotExist:
+            return None
     
     def hash_raw_code(self, code: str):
         if code:
