@@ -447,7 +447,7 @@ Example: This will create a flex container with items aligned to the right
 input {
     text-align: center;
     border: 1px solid black;
-    font-size: 1.25rem;
+    font-size: 1.1rem;
     font-family: 'Fira Code', monospace;
     letter-spacing: 0.1rem;
     padding: 0.5rem;

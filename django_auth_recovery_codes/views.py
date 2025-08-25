@@ -86,14 +86,14 @@ def delete_recovery_code(request):
         response_data = {'SUCCESS': False}
 
         recovery_code  = RecoveryCode.get_by_code(plaintext_code)
-       
+        print("I am here")
         if not recovery_code:
             return False, response_data
 
         recovery_code.delete_code()
         
         recovery_batch = recovery_code.batch
-        recovery_batch.update_delete_code_count(save=True)
+        recovery_batch.update_delete_code_count()
 
         response_data.update({'SUCCESS': True})
     
@@ -134,14 +134,14 @@ def invalidate_user_code(request):
         response_data = {'SUCCESS': False}
 
         recovery_code  = RecoveryCode.get_by_code(plaintext_code)
-       
+        
         if not recovery_code:
             return False, response_data
 
         recovery_code.invalidate_code()
         
         recovery_batch = recovery_code.batch
-        recovery_batch.update_invalidate_code_count(save=True)
+        recovery_batch.update_invalidate_code_count(0)
 
         response_data.update({'SUCCESS': True})
     
