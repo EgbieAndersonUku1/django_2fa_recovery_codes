@@ -93,7 +93,7 @@ def delete_recovery_code(request):
         recovery_code.delete_code()
         
         recovery_batch = recovery_code.batch
-        recovery_batch.update_invalidate_code_count(save=True)
+        recovery_batch.update_delete_code_count(save=True)
 
         response_data.update({'SUCCESS': True})
     
