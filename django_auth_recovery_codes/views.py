@@ -47,8 +47,60 @@ def recovery_codes_verify(request, code):
     pass
 
 
-def deactivate_recovery_code(request, code):
-    pass
+@require_http_methods(['POST'])
+@csrf_protect
+@login_required
+def delete_recovery_code(request):
+    """
+    Deletes a recovery code for the currently logged-in user.
+
+    This view expects a POST request containing a JSON body with a 'code' key.
+    It uses a generic helper (`recovery_code_operation_helper`) to handle the
+    operation, including JSON parsing, error handling, and response formatting.
+
+    The internal function `delete_code` defines the operation logic:
+        - Retrieves the recovery code using `RecoveryCode.get_by_code`.
+        - If the code exists, it delets the code and updates the batch.
+        - Returns a tuple (success: bool, response_data: dict) indicating the result.
+
+   **Note**  
+    - Recovery codes are not deleted immediately. Instead, they are marked for deletion 
+      and processed by a background task.  
+    - This approach provides a smoother user experience by avoiding delays in the UI.  
+    - It also reduces the risk of database contention or performance issues if many users
+      attempt to delete codes at the same time.  
+
+
+    The `operation_name` attribute is set to "Delete" so the helper can
+    automatically generate meaningful success or failure messages if the internal
+    function does not provide one.
+
+    Returns:
+        JsonResponse: JSON response indicating whether the code was successfully
+        deactivated. The response contains 'SUCCESS' and may include additional
+        messages or errors.
+    """
+
+    def delete_code(plaintext_code: str) -> Tuple[bool, dict]:
+
+        response_data = {'SUCCESS': False}
+
+        recovery_code  = RecoveryCode.get_by_code(plaintext_code)
+       
+        if not recovery_code:
+            return False, response_data
+
+        recovery_code.delete_code()
+        
+        recovery_batch = recovery_code.batch
+        recovery_batch.update_invalidate_code_count(save=True)
+
+        response_data.update({'SUCCESS': True})
+    
+        return True, response_data
+    
+    delete_code.operation_name = "Deactivate"  # Assign a custom attribute to the function for the helper to use
+    return recovery_code_operation_helper(request, delete_code)
 
 
 @require_http_methods(['POST'])
@@ -97,11 +149,6 @@ def invalidate_user_code(request):
     
     invalidate_code.operation_name = "Deactivate"  # Assign a custom attribute to the function for the helper to use
     return recovery_code_operation_helper(request, invalidate_code)
-
-
-
-
-
 
 
 @require_http_methods(['POST'])
