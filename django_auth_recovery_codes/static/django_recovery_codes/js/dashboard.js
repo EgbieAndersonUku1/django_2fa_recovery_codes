@@ -517,6 +517,9 @@ async function handleInvalidateButtonClick(e) {
 async function handleDeleteCodeeButtonClick(e) {
 
     const formData = await handleDeleteFormSubmission(e);
+    if (!formData) return;
+
+    const code = formData.deleteCode;
 
     if (formData) {
         const alertAttributes = {
@@ -529,19 +532,17 @@ async function handleDeleteCodeeButtonClick(e) {
             denyButtonText: "No, don't delete code"
         }
 
-        const handleRemoveRecoveryCodeApiRequest = () => {
-            const respData = {
-                TOTAL_ISSUED: 0,
-                TOTAL_USED: 0,
-                TOTAL_DEACTIVATED: 0,
-                TOTAL_REMOVED: 1,
-                TOTAL_DOWNLOADED: 0,
-                TOTAL_EMAILED: 0,
-                BATCH_REMOVED: 0,
-                SUCCESS: true,
-            }
-            deleteFormElement.reset();
-            return respData
+        const handleRemoveRecoveryCodeApiRequest = async () => {
+
+            const data = await fetchData({
+                url: "/auth/recovery-codes/delete-codes/",
+                csrfToken: getCsrfToken(),
+                method: "POST",
+                body: { code },
+                throwOnError: false,
+            });
+
+            return data
         }
 
         const resp = await handleButtonAlertClickHelper(e,
@@ -550,8 +551,22 @@ async function handleDeleteCodeeButtonClick(e) {
             alertAttributes,
             handleRemoveRecoveryCodeApiRequest)
 
-        if (resp) {
-            statsTotalCodesRemovedBoard.textContent = resp.TOTAL_REMOVED
+        const data = resp.data;
+        if (!data.SUCCESS) {
+            AlertUtils.showAlert({
+                title: "Error",
+                text: data.MESSAGE || `Failed to delete code "${code}".`,
+                icon: "error",
+                confirmButtonText: "Ok"
+            });
+            deleteFormElement.reset();
+        } else {
+            AlertUtils.showAlert({
+                title: "Success",
+                text: data.MESSAGE || `Code "${code}" was successfully deleted.`,
+                icon: "success",
+                confirmButtonText: "Ok"
+            });
         }
 
     }
@@ -946,9 +961,9 @@ function handleInputFieldHelper(e) {
 
     const LENGTH_PER_DASH = 6;
 
-    e.target.value = sanitizeText(inputField.value, false, true, ["2","3","4","5","6","7","8","9"]).toUpperCase();
+    e.target.value = sanitizeText(inputField.value, false, true, ["2", "3", "4", "5", "6", "7", "8", "9"]).toUpperCase();
     applyDashToInput(e, LENGTH_PER_DASH);
-  
+
 
 
 }
@@ -1189,8 +1204,6 @@ function toggleElement(element, hide = true) {
 
 
 function populateTableWithUserCodes(codes) {
-
-
 
     const tableObjectData = {
         classList: ["margin-top-lg"],

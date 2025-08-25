@@ -2,6 +2,7 @@ import uuid
 
 from django.db import models, connections
 from django.contrib.auth.hashers import make_password, check_password
+from django.db.models import F
 from django.utils import timezone
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -129,16 +130,116 @@ class RecoveryCodesBatch(models.Model):
         >>> recovery_code.update_invalidate_code_count().save()   # deferred save, also increments by 1 and not increase accidently
         """
        
-        if not isinstance(save, bool):
-            raise TypeError(f"Expected the save parameter to be a boolean instance but got object with type {type(save).__name__}")
+        self.status = Status.INVALIDATE
         
-        self.number_invalidated += 1
+        # Increment counter safely (atomic by default)
+        self._update_field_counter("number_invalidated", save=save, atomic=True)
+        return self
+    
+    def update_delete_code_count(self, save: bool = False) -> "RecoveryCode":
+        """
+        Increment the count of deleted (removed) codes by 1.
+
+        This method ensures consistent updates to the `number_removed` field.
+        Optionally, it can save the instance immediately if `save` is True; 
+        otherwise, the update is deferred, allowing additional operations before saving.
+
+        Parameters
+        ----------
+        save : bool, default=False
+            If True, saves the instance immediately after incrementing.  
+            If False, the update is performed in memory and can be saved later.
+
+        Raises
+        ------
+        TypeError
+            If `save` is not a boolean.
+
+        Returns
+        -------
+        RecoveryCode
+            Returns self to allow method chaining.
+
+        Notes
+        -----
+        This could also be done manually in views, for example:
+
+            # views.py
+
+            >>> recovery_code_batch = RecoveryCodeBatch.get_by_user(user="eu")
+            >>> recovery_code_batch.number_removed += 1
+            >>> recovery_code_batch.save()
+
+        However, this risks mistakes (e.g., incrementing by 2 instead of 1).
+        By using this method, increments remain consistent and the logic
+        is encapsulated within the model instead of spread across views.
+
+        Example
+        -------
+        >>> recovery_code.update_delete_code_count(save=True)   # increments by 1 safely
+        >>> recovery_code.update_delete_code_count().save()     # deferred save, still increments by 1
+        """
+       
+        self.status = Status.INVALIDATE
+        
+        # Increment counter safely (atomic by default)
+        self._update_field_counter("number_removed", save=save, atomic=True)
+        return self
+       
+    def _update_field_counter(self, field_name: str, save: bool = False, atomic: bool = True):
+        """
+        Internal helper to increment a numeric counter field safely.
+
+        Intended for use **only** by the public methods:
+        - `update_invalidate_code_count`
+        - `update_delete_code_count`
+
+        Parameters
+        ----------
+        field_name : str
+            The name of the field to increment. Must exist on the model.
+        save : bool, default=False
+            If True, saves the instance immediately after incrementing. 
+            If False, the update is performed in memory and can be saved later.
+        atomic : bool, default=True
+            If True, performs a DB-level atomic increment using F() to prevent lost updates
+            in concurrent scenarios. If False, increments in memory (faster but not safe under concurrency).
+
+        Returns
+        -------
+        self : Model instance
+            The updated instance for method chaining.
+
+        Notes
+        -----
+        - This method is private and should **not** be called directly outside the model.
+        - Use `atomic=True` for production or concurrent updates; `atomic=False` is safe for single-user scripts or tests.
+        - Encapsulating the increment logic ensures consistent counter updates and prevents misuse.
+        """
+      
+        if not hasattr(self, field_name):
+            raise AttributeError(f"{self.__class__.__name__} has no field '{field_name}'")
+
+        if atomic:
+
+            # DB-level increment (avoids race conditions)
+            self.__class__.objects.filter(pk=self.pk).update(**{field_name: F(field_name) + 1})
+
+            # Refresh this instance from DB so it's up to date
+            return self.refresh_from_db()
+
+        # In-memory increment (not concurrency-safe) especially if the user tries to update the valuse using multiple tabs
+        # at the same time or right after another
+        current_val = getattr(self, field_name, None)
+        if current_val is None:
+            raise ValueError(f"Field '{field_name}' is None, cannot increment.")
+        setattr(self, field_name, current_val + 1)
 
         if save:
             self.save()
 
         return self
-
+    
     def get_cache_values(self) -> dict:
         """
         Returns the current state of this batch for caching.
@@ -315,7 +416,6 @@ class RecoveryCode(models.Model):
     code_downloaded   = models.BooleanField(default=False)
     code_emailed      = models.BooleanField(default=False)
 
-
     def __str__(self):
         """Returns a string representation of the class"""
 
@@ -377,10 +477,38 @@ class RecoveryCode(models.Model):
             code.some_other_field = "new value"
             code.save()  # Both changes persisted together
         """
-        self.is_active = True
+        self.status = Status.INVALIDATE
         if save:
-            self.save(update_fields=["is_active"])
+            self.save(update_fields=["status"])
         return True
+
+    def delete_code(self, save: bool = True) -> "RecoveryCode":
+        """
+        Marks this recovery code pending to be deleed.
+
+        If `save` is True (default), the change is immediately persisted to the database.
+        If `save` is False, the change is applied in memory and will not be written 
+        to the database until you explicitly call `.save()` later.
+
+        Without the optional `save` parameter, making multiple changes in a single 
+        operation can result in multiple database writes.
+
+        Example 1 (less efficient):
+            # This results in TWO database hits
+            code.delete_code()  # First hit (inside method)
+            code.some_other_field = "new value"
+            code.save()                    # Second hit
+
+        Example 2 (optimised):
+            # This results in ONE database hit
+            code.delete_code(save=False)
+            code.some_other_field = "new value"
+            code.save()  # Both changes persisted together
+        """
+        self.status = Status.INVALIDATE
+        if save:
+            self.save(update_fields=["status"])
+        return self
 
     @classmethod
     def get_by_code(cls, code: str) -> "RecoveryCode":
