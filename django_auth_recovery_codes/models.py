@@ -413,7 +413,7 @@ class RecoveryCode(models.Model):
         if not isinstance(code, str):
             raise ValueError(f"The code parameter is not a string. Expected a string but got an object with type {type(code)}")
         
-        hashed_code = make_password(code)
+        hashed_code = make_password(code.strip())
 
         try:
             return cls.objects.select_related("batch").get(hash_code=hashed_code)

@@ -82,7 +82,7 @@ def invalidate_user_code(request):
         response_data = {'SUCCESS': False}
 
         recovery_code  = RecoveryCode.get_by_code(plaintext_code)
-
+       
         if not recovery_code:
             return False, response_data
 
@@ -92,7 +92,7 @@ def invalidate_user_code(request):
         recovery_batch.update_invalidate_code_count(save=True)
 
         response_data.update({'SUCCESS': True})
-        
+    
         return True, response_data
     
     invalidate_code.operation_name = "Deactivate"  # Assign a custom attribute to the function for the helper to use

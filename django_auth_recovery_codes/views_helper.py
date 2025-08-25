@@ -100,6 +100,8 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
     except Exception as e:
         resp["ERROR"] = str(e)
 
+    return JsonResponse(resp, status=201 if resp["SUCCESS"] else 400)
+
 
 
 
@@ -119,12 +121,13 @@ def recovery_code_operation_helper(
 
     try:
         data = json.loads(request.body.decode("utf-8"))
+        # print(data)
     except json.JSONDecodeError:
         resp["ERROR"] = "Invalid JSON body"
         return JsonResponse(resp, status=400)
 
     plaintext_code = data.get("code")
-    
+      
     if not plaintext_code:
         resp["MESSAGE"] = "The plaintext code wasn't found in the JSON body"
         return JsonResponse(resp, status=400)
@@ -133,10 +136,11 @@ def recovery_code_operation_helper(
         raise ValueError("The function must be callable and take one parameter: (str)")
 
     operation_name = getattr(func, "operation_name", "Code operation")  # Retrieve the operation name from the function, or use a default
-
+    
+  
     try:
         success, response_data = func(plaintext_code)
-
+    
         resp.update(response_data)
         resp["SUCCESS"] = success
 

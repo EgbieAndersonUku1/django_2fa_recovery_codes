@@ -4,48 +4,86 @@
  * Supports only "POST" and "GET" methods. For POST requests, the body must be a non-null object.
  * Optionally includes a CSRF token header if provided.
  * 
+ * 
+ * Automatically logs useful debugging information if a request fails, including:
+ * - URL
+ * - HTTP status code
+ * - Status text
+ * - Response headers
+ * - Parsed JSON body (if available)
+ * 
+ * 
  * @param {Object}   params
- * @param {string}   params.url         - The endpoint URL to send the request to.
- * @param {?string}  [params.csrfToken] - Optional CSRF token to include in the request headers.
- * @param {?Object}  [params.body]      - Request payload for POST method. Must be an object.
- * @param {string}   [params.method="POST"] - HTTP method to use ("POST" or "GET").
+ * @param {string}   params.url                   - The endpoint URL to send the request to.
+ * @param {?string}  [params.csrfToken]          - Optional CSRF token to include in the request headers.
+ * @param {?Object}  [params.body]               - Request payload for POST method. Must be an object.
+ * @param {string}   [params.method="POST"]      - HTTP method to use ("POST" or "GET").
  * @param {boolean}  [params.returnRawResponse=false] - If true, returns the raw fetch Response object 
- *                                                     instead of parsing JSON. Useful for file downloads.
+ *                                                      instead of parsing JSON (useful for file downloads).
+ * @param {boolean}  [params.throwOnError=true]  - If true, throws an error for non-ok responses.
+ *                                                  If false, returns the Response and the data object even for errors.
  * 
+ * @throws {Error} Throws if an invalid method is used, POST body is invalid, or response is not ok
+ *                 (and throwOnError is true).
  * 
- * @throws {Error} Throws if an invalid method is used, or if POST body is invalid, 
- *                 or if the server response is not ok.
+ * @returns {Promise<Object|Response>} Resolves with parsed JSON data, or raw Response if returnRawResponse
+ *                                    is true, or Response on error if throwOnError is false.
  * 
- * @returns {Promise<Object>} Resolves with the parsed JSON data from the server response.
+ * /**
+ * @example
+ * // Normal API call (throws on error)
+ * try {
+ *   const data = await fetchData({
+ *       url: "/api/get-user/",
+ *       method: "POST",
+ *       body: { userId: 123 }
+ *   });
+ *   console.log(data);
+ * } catch (err) {
+ *   console.error("Error fetching user:", err.message);
+ * }
  * 
  * @example
- * // JSON API call
- * const data = await fetchData({
- *     url: "/api/get-user/",
- *     method: "POST",
- *     body: { userId: 123 }
+ * // API call returning response on error (does not throw)
+ * const { response, data } = await fetchData({
+ *   url: "/api/login/",
+ *   method: "POST",
+ *   body: { username: "test", password: "wrong" },
+ *   throwOnError: false
  * });
- * console.log(data); // Parsed JSON response
+ * 
+ * if (!response.ok) {
+ *   console.log("Login failed:");
+ *   console.log("Status:", response.status);
+ *   console.log("Response body:", data);
+ * } else {
+ *   console.log("Login successful:", data);
+ * }
  * 
  * @example
+ * 
  * // File download
  * const response = await fetchData({
- *     url: "/download-code/",
- *     method: "POST",
- *     returnRawResponse: true
+ *   url: "/download/report.pdf",
+ *   method: "GET",
+ *   returnRawResponse: true
  * });
  * 
  * const blob = await response.blob();
  * const filename = response.headers.get("Content-Disposition")
- *     .split("filename=")[1].replace(/['"]/g, "");
- * 
- * const a    = document.createElement("a");
- * a.href     = URL.createObjectURL(blob);
+ *     ?.split("filename=")[1].replace(/['"]/g, "") || "file.pdf";
+ * const a = document.createElement("a");
+ * a.href = URL.createObjectURL(blob);
  * a.download = filename;
- * 
  * a.click();
  */
-export default async function fetchData({ url, csrfToken = null, body = null, method = "POST", returnRawResponse = false }) {
+export default async function fetchData({ url, 
+                                      csrfToken = null, 
+                                      body = null, 
+                                      method = "POST", 
+                                      returnRawResponse = false,
+                                      throwOnError = true,
+                                    }) {
 
     try {
 
@@ -89,15 +127,30 @@ export default async function fetchData({ url, csrfToken = null, body = null, me
         const data = await response.json();
 
         if (!response.ok) {
-            console.log(`HTTP error! Status: ${response.status}`);
-            throw new Error(`${data.ERROR || "Unknown Error"}`);
+             
+            // Log useful information for debugging
+            if (throwOnError) {
+
+                console.error("Fetch error details:");
+                console.error("URL:", response.url);
+                console.error("Status:", response.status);
+                console.error("Status Text:", response.statusText);
+                console.error("Headers:", response.headers);
+                console.error("Body:", data);
+
+                throw new Error(`${data || "Unknown Error"}`);
+            }
+
+            // Return structured object if throwOnError is false
+            return {response: response, data: data}
+           
         }
 
         return data;
 
     } catch (error) {
 
-        console.error("Fetch error:", error);
+        console.error("Fetch error:", error.message);
         throw new Error(`${error}`);
       
     }

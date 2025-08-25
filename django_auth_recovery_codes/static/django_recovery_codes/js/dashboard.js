@@ -424,7 +424,7 @@ async function handleDownloadButtonClick(e) {
         updateButtonFromConfig(btn, buttonStates.downloaded, "You have already downloaded this code");
         toggleButtonDisabled(btn)
 
-     
+
     } else {
         warnError("handleDownloadButtonClick", "The button container element wasn't found");
 
@@ -438,13 +438,11 @@ async function handleDownloadButtonClick(e) {
 
 }
 
-
-
 /**
  * Handles the click event for the "Invalidate code" button.
  * 
  * When clicked, this function triggers a Fetch API request to invalidate
- * a single recovery code, provided the required form data is valid when submitted.
+ * a single recovery code, provided the required form data is valid.
  * If the form data is invalid, no request is made and no action is taken.
  * 
  * @param {Event} e - The click event triggered by the button.
@@ -453,40 +451,58 @@ async function handleDownloadButtonClick(e) {
 async function handleInvalidateButtonClick(e) {
     const formData = await handleInvalidationFormSubmission(e);
 
-    if (formData) {
-        const alertAttributes = {
-            title: "Invalidate code",
-            text: "Doing this will invalidate this code. This action cannot be undone. Are you sure you want to go ahead?",
-            icon: "warning",
-            cancelMessage: "No worries! Your code is safe.",
-            messageToDisplayOnSuccess: "Awesome! Your code has been invalidated.",
-            confirmButtonText: "Yes, invalidate",
-            denyButtonText: "No, don't invalidate code"
-        }
+    if (!formData) return;
 
-        const handleInvalidateCodeFetchAPI = () => {
-            const respData = {
-                TOTAL_ISSUED: 0,
-                TOTAL_USED: 0,
-                TOTAL_DEACTIVATED: 1,
-                TOTAL_REMOVED: 0,
-                TOTAL_DOWNLOADED: 0,
-                TOTAL_EMAILED: 0,
-                BATCH_REMOVED: 0,
-                SUCCESS: true,
-            }
-            invalidateFormElement.reset();
-            return respData;
-        }
+    const code = formData.invalidateCode;
 
-        const resp = await handleButtonAlertClickHelper(e, INVALIDATE_CODE_BTN, invalidateSpinnerElement, alertAttributes, handleInvalidateCodeFetchAPI);
-        if (resp.SUCCESS) {
-            statsCodesDeactivatedBoard.textContent = resp.TOTAL_DEACTIVATED
-        }
+    const alertAttributes = {
+        title: "Invalidate Code",
+        text: `You are about to invalidate code "${code}". This action cannot be undone. Are you sure you want to proceed?`,
+        icon: "warning",
+        cancelMessage: "Cancelled – your code is safe.",
+        messageToDisplayOnSuccess: `Awesome! Your request to invalidate code "${code}" is being processed.`,
+        confirmButtonText: "Yes, invalidate",
+        denyButtonText: "No, keep code safe"
+    };
 
+    const handleInvalidateCodeFetchAPI = async () => {
+        const data = await fetchData({
+            url: "/auth/recovery-codes/invalidate-codes/",
+            csrfToken: getCsrfToken(),
+            method: "POST",
+            body: { code },
+            throwOnError: false,
+        });
+        return data;
+    };
+
+    const resp = await handleButtonAlertClickHelper(
+        e,
+        INVALIDATE_CODE_BTN,
+        invalidateSpinnerElement,
+        alertAttributes,
+        handleInvalidateCodeFetchAPI
+    );
+
+    const data = resp.data;
+
+    if (!data.SUCCESS) {
+        AlertUtils.showAlert({
+            title: "Error",
+            text: data.MESSAGE || `Failed to invalidate code "${code}".`,
+            icon: "error",
+            confirmButtonText: "Ok"
+        });
+    } else {
+        AlertUtils.showAlert({
+            title: "Success",
+            text: data.MESSAGE || `Code "${code}" was successfully invalidated.`,
+            icon: "success",
+            confirmButtonText: "Ok"
+        });
     }
-
 }
+
 
 
 
@@ -607,7 +623,7 @@ async function handleEmailCodeeButtonClick(e) {
         messageToDisplayOnSuccess: "Awesome! Your recovery codes are on their way. We’ll notify you once the email is sent.",
         confirmButtonText: "Yes, email me",
         denyButtonText: "No, thanks"
-}
+    }
 
 
 
@@ -628,7 +644,7 @@ async function handleEmailCodeeButtonClick(e) {
         enqueueMessages.push(resp.MESSAGE);
         showEnqueuedMessages(enqueueMessages, messageContainerElement)
 
-     
+
     } else {
         enqueueMessages.push(resp.MESSAGE)
         showEnqueuedMessages(enqueueMessages, messageContainerElement)
@@ -683,13 +699,13 @@ async function handlDeleteAllCodeButtonClick(e) {
     if (resp.SUCCESS) {
         statsBatchCodesRemovedBoard.textContent = resp.TOTAL_REMOVED;
         const codeActionButtons = document.getElementById("code-actions");
-        const tableCodes        = document.getElementById("table-code-view")
+        const tableCodes = document.getElementById("table-code-view")
         if (checkIfHTMLElement(codeActionButtons) && checkIfHTMLElement(tableCodes)) {
-           
+
             toggleElement(codeActionButtons);
             toggleElement(tableCodes);
-         
-           AlertUtils.showAlert({
+
+            AlertUtils.showAlert({
                 title: "Codes Deleted",
                 text: "All your codes have been deleted. Refresh the page to generate new ones.",
                 icon: "success",
@@ -699,8 +715,8 @@ async function handlDeleteAllCodeButtonClick(e) {
         } else {
             warnError("handleDeleteAllCodeButtonClick", "The button container element wasn't found")
         }
-    
-    } 
+
+    }
 
 }
 
@@ -820,6 +836,27 @@ function handleDeleteFormSubmission(e) {
 
 
 
+/**
+ * Handles the submission event for the "invalidating a code" form.
+ *
+ * The function allows the user to submit a request to invalidate a single recovery
+ * codes via a fetch API request when the form is submitted.
+ * 
+ *
+ *
+ * @param {Event} e - The submit event triggered by the form.
+ * @returns {void}
+ */
+function handleInvalidatingFormSubmission(e) {
+    return handleFormSubmissionHelper(e, invalidateFormElement, ["invalidate_code"]);
+
+}
+
+
+
+
+
+
 
 
 /**
@@ -881,7 +918,12 @@ function handleFormSubmissionHelper(e, formElement, requiredFields) {
  *
  * This function is intended to be called within other event handlers
  * to keep input field logic modular and reusable.
- *
+ * 
+ * The handle helper functions ensure that only the allowed values (A-Z, 2-9) 
+ * are rendered in the form. 
+ * 0 and 1 are not allowed because they can easily be confused with the letters 
+ * O and I.
+ * 
  * @param {Event} e - The input event triggered by the text field.
  * @returns {void}
  */
@@ -902,10 +944,11 @@ function handleInputFieldHelper(e) {
         inputField.setCustomValidity(''); // reset
     }
 
-    const LENGTH_PER_DASH = 4;
+    const LENGTH_PER_DASH = 6;
 
-    e.target.value = sanitizeText(inputField.value, false, true).toUpperCase();
+    e.target.value = sanitizeText(inputField.value, false, true, ["2","3","4","5","6","7","8","9"]).toUpperCase();
     applyDashToInput(e, LENGTH_PER_DASH);
+  
 
 
 }
