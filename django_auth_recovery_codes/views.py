@@ -86,7 +86,7 @@ def delete_recovery_code(request):
         response_data = {'SUCCESS': False}
 
         recovery_code  = RecoveryCode.get_by_code(plaintext_code)
-        print("I am here")
+
         if not recovery_code:
             return False, response_data
 
