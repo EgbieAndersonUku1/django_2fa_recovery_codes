@@ -25,8 +25,8 @@ def _generate_recovery_codes_with_expiry_date_helper(request, user) -> list:
     if days_to_expire <= 0:
         raise ValueError("daysToExpiry must be a positive integer")
             
-    raw_codes = RecoveryCodesBatch.create_recovery_batch(user=user, days_to_expire=days_to_expire)
-    return raw_codes
+    raw_codes, batch = RecoveryCodesBatch.create_recovery_batch(user=user, days_to_expire=days_to_expire)
+    return raw_codes, batch
 
 
 def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  generate_with_expiry_date: bool = False):
@@ -54,12 +54,7 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
         JsonResponse: A JSON response containing the status, issued codes, and any error messages.
     """
     
-    resp = {"TOTAL_ISSUED": 0, 
-            "SUCCESS": False,
-             "ERROR": "", "codes": []
-             }
-
-    user = request.user
+  
 
     if generate_with_expiry_date and not isinstance(generate_with_expiry_date, bool):
         raise TypeError(f"Expected `generate_with_expiry_date` flag to be a bool but got object with type {type(generate_with_expiry_date).__name__} ")
@@ -68,22 +63,31 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
         raise TypeError(f"Expected the cache parameter to be a string but got object with type {type(cache_key).__name__} ")
           
     try:
+        resp = {"TOTAL_ISSUED": 0, 
+            "SUCCESS": False,
+             "ERROR": "", "codes": []
+             }
+
+        user  = request.user
+        batch = None
 
         if generate_with_expiry_date:
            
-            raw_codes = _generate_recovery_codes_with_expiry_date_helper(request, user)
+            raw_codes, batch = _generate_recovery_codes_with_expiry_date_helper(request, user)
         else:
-            raw_codes = RecoveryCodesBatch.create_recovery_batch(user)
+            raw_codes, batch = RecoveryCodesBatch.create_recovery_batch(user)
 
         resp.update({
             "TOTAL_ISSUED": 1,
             "SUCCESS": True,
-            "CODES": raw_codes
+            "CODES": raw_codes,
+            "BATCH": batch.get_json_values()
         })
 
         request.session["recovery_codes_state"] = {"codes": raw_codes}
         request.session["is_emailed"]           = False
         request.session["is_downloaded"]        = False
+
 
         # update the cache
         values_to_save_in_cache = {
@@ -132,7 +136,7 @@ def recovery_code_operation_helper(
         return JsonResponse(resp, status=400)
 
     plaintext_code = data.get("code")
-    print(data)
+
       
     if not plaintext_code:
         resp["MESSAGE"] = "The plaintext code wasn't found in the JSON body"

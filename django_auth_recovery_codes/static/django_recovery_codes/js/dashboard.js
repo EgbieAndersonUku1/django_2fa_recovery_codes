@@ -1025,6 +1025,7 @@ async function handleRecoveryCodesAction({ e,
         handleGenerateCodeFetchApi
     )
 
+    console.log(resp)
     if (resp.SUCCESS) {
 
         statsTotalCodesIssuedBoard.textContent = resp.TOTAL_ISSUED;

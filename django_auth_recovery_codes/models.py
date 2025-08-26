@@ -10,7 +10,7 @@ from django_email_sender.models import EmailBaseLog
 
 from django_auth_recovery_codes.utils.security.generator import generate_2fa_secure_recovery_code
 from django_auth_recovery_codes.utils.security.security import is_already_hashed
-from django_auth_recovery_codes.utils.utils import schedule_future_date
+from django_auth_recovery_codes.utils.utils import schedule_future_date, create_json_from_attrs
 
 
 User = get_user_model()
@@ -56,6 +56,10 @@ class RecoveryCodeCleanUpScheduler(models.Model):
 
 class RecoveryCodesBatch(models.Model):
     CACHE_KEYS = ["generated", "downloaded", "emailed", "viewed"]
+    JSON_KEYS  = ["number_issued", "number_removed", "number_invalidated", "number_used", "created_at",
+                  "modified_at", "expiry_date", "deleted_at", "deleted_by", "viewed", "downloaded",
+                  "emailed", "generated"
+                  ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True, db_index=True)
 
@@ -261,7 +265,20 @@ class RecoveryCodesBatch(models.Model):
         """
         Returns the current state of this batch for caching.
         """
-        return {key: getattr(self, key) for key in self.CACHE_KEYS}
+        return create_json_from_attrs(self, self.CACHE_KEYS)
+    
+    def get_json_values(self):
+        """
+        Returns the attribrutes/field name for the model class
+        """
+        json_cache = create_json_from_attrs(self, keys=self.JSON_KEYS, capitalise_keys=True)
+        if json_cache:
+            json_cache["STATUS"]    = self.frontend_status
+            json_cache["USERNAME"]  = self.user.username
+            return json_cache
+        return {}
+    
+   
 
     def reset_cache_values(self):
         """
@@ -318,7 +335,6 @@ class RecoveryCodesBatch(models.Model):
         Returns a list of raw recovery codes.
         """
 
-        # Type validations
         if not isinstance(user, User):
             raise TypeError(f"Expected User instance, got {type(user).__name__}")
         if not isinstance(batch_number, int):
@@ -330,9 +346,8 @@ class RecoveryCodesBatch(models.Model):
         batch_instance = cls(user=user, number_issued=batch_number)
         if days_to_expire:
             batch_instance.expiry_date = schedule_future_date(days=days_to_expire)
-        batch_instance.mark_as_generated(save=False)
-        batch_instance.save()
-
+        batch_instance.mark_as_generated()
+  
         raw_codes = []
         batch     = []
        
@@ -363,7 +378,7 @@ class RecoveryCodesBatch(models.Model):
         if batch:
             cls._if_async_supported_async_bulk_create_or_use_sync_bulk_crate(batch)
            
-        return raw_codes
+        return raw_codes, batch_instance
 
 
     @classmethod
