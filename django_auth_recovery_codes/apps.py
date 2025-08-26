@@ -14,6 +14,6 @@ class DjangoAuthRecoveryCodesConfig(AppConfig):
             for template_config in settings.TEMPLATES:
                 if 'OPTIONS' in template_config and 'context_processors' in template_config['OPTIONS']:
                     context_processors = template_config['OPTIONS']['context_processors']
-                    # Add our context processor only if it's not already there
-                    if 'myapp.context_processors.request' not in context_processors:
+
+                    if 'django_auth_recovery_codes.context_processors.request' not in context_processors:
                         context_processors.append('django_auth_recovery_codes.context_processors.request')
