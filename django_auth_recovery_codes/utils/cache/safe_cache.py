@@ -1,8 +1,12 @@
+import logging
+import time
 from typing import Callable, Any, Union
-
 from django.core.cache import cache
 from contextlib import contextmanager
-import time
+
+
+logger = logging.getLogger(__name__)
+
 
 @contextmanager
 def cache_lock(key: str, timeout: int = 5):
@@ -97,74 +101,122 @@ def set_cache(key: str, value, ttl: int = 300):
 
 
 
-
-
-def get_with_retry(cache_key, fetch_func, ttl, retries=4, delay=0.2):
+def _cache_operation_with_retry(
+    key: str,
+    operation: Callable[[], None],
+    retries: int = 2,
+    delay: float = 0.1,
+    backoff: float = 2.0,
+    log_failures: bool = False,
+    action_name: str = "operation"
+) -> bool:
     """
-    Attempt to get a cached value, retrying only on cache-related exceptions.
-
-    Args:
-        cache_key (str): The cache key to retrieve.
-        fetch_func (Callable): Function to fetch the value if cache miss occurs.
-        ttl (int): Time-to-live for the cache entry.
-        retries (int): Number of retry attempts on cache exception.
-        delay (float): Delay between retries in seconds.
-
-    Returns:
-        Any: Cached value or a safe default dictionary if all retries fail due to cache errors.
-    """
-    for _ in range(retries):
-        try:
-            return get_cache_or_set(cache_key, fetch_func, ttl)
-        except Exception:
-            # Retry only on cache-related errors
-            time.sleep(delay)
-    
-    # Fallback if all retries fail
-    return {
-        "generated": False,
-        "emailed": False,
-        "viewed": False,
-        "downloaded": False
-    }
-
-
-
-def set_cache_with_retry(key: str, value, ttl: int = 300, retries: int = 2, delay: float = 0.1):
-    """
-    Safely set a value in the cache with retries to handle transient failures.
-
-    This function is backend-agnostic and works with any Django cache backend.  
-    It uses a **per-key lock** to prevent race conditions when multiple processes 
-    attempt to write to the same cache key at the same time.  
-
-    If the cache backend fails temporarily (e.g., due to network issues or high load),
-    the function will retry the operation a few times before giving up.  
+    Generic helper to safely perform a cache operation with retries,
+    per-key locking, and exponential backoff.
 
     Args:
         key (str): Cache key.
-        value (Any): Value to store.
-        ttl (int): Time to live for the cache entry in seconds.
+        operation (Callable): Function that performs the cache action (e.g., set/delete).
         retries (int): Number of retry attempts on failure.
-        delay (float): Delay between retries in seconds.
+        delay (float): Initial delay between retries in seconds.
+        backoff (float): Backoff multiplier applied after each failed attempt.
+        log_failures (bool): Whether to log failures after all retries.
+        action_name (str): Descriptive name of the action for logging.
 
-    Notes:
-        - If multiple processes try to write the same key, the lock ensures only one sets it at a time.
-        - If they write different keys, there is no blocking — they can run concurrently.
-        - If all retries fail, the function silently continues. You can optionally log failures.
-    
-    Example:
-        # Set a simple value safely
-        set_cache_with_retry("my_key", [1, 2, 3], ttl=300, retries=3, delay=0.2)
+    Returns:
+        bool: True if the operation succeeded, False otherwise.
     """
-    for _ in range(retries):
+    current_delay = delay
+    for attempt in range(1, retries + 1):
         try:
-            with cache_lock(key) as locked:
-                cache.set(key, value, ttl)
-            return  
+            result = None
+            with cache_lock(key):
+                result = operation()
+            return result
         except Exception:
-           
-            time.sleep(delay)
+            if attempt < retries:
+                time.sleep(current_delay)
+                current_delay *= backoff  # Exponential backoff
 
-    # All retries failed; fallback: do nothing
-    return None
+    if log_failures:
+        logger.warning(
+            "Failed to %s cache for key '%s' after %d attempts.",
+            action_name, key, retries
+        )
+    return False
+
+
+def set_cache_with_retry(
+    key: str,
+    value: Any,
+    ttl: int = 300,
+    retries: int = 2,
+    delay: float = 0.1,
+    backoff: float = 2.0,
+    log_failures: bool = False
+) -> bool:
+    """
+    Safely set a value in the cache with retries, per-key lock,
+    and exponential backoff.
+
+    Returns True if the value was successfully set, False otherwise.
+    """
+    return _cache_operation_with_retry(
+        key,
+        lambda: cache.set(key, value, ttl),
+        retries=retries,
+        delay=delay,
+        backoff=backoff,
+        log_failures=log_failures,
+        action_name="set"
+    )
+
+
+def delete_cache_with_retry(
+    key: str,
+    retries: int = 2,
+    delay: float = 0.1,
+    backoff: float = 2.0,
+    log_failures: bool = False
+) -> bool:
+    """
+    Safely delete a value from the cache with retries, per-key lock,
+    and exponential backoff.
+
+    Returns True if the value was successfully deleted, False otherwise.
+    """
+    return _cache_operation_with_retry(
+        key,
+        lambda: cache.delete(key),
+        retries=retries,
+        delay=delay,
+        backoff=backoff,
+        log_failures=log_failures,
+        action_name="delete"
+    )
+
+
+def get_cache_with_retry(
+    key: str,
+    default: Any = None,
+    retries: int = 2,
+    delay: float = 0.1,
+    backoff: float = 2.0,
+    log_failures: bool = False
+) -> Any:
+    """
+    Safely get a value from the cache with retries, per-key lock,
+    and exponential backoff.
+
+    Returns the cached value, or `default` if not found or if all retries fail.
+    """
+    result = _cache_operation_with_retry(
+        key,
+        lambda: cache.get(key, default),
+        retries=retries,
+        delay=delay,
+        backoff=backoff,
+        log_failures=log_failures,
+        action_name="get"
+    )
+    return result if result is not None else default

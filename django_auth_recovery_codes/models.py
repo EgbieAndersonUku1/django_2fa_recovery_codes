@@ -62,6 +62,7 @@ class RecoveryCodesBatch(models.Model):
     number_issued      = models.PositiveSmallIntegerField(default=10)
     number_removed     = models.PositiveSmallIntegerField(default=0)
     number_invalidated = models.PositiveSmallIntegerField(default=0)
+    number_used        = models.PositiveSmallIntegerField(default=0)
     user               = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name="recovery_batches")
     created_at         = models.DateTimeField(auto_now_add=True)
     modified_at        = models.DateTimeField(auto_now=True)
@@ -83,6 +84,22 @@ class RecoveryCodesBatch(models.Model):
     def __str__(self):
         return f"Batch {self.id} for {self.user or 'Deleted User'}"
     
+
+    @property
+    def frontend_status(self):
+        """
+        Returns a human-readable status for frontend display.
+
+        Overrides certain internal statuses with custom labels for clarity.
+        For example:
+        - Status.PENDING_DELETE is shown as "Deleted"
+
+        All other statuses use their default TextChoices label.
+        """
+        overrides = {Status.PENDING_DELETE: "Deleted"}
+        return overrides.get(Status(self.status), Status(self.status).label)
+ 
+            
     def update_invalidate_code_count(self, save = False) -> "RecoveryCode":
         """
         Increment the count of invalidated codes by 1.

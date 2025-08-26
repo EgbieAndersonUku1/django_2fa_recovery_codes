@@ -12,15 +12,19 @@ from django.http import HttpResponse
 from django.conf import settings
 from typing import Tuple
 
-from .models import RecoveryCodesBatch, RecoveryCode
-from .views_helper import  generate_recovery_code_fetch_helper, recovery_code_operation_helper
-from .utils.cache.safe_cache import get_cache_or_set, set_cache, get_with_retry, set_cache_with_retry
+from .models import RecoveryCodesBatch, RecoveryCode, Status
+from .views_helper import  generate_recovery_code_fetch_helper, recovery_code_operation_helper, get_recovery_batches_context
+from .utils.cache.safe_cache import (get_cache_or_set, set_cache, 
+                                     get_cache_with_retry, 
+                                     set_cache_with_retry, 
+                                     )
 from .tasks import send_recovery_codes_email
 from .utils.exporters.file_converters import to_csv, to_pdf, to_text
 
 
-CACHE_KEY           = 'recovery_codes_generated_{}'
-MINUTES_IN_SECONDS  = 300
+CACHE_KEY            = 'recovery_codes_generated_{}'
+MINUTES_IN_SECONDS   = 300
+
 
 TTL = getattr(settings, 'DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL', MINUTES_IN_SECONDS)
 TTL = TTL if isinstance(TTL, int) else MINUTES_IN_SECONDS
@@ -217,7 +221,7 @@ def download_code(request):
     response = HttpResponse(response_content, content_type=content_type)
     response["Content-Disposition"] = f'attachment; filename="{file_name}"'
     response["X-Success"]           = "true"
-
+    request.session["force_update"] = True
     return response
 
 
@@ -238,7 +242,7 @@ def mark_all_recovery_codes_as_pending_delete(request):
         recovery_batch.save()
         request.session["is_downloaded"] = False
         request.session["is_emailed"]    = False
-
+        request.session["force_update"] = True
         set_cache(CACHE_KEY.format(request.user.id), recovery_batch.get_cache_values(), TTL)
 
         data.update({
@@ -302,7 +306,8 @@ def email_recovery_codes(request):
 
     set_cache_with_retry(CACHE_KEY.format(user.id), recovery_batch.get_cache_values(), TTL)
    
-    request.session["is_emailed"] = True  # needed to hide the page in the UI
+    request.session["is_emailed"]   = True  # needed to hide the page in the UI
+    request.session["force_update"] = True
     resp.update({
         "MESSAGE": "Recovery codes email has been queued. We will notify you once they have been sent",
         "SUCCESS": True,
@@ -331,7 +336,8 @@ def marked_code_as_viewed(request):
             set_cache(CACHE_KEY.format(user.id),
                     value=recovery_batch.get_cache_values()
                     )
-            resp["SUCCESS"] = True
+            resp["SUCCESS"]                 = True
+            request.session["force_update"] = True
    
     else:
         resp["ERROR"] = "Failed to set batch to marked because it wasn't found"
@@ -359,27 +365,39 @@ def generate_recovery_code_without_expiry(request):
     return generate_recovery_code_fetch_helper(request, CACHE_KEY)
 
 
-
 @csrf_protect
 @login_required
 def recovery_dashboard(request):
-    user       = request.user
-    cache_key  = CACHE_KEY.format(user.id)
-    context    = {}
-
-    user_data = get_with_retry(cache_key,
-                            fetch_func=lambda: RecoveryCodesBatch.get_by_user(user=user).get_cache_values(),
-                            ttl=TTL
-                        )
+    user               = request.user
+    cache_key          = CACHE_KEY.format(user.id)
+    user_data          =  get_cache_with_retry(cache_key)
+    context            = {}
     
+    recovery_batch_context = get_recovery_batches_context(request)
+
   
-    if user_data:
-        data = user_data
+    if user_data is None:
+        # cache has expired, get data and re-add to cache
+        recovery_batch = RecoveryCodesBatch.get_by_user(user)
+        if recovery_batch:
+            user_data = recovery_batch.get_cache_values()
+        set_cache_with_retry(cache_key, user_data)
+    
+ 
+    data = user_data
+    if data:
         context.update({
-            "is_generated": data.get("generated"),
-            "is_email": data.get("emailed"),
-            "is_viewed": data.get("viewed"),
-            "is_downloaded": data.get("downloaded")
-        })
+                "is_generated": data.get("generated"),
+                "is_email": data.get("emailed"),
+                "is_viewed": data.get("viewed"),
+                "is_downloaded": data.get("downloaded")
+            })
+    
+    if not isinstance(recovery_batch_context, dict):
+        raise TypeError(f"Expected a context dictionary but got object with type {type(recovery_batch_context).__name__}")
+
+    context.update(recovery_batch_context)
     
     return render(request, "django_auth_recovery_codes/dashboard.html", context)
+
+

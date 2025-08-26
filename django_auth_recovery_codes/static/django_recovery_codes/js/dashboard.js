@@ -8,7 +8,8 @@ import {
     getCsrfToken,
     showTemporaryMessage,
     showEnqueuedMessages,
-    downloadFromResponse
+    downloadFromResponse,
+ 
 } from "./utils.js";
 
 import { parseFormData } from "./form.js";
@@ -398,7 +399,7 @@ async function handleDownloadButtonClick(e) {
             url: "/auth/recovery-codes/download-codes/",
             csrfToken: getCsrfToken(),
             method: "POST",
-            body: {},
+            body: {forceUpdate: true},
             returnRawResponse: true,
         });
 
@@ -470,7 +471,7 @@ async function handleInvalidateButtonClick(e) {
             url: "/auth/recovery-codes/invalidate-codes/",
             csrfToken: getCsrfToken(),
             method: "POST",
-            body: { code },
+            body: { code: code, forceUpdate: true },
             throwOnError: false,
         });
         return data;
@@ -538,7 +539,7 @@ async function handleDeleteCodeeButtonClick(e) {
                 url: "/auth/recovery-codes/delete-codes/",
                 csrfToken: getCsrfToken(),
                 method: "POST",
-                body: { code },
+                body: { code : code, forceUpdate: "1"},
                 throwOnError: false,
             });
 
@@ -644,7 +645,8 @@ async function handleEmailCodeeButtonClick(e) {
 
 
     const handleEmailFetchApiSend = async () => {
-        const url = "/auth/recovery-codes/email/"
+        const url = "/auth/recovery-codes/email/";
+
         return await sendPostFetchWithoutBody(url, "The email wasn't sent")
     }
 
@@ -698,7 +700,9 @@ async function handlDeleteAllCodeButtonClick(e) {
             url: "/auth/recovery-codes/mark-batch-as-deleted/",
             csrfToken: getCsrfToken(),
             method: "POST",
-            body: {},
+            body: {
+               forceUpdate: true
+            },
         });
 
         return resp;
@@ -851,27 +855,6 @@ function handleDeleteFormSubmission(e) {
 
 
 
-/**
- * Handles the submission event for the "invalidating a code" form.
- *
- * The function allows the user to submit a request to invalidate a single recovery
- * codes via a fetch API request when the form is submitted.
- * 
- *
- *
- * @param {Event} e - The submit event triggered by the form.
- * @returns {void}
- */
-function handleInvalidatingFormSubmission(e) {
-    return handleFormSubmissionHelper(e, invalidateFormElement, ["invalidate_code"]);
-
-}
-
-
-
-
-
-
 
 
 /**
@@ -1013,9 +996,12 @@ async function handleRecoveryCodesAction({ e,
     const body = {};
 
     if (daysToExpiry !== null && typeof daysToExpiry === "number") {
-        body.daysToExpiry = daysToExpiry
+        body.daysToExpiry = daysToExpiry;
+     
+   
     }
 
+    body.forceUpdate  =  true;
 
     const handleGenerateCodeFetchApi = async () => {
 
@@ -1272,7 +1258,7 @@ async function sendPostFetchWithoutBody(url, msg = "") {
             url: url,
             csrfToken: getCsrfToken(),
             method: "POST",
-            body: {}             // fetchData will handle stringifying and headers
+            body: {forceUpdate : true}  // fetchData will handle stringifying and headers
         });
     } catch (error) {
         console.warn(msg, error);
@@ -1300,6 +1286,8 @@ function pickRightDivAndPopulateTable(tableCodesElement) {
 
 
 }
+
+
 
 
 

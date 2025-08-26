@@ -3,14 +3,32 @@ from django.http import JsonResponse
 from django.db import IntegrityError
 from django.http import HttpRequest 
 from typing import Callable, Tuple, Dict, Any
-
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 
 from .models import RecoveryCodesBatch, Status
-from .utils.cache.safe_cache import set_cache_with_retry,  get_cache_or_set
+from .utils.cache.safe_cache import set_cache_with_retry, get_cache_with_retry, delete_cache_with_retry
 
 
+RECOVERY_CODES_BATCH_HISTORY_KEY = 'recovery_codes_batch_history_{}'
+PAGE_SIZE = 25
  
+
+def _generate_recovery_codes_with_expiry_date_helper(request, user) -> list:
+     
+    data           = json.loads(request.body.decode("utf-8"))
+    days_to_expire = int(data.get("daysToExpiry", 0))
+
+    if not isinstance(days_to_expire, int):
+        raise TypeError(f"Expected an integer from the frontend fetch api but got object with type {type(days_to_expire).__name__} ")
+            
+    if days_to_expire <= 0:
+        raise ValueError("daysToExpiry must be a positive integer")
+            
+    raw_codes = RecoveryCodesBatch.create_recovery_batch(user=user, days_to_expire=days_to_expire)
+    return raw_codes
+
+
 def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  generate_with_expiry_date: bool = False):
     """
     Generate recovery codes for a user, optionally with an expiry date.
@@ -52,19 +70,8 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
     try:
 
         if generate_with_expiry_date:
-            data           = json.loads(request.body.decode("utf-8"))
-            days_to_expire = int(data.get("daysToExpiry", 0))
-
-            if not isinstance(days_to_expire, int):
-                raise TypeError(f"Expected an integer from the frontend fetch api but got object with type {type(days_to_expire).__name__} ")
-            
-            if days_to_expire <= 0:
-                raise ValueError("daysToExpiry must be a positive integer")
-            
-            raw_codes = RecoveryCodesBatch.create_recovery_batch(
-                user=user,
-                days_to_expire=days_to_expire
-            )
+           
+            raw_codes = _generate_recovery_codes_with_expiry_date_helper(request, user)
         else:
             raw_codes = RecoveryCodesBatch.create_recovery_batch(user)
 
@@ -74,12 +81,9 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
             "CODES": raw_codes
         })
 
-        request.session["recovery_codes_state"] = {
-                        "codes": raw_codes,
-                    }
-        
-        request.session["is_emailed"] = False
-        request.session["is_downloaded"] = False
+        request.session["recovery_codes_state"] = {"codes": raw_codes}
+        request.session["is_emailed"]           = False
+        request.session["is_downloaded"]        = False
 
         # update the cache
         values_to_save_in_cache = {
@@ -89,10 +93,11 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
             "viewed": False
         }
         
-        set_cache_with_retry(cache_key.format(user.id),
-                  value=values_to_save_in_cache,
-                  )
+        set_cache_with_retry(cache_key.format(user.id), value=values_to_save_in_cache)
         
+        data                             = json.loads(request.body.decode("utf-8"))   
+        request.session["force_update"]  = data.get("forceUpdate", False)
+
     except IntegrityError as e:
         resp["ERROR"] = str(e)
     except json.JSONDecodeError:
@@ -127,6 +132,7 @@ def recovery_code_operation_helper(
         return JsonResponse(resp, status=400)
 
     plaintext_code = data.get("code")
+    print(data)
       
     if not plaintext_code:
         resp["MESSAGE"] = "The plaintext code wasn't found in the JSON body"
@@ -146,8 +152,9 @@ def recovery_code_operation_helper(
 
         # Auto-generate MESSAGE if not provided
         if "MESSAGE" not in resp or not resp["MESSAGE"]:
-            resp["MESSAGE"] = f"{operation_name} succeeded" if success else f"{operation_name} failed"
-
+            resp["MESSAGE"] =  f"{operation_name} succeeded"  if success else f"{operation_name} failed"
+        
+     
     except IntegrityError as e:
         resp["ERROR"] = str(e)
     except Exception as e:
@@ -157,4 +164,49 @@ def recovery_code_operation_helper(
 
 
 
- 
+def get_recovery_batches_context(request):
+    """
+    Returns a context dict with recovery batches, paginated.
+    Automatically refreshes cache if the session flag indicates update.
+    """
+    user               = request.user
+    recovery_cache_key = RECOVERY_CODES_BATCH_HISTORY_KEY.format(user.id)
+    context            = {}
+
+    PAGE_SIZE = 20
+    PER_PAGE  = 5
+
+    # fetch from cache or DB
+   
+    force_update = request.session.get("force_update", False)
+
+    if not force_update:
+        recovery_batch_history = get_cache_with_retry(recovery_cache_key)
+    else:
+        delete_cache_with_retry(recovery_cache_key)
+        recovery_batch_history = None
+        request.session.pop("force_update")
+  
+    if recovery_batch_history is None:
+        recovery_batch_history = list(
+            RecoveryCodesBatch.objects.filter(user=user).order_by("-created_at")[:PAGE_SIZE]
+        )
+        set_cache_with_retry(recovery_cache_key, value=recovery_batch_history)
+
+    if recovery_batch_history:
+        request.session["show_batch"]  = True
+
+    paginator   = Paginator(recovery_batch_history, PER_PAGE)
+    page_number = request.GET.get("page", 1)
+
+    try:
+        recovery_batches = paginator.page(page_number)
+    except PageNotAnInteger:
+        recovery_batches = paginator.page(1)
+    except EmptyPage:
+        recovery_batches = paginator.page(paginator.num_pages)
+
+    context["recovery_batches"] = recovery_batches
+    context["Status"]           = Status
+
+    return context

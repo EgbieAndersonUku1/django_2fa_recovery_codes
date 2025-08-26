@@ -1,3 +1,5 @@
+{% if request.session.show_batch %}
+ 
 <section id="view-batch-history" class="margin-top-xlg">
     <div class="container">
 
@@ -7,6 +9,7 @@
                 <h1 class="margin-top-lg pb-sm medium-title">Batch details History</h1>
                 <hr class="dividor margin-bottom-lg">
 
+                {% for recovery_batch in recovery_batches %}
                 <div class="card">
 
                     <div class="card-head">
@@ -16,17 +19,31 @@
                             </div>
 
                             <div class="value">
-                                <p>11111111111111111111111111111111111111111111111</p>
+                                <p>{{ recovery_batch.id | upper  }}</p>
                             </div>
                         </div>
 
+                          <div class="info-box">
+                            <div class="label">
+                                <p>Expiry info</p>
+                            </div>
+
+                            <div class="value">
+                               
+                                <p class="recovery_status {% if recovery_batch.status == Status.ACTIVE %} text-green {% else %} text-red {% endif %}">
+                                        {{ recovery_batch.frontend_status }}
+                                      
+                                </p>
+
+                            </div>
+                        </div>
                         <div class="info-box">
                             <div class="label">
                                 <p>User</p>
                             </div>
 
                             <div class="value">
-                                <p>John</p>
+                                <p>{{ recovery_batch.user.username | title }}  </p>
                             </div>
                         </div>
 
@@ -36,17 +53,48 @@
                             </div>
 
                             <div class="value">
-                                <p>1st January 2027</p>
+                                <p>{{ recovery_batch.created_at }}</p>
                             </div>
                         </div>
 
+                          <div class="info-box">
+                            <div class="label">
+                                <p>Date modified </p>
+                            </div>
+
+                            <div class="value">
+                                <p>{{ recovery_batch.modified_at }}</p>
+                            </div>
+                        </div>
+
+                        {% if recovery_batch.deleted_by %}
+                        <div class="info-box">
+                            <div class="label">
+                                <p>Deleted at </p>
+                            </div>
+
+                            <div class="value">
+                                <p>{{ recovery_batch.deleted_at }}</p>
+                            </div>
+                        </div>
+
+                        <div class="info-box">
+                            <div class="label">
+                                <p>Deleted by </p>
+                            </div>
+
+                            <div class="value">
+                                <p>{{ recovery_batch.deleted_by }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
                         <div class="info-box">
                             <div class="label">
                                 <p>Number of Code issued</p>
                             </div>
 
                             <div class="value">
-                                <p>10</p>
+                                <p>{{ recovery_batch.number_issued }}</p>
                             </div>
                         </div>
 
@@ -56,7 +104,7 @@
                             </div>
 
                             <div class="value">
-                                <p>1</p>
+                                <p>{{ recovery_batch.number_used }}</p>
                             </div>
                         </div>
 
@@ -66,7 +114,7 @@
                             </div>
 
                             <div class="value">
-                                <p>1</p>
+                                <p>{{ recovery_batch.number_invalidated }}</p>
                             </div>
                         </div>
 
@@ -76,19 +124,73 @@
                             </div>
 
                             <div class="value">
-                                <p>1</p>
+                                <p>{{ recovery_batch.number_removed }}</p>
                             </div>
                         </div>
 
-                        <div class="info-box">
+                      
+
+                            <div class="info-box">
                             <div class="label">
-                                <p>Expiry info</p>
+                                <p>Has generated code batch</p>
                             </div>
 
                             <div class="value">
-                                <p>Does not expiry</p>
+                               
+                                <p class="">
+                                        {{ recovery_batch.generated }}
+                                </p>
+
                             </div>
+                            
                         </div>
+
+                          <div class="info-box">
+                            <div class="label">
+                                <p>Has viewed code batch</p>
+                            </div>
+
+                            <div class="value">
+                               
+                                <p class="">
+                                        {{ recovery_batch.viewed }}
+                                </p>
+
+                            </div>
+                            
+                        </div>
+
+
+                         <div class="info-box">
+                            <div class="label">
+                                <p>Has downloaded code batch</p>
+                            </div>
+
+                            <div class="value">
+                               
+                                <p class="">
+                                        {{ recovery_batch.downloaded }}
+                                </p>
+
+                            </div>
+                            
+                        </div>
+
+                          <div class="info-box">
+                            <div class="label">
+                                <p>Has emailed code batch</p>
+                            </div>
+
+                            <div class="value">
+                               
+                                <p class="">
+                                        {{ recovery_batch.emailed  }}
+                                </p>
+
+                            </div>
+                            
+                        </div>
+
                     </div>
 
                     <hr class="dividor margin-top-lg margin-bottom-lg">
@@ -98,95 +200,9 @@
 
                 </div>
 
-                <div class="card">
+                {% endfor %}
 
-                    <div class="card-head">
-                        <div class="info-box">
-                            <div class="label">
-                                <p>Batch id</p>
-                            </div>
-
-                            <div class="value">
-                                <p>11111111111111111111111111111111111111111111111</p>
-                            </div>
-                        </div>
-
-                        <div class="info-box">
-                            <div class="label">
-                                <p>User</p>
-                            </div>
-
-                            <div class="value">
-                                <p>John</p>
-                            </div>
-                        </div>
-
-                        <div class="info-box">
-                            <div class="label">
-                                <p>Date issued</p>
-                            </div>
-
-                            <div class="value">
-                                <p>1st January 2027</p>
-                            </div>
-                        </div>
-
-                        <div class="info-box">
-                            <div class="label">
-                                <p>Number of Code issued</p>
-                            </div>
-
-                            <div class="value">
-                                <p>10</p>
-                            </div>
-                        </div>
-
-                        <div class="info-box">
-                            <div class="label">
-                                <p>Number of Code used</p>
-                            </div>
-
-                            <div class="value">
-                                <p>1</p>
-                            </div>
-                        </div>
-
-                        <div class="info-box">
-                            <div class="label">
-                                <p>Number of deactivated</p>
-                            </div>
-
-                            <div class="value">
-                                <p>1</p>
-                            </div>
-                        </div>
-
-                        <div class="info-box">
-                            <div class="label">
-                                <p>Number of removed</p>
-                            </div>
-
-                            <div class="value">
-                                <p>1</p>
-                            </div>
-                        </div>
-
-                        <div class="info-box">
-                            <div class="label">
-                                <p>Expiry info</p>
-                            </div>
-
-                            <div class="value">
-                                <p>Does not expiry</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <hr class="dividor margin-top-lg margin-bottom-lg">
-
-            
-
-                </div>
+             
             </div>
 
 
@@ -196,3 +212,5 @@
 </section>
 
 <hr class="dividor margin-top-md margin-bottom-md">
+
+{% endif %}
