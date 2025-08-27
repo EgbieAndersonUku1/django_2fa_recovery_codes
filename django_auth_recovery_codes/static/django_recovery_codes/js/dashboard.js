@@ -9,6 +9,8 @@ import {
     showTemporaryMessage,
     showEnqueuedMessages,
     downloadFromResponse,
+    prependChild,
+  
  
 } from "./utils.js";
 
@@ -27,7 +29,7 @@ import { createRecordBatcbCard } from "./generateBatchHistoryCard.js";
 const recovryDashboardElement = document.getElementById("recovery-dashboard");
 const daysToExpiryGroupWrapperElement = document.getElementById("days-to-expiry-group");
 const navigationIconContainerElement = document.getElementById("navigation-icon-elements");
-const generateCodeSectionElement = document.getElementById("generate-code-section");
+const generaterecoveryBatchSectionElement = document.getElementById("generate-code-section");
 const codeTableElement = document.getElementById("table-code-view");
 const codeActionContainerElement = document.getElementById("page-buttons");
 const tempGeneratedTableContainer = document.getElementById("generated-code-table");
@@ -91,7 +93,7 @@ recovryDashboardElement.addEventListener("click", handleEventDelegation);
  * when the page is refreshed. Since the form doesn't exist, 
  * attempting to attach an event listener would cause an error.
  */
-if (generateCodeSectionElement !== null) {
+if (generaterecoveryBatchSectionElement !== null) {
     generateCodeWithExpiryFormElement.addEventListener("submit",
         handleGenerateCodeWithExpiryFormSubmission
     );
@@ -158,7 +160,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 let alertMessage;
 
-hideViewBatchHistoryHeaders();
+// hideViewBatchHistoryHeaders();
 
 
 // configuration
@@ -1037,7 +1039,7 @@ async function handleRecoveryCodesAction({ e,
     if (resp.SUCCESS) {
 
         statsTotalCodesIssuedBoard.textContent = resp.TOTAL_ISSUED;
-        toggleElement(generateCodeSectionElement);
+        toggleElement(generaterecoveryBatchSectionElement);
     
         const isPopulated = populateTableWithUserCodes(resp.CODES);
 
@@ -1237,7 +1239,7 @@ function populateTableWithUserCodes(codes) {
             }
             
 
-            if (generateCodeSectionElement === null) {
+            if (generaterecoveryBatchSectionElement === null) {
                 codeActionContainerElement.innerHTML = "";
 
             }
@@ -1299,7 +1301,7 @@ function pickRightDivAndPopulateTable(tableCodesElement) {
 
 
 function insertBatchCardIntoSection(batch) {
-    const codeSectionElement = document.getElementById(CODE_BATCH_SECTION_ID);
+    const recoveryBatchSectionElement = document.getElementById(CODE_BATCH_SECTION_ID);
     const historyCard        = createRecordBatcbCard(batch);
     
     dynamicBatchSpinnerElement.style.display = "inline-block";
@@ -1308,12 +1310,14 @@ function insertBatchCardIntoSection(batch) {
     console.log(historyCard);
 
     setTimeout(() => {
-        if (codeSectionElement === null) {
+        if (recoveryBatchSectionElement !== null) {
+            prependChild(recoveryBatchSectionElement, historyCard)
+            toggleSpinner(dynamicBatchSpinnerElement, false);
+
 
         } else {
             dynameicViewBatchHistorySection.appendChild(historyCard);
             toggleSpinner(dynamicBatchSpinnerElement, false);
-             dynamicBatchSpinnerElement.style.display = "none";
         }
 
     }, (MILLI_SECONDS_BEFORE_DISPLAY + MILLI_SECONDS) )

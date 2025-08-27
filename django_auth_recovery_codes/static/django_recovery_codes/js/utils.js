@@ -42,8 +42,45 @@ export function toggleSpinner(spinnerElement, show=true) {
     }
 
     spinnerElement.classList.remove("show-spinner");
+    spinnerElement.style.display = "none"; // force hide in case class removal doesn’t work
 
    
+}
+
+
+/**
+ * Converts an ISO 8601 date string into a human-readable, localized format.
+ * 
+ * By default, formats dates in British English (en-GB) with 12-hour time
+ * and lowercase a.m./p.m., e.g., "Aug. 27, 2025, 4:25 p.m.".
+ * 
+ * @param {string} isoDate - The ISO 8601 date string to format, e.g., "2025-08-27T16:25:06.535Z".
+ * @param {string} [locale="en-GB"] - Optional locale code for formatting, e.g., "en-US" or "en-GB".
+ * @returns {string} A formatted, human-readable date string.
+ *
+ * @example
+ * formatIsoDate("2025-08-27T16:25:06.535Z");
+ * // Returns: "Aug. 27, 2025, 4:25 p.m."
+ * 
+ * @example
+ * formatIsoDate("2025-08-27T16:25:06.535Z", "en-US");
+ * // Returns: "Aug. 27, 2025, 4:25 p.m."
+ */
+export function formatIsoDate(isoDate, locale = "en-GB") {
+  const date = new Date(isoDate);
+
+  const formatted = date.toLocaleString(locale, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  })
+  .replace("AM", "a.m.").replace("PM", "p.m.")
+  .replace(/(\w+)\s/, "$1. ");
+
+  return formatted;
 }
 
 
@@ -367,3 +404,14 @@ export async function downloadFromResponse(resp) {
 }
 
 
+export function prependChild(parent, newChild) {
+  if (typeof parent.prepend === "function") {
+    // Modern browsers
+    parent.prepend(newChild);
+    console.log("I am here 2");
+  } else {
+    // Fallback for older browsers (like IE)
+    parent.insertBefore(newChild, parent.firstChild || null);
+    console.log("I am here 23322");
+  }
+}

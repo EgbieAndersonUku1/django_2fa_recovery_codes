@@ -1,3 +1,7 @@
+import { warnError } from "./logger.js";
+import { formatIsoDate } from "./utils.js";
+
+
 const batchKeysMapping = {
   ID: "ID",
   NUMBER_ISSUED: "Number of Code issued",
@@ -33,29 +37,11 @@ export function createRecordBatcbCard(batch) {
 
     const batchElement = createCard(batch);
     historyCardsContainer.appendChild(batchElement);
-    divContainer.appendChild(createH1Header())
     divContainer.appendChild(historyCardsContainer);
     return divContainer;
 
 }
 
-
-function createH1Header() {
-    
-    const fragment  = document.createDocumentFragment();
-    const h1Element = document.createElement("h1");
-    const hrElement = document.createElement("hr");
-
-    h1Element.classList.add("margin-top-lg", "pb-sm", "medium-title")
-    hrElement.classList.add("dividor", "margin-bottom-lg");
-
-    h1Element.textContent = "Batch Details History";
-    fragment.appendChild(h1Element);
-    fragment.appendChild(hrElement);
-    return fragment;
-
-
-}
 
 function createCard(batch) {
     const cardElement     = document.createElement("div");
@@ -64,14 +50,14 @@ function createCard(batch) {
     cardElement.className = "card";
     cardHeadElement.className = "card-head";
 
-    for (let key in batch) {
-        let label = batchKeysMapping[key];
+    for (let fieldName in batch) {
+        let label = batchKeysMapping[fieldName];
         if (label === batchKeysMapping.ID) {
             label = label.toUpperCase()
     
         }
-        const value = batch[key];
-        const infoBox = createCardInfoBox(label, value);
+        const value = batch[fieldName];
+        const infoBox = createCardInfoBox(label, value, fieldName); // label, value, field  as the class name for card p info
         cardHeadElement.appendChild(infoBox)
     }
 
@@ -80,7 +66,7 @@ function createCard(batch) {
 }
 
 
-function createCardInfoBox(label, value) {
+function createCardInfoBox(label, value, fieldName) {
 
     const infoBoxElement = document.createElement("div");
     const labelElement   = document.createElement("div");
@@ -95,14 +81,70 @@ function createCardInfoBox(label, value) {
     valueElement.className   = "value";
 
     pLabelElement.textContent = label;
-    pValueElement.textContent  = value;
+    pValueElement.textContent  = formatDateFieldIfApplicable(fieldName, value);
+
+    if (fieldName) {
+        fieldName = fieldName.toLowerCase();
+    }
+
+    
+    pValueElement.className = fieldName;
 
     labelElement.appendChild(pLabelElement);
     valueElement.appendChild(pValueElement)
+
+    
 
     infoBoxElement.appendChild(labelElement);
     infoBoxElement.appendChild(valueElement);
 
     return infoBoxElement;
 
+}
+
+/**
+ * Conditionally formats a value if it belongs to a date field.
+ * 
+ * @param {string} fieldName - The class name or field key.
+ * @param {string} value - The value to potentially format.
+ * @returns {string} Formatted value if date, otherwise original value.
+ */
+function formatDateFieldIfApplicable(fieldName, value) {
+  
+  if (batchKeysMapping && typeof batchKeysMapping === "object") {
+
+      const dateFields = [batchKeysMapping.CREATED_AT, batchKeysMapping.MODIFIED_AT];
+      if (dateFields.includes(batchKeysMapping[fieldName])) {
+        return formatIsoDate(value); 
+    }
+
+    return markCodeWithExpiryDateIfApplicableOrMarkAsDoesNotExpiry(fieldName, value)
+
+   
+  } else {
+    warnError("formatDateFieldIfApplicatble", "Missing batch key recovery mapping object object")
+  }
+
+  return value;
+}
+
+
+/**
+ * Conditionally formats a value if it belongs to a expiry date field.
+ * However, if the field is null, marks it as doesn't expiry. Assumes
+ * the file contains `batchKeyMapping` dictionary where the keys returned
+ * from the backend are mapped into readable human format
+ * 
+ * @param {string} fieldName - The class name or field key.
+ * @param {string} value - The value to potentially format.
+ * @returns {string} Formatted value if date, otherwise marks it as doesn't expiry.
+ */
+function markCodeWithExpiryDateIfApplicableOrMarkAsDoesNotExpiry(fieldName, value) {
+    const dateFields = [batchKeysMapping.EXPIRY_DATE];
+
+    if (dateFields.includes(batchKeysMapping[fieldName])) {
+        return value !== null ? formatIsoDate(value) : "Recovery code does not expiry"
+    }
+
+    return value
 }
