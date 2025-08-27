@@ -56,9 +56,9 @@ class RecoveryCodeCleanUpScheduler(models.Model):
 
 class RecoveryCodesBatch(models.Model):
     CACHE_KEYS = ["generated", "downloaded", "emailed", "viewed"]
-    JSON_KEYS  = ["number_issued", "number_removed", "number_invalidated", "number_used", "created_at",
+    JSON_KEYS  = ["id", "number_issued", "number_removed", "number_invalidated", "number_used", "created_at",
                   "modified_at", "expiry_date", "deleted_at", "deleted_by", "viewed", "downloaded",
-                  "emailed", "generated"
+                  "emailed", "generated", 
                   ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True, db_index=True)

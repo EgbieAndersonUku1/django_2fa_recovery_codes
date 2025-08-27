@@ -1,3 +1,10 @@
+<section id="dynamic-view-batch-history" class="margin-top-xlg">
+    <div class="center">
+        <span span class="loader" id="dynamic-batch-loader"></span>
+    </div>
+
+</section>
+
 {% if request.session.show_batch %}
  
 <section id="view-batch-history" class="margin-top-xlg">
@@ -6,13 +13,14 @@
         <div class="history-cards">
             <div class="cards">
 
-                <h1 class="margin-top-lg pb-sm medium-title">Batch details History</h1>
-                <hr class="dividor margin-bottom-lg">
+                <h1 class="margin-top-lg pb-sm medium-title" id="batch-details-history">Batch details History</h1>
+                <hr class="dividor margin-bottom-lg" id="dividor-batch-details-history">
 
                 {% for recovery_batch in recovery_batches %}
                 <div class="card">
 
                     <div class="card-head">
+                        
                         <div class="info-box">
                             <div class="label">
                                 <p>Batch id</p>

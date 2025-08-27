@@ -1057,12 +1057,14 @@ button {
 
 /* Show spinner when active */
 .loader.show-spinner,
+#dynamic-batch-loader,
 #table-loader-spinner {
     display: inline-block;
 }
 
 
 /* The table loader spinner */
+#dynamic-batch-loader,
 #table-loader {
     width: 30px;
     height: 30px;
@@ -1073,7 +1075,7 @@ button {
    
    
 }
-
+#dynamic-batch-loader,
 #table-container-spinner {
     height: 30px;
     overflow: hidden;

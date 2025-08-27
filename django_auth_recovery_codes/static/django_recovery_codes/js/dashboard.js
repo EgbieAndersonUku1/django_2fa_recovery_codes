@@ -19,6 +19,7 @@ import fetchData from "./fetch.js";
 import { HTMLTableBuilder } from "./generateTable.js";
 import { generateCodeActionAButtons, buttonStates, updateButtonFromConfig } from "./generateCodeActionButtons.js";
 import { notify_user } from "./notify.js";
+import { createRecordBatcbCard } from "./generateBatchHistoryCard.js";
 
 
 
@@ -30,6 +31,9 @@ const generateCodeSectionElement = document.getElementById("generate-code-sectio
 const codeTableElement = document.getElementById("table-code-view");
 const codeActionContainerElement = document.getElementById("page-buttons");
 const tempGeneratedTableContainer = document.getElementById("generated-code-table");
+const dynameicViewBatchHistorySection = document.getElementById("dynamic-view-batch-history");
+const batchHistoryH1Element = document.getElementById("batch-details-history");
+const batchHistoryHrElement = document.getElementById("dividor-batch-details-history")
 
 
 // spinner elements
@@ -43,6 +47,7 @@ const deleteAllCodeButtonSpinnerElement = document.getElementById("delete-all-co
 const downloadCodeButtonElementSpinner = document.getElementById("download-code-loader");
 const invalidateSpinnerElement = document.getElementById("invalidate-code-loader");
 const tableCoderSpinnerElement = document.getElementById("table-loader");
+const dynamicBatchSpinnerElement = document.getElementById("dynamic-batch-loader");
 
 // button elements
 const generateButtonElement = document.getElementById("generate-code-button-wrapper");
@@ -130,6 +135,7 @@ const statsTotalCodesRemovedBoard = document.getElementById("stat__total-codes-r
 
 // constants
 const MILLI_SECONDS_BEFORE_DISPLAY = 1000;
+const MILLI_SECONDS = 6000
 const REGENERATE_BUTTON_ID = "regenerate-code-btn";
 const EMAIL_BUTTON_ID = "email-code-btn";
 const DELETE_CURRENT_CODE_BUTTON_ID = "delete-current-code-btn";
@@ -141,6 +147,7 @@ const GENERATE_CODE_WITH_NO_EXPIRY = "generate-code-with-no-expiry-btn";
 const OPEN_NAV_BAR_HAMBURGERR_ICON = "open-hamburger-nav-icon";
 const CLOSE_NAV_BAR_ICON = "close-nav-icon";
 const enqueueMessages = [];
+const CODE_BATCH_SECTION_ID = "view-batch-history";
 
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -150,6 +157,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 let alertMessage;
+
+hideViewBatchHistoryHeaders();
 
 
 // configuration
@@ -1025,18 +1034,21 @@ async function handleRecoveryCodesAction({ e,
         handleGenerateCodeFetchApi
     )
 
-    console.log(resp)
     if (resp.SUCCESS) {
 
         statsTotalCodesIssuedBoard.textContent = resp.TOTAL_ISSUED;
         toggleElement(generateCodeSectionElement);
-
+    
         const isPopulated = populateTableWithUserCodes(resp.CODES);
 
+    
+        console.log(resp.BATCH)
         if (isPopulated) {
             sendPostFetchWithoutBody("/auth/recovery-codes/viewed/",
                 "Failed to mark code as viewed "
             );
+            
+            insertBatchCardIntoSection(resp.BATCH);
         }
         return true;
 
@@ -1203,9 +1215,6 @@ function populateTableWithUserCodes(codes) {
 
     const tableElement = HTMLTableBuilder(colHeaders, codes, tableObjectData);
 
-
-
-
     if (tableElement) {
         messageContainerElement.classList.add("show");
         messagePTag.textContent = "Your recovery codes are now ready...";
@@ -1226,7 +1235,7 @@ function populateTableWithUserCodes(codes) {
                 generateCodeActionAButtons();
                 codeActionContainerElement.appendChild(generateCodeActionAButtons());
             }
-            console.log(generateCodeSectionElement);
+            
 
             if (generateCodeSectionElement === null) {
                 codeActionContainerElement.innerHTML = "";
@@ -1289,7 +1298,31 @@ function pickRightDivAndPopulateTable(tableCodesElement) {
 }
 
 
+function insertBatchCardIntoSection(batch) {
+    const codeSectionElement = document.getElementById(CODE_BATCH_SECTION_ID);
+    const historyCard        = createRecordBatcbCard(batch);
+    
+    dynamicBatchSpinnerElement.style.display = "inline-block";
+    toggleSpinner(dynamicBatchSpinnerElement);
+
+    console.log(historyCard);
+
+    setTimeout(() => {
+        if (codeSectionElement === null) {
+
+        } else {
+            dynameicViewBatchHistorySection.appendChild(historyCard);
+            toggleSpinner(dynamicBatchSpinnerElement, false);
+             dynamicBatchSpinnerElement.style.display = "none";
+        }
+
+    }, (MILLI_SECONDS_BEFORE_DISPLAY + MILLI_SECONDS) )
+ 
+}
 
 
 
-
+function hideViewBatchHistoryHeaders() {
+    toggleElement(batchHistoryH1Element);
+    toggleElement(batchHistoryHrElement);
+}
