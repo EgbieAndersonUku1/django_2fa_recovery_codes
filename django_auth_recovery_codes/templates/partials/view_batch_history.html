@@ -3,9 +3,26 @@
 <hr class="dividor">
 {% endif %}
 
+
+<!-- 
+Dynamic Recovery Batch History Section
+
+This section serves as the container for all recovery batch history cards.
+- The structure is static to maintain consistent layout and styling.
+- The loader (<span id="dynamic-batch-loader">) is shown while batches are being fetched or generated.
+- The <div class="cards"> container holds individual batch cards, which are added dynamically via JavaScript.
+- Helper functions like `prependChild` and `getNthChildFast` are used to manipulate the cards efficiently.
+-->
 <section id="dynamic-view-batch-history" class="">
     <div class="center">
         <span span class="loader" id="dynamic-batch-loader"></span>
+    </div>
+    <div class="container">
+        <div class="history-cards">
+            <div class="cards" id="dynamic-cards-card-history">
+
+            </div>
+        </div>
     </div>
 
 </section>
@@ -16,7 +33,7 @@
     <div class="container">
 
         <div class="history-cards">
-            <div class="cards">
+            <div class="cards" id="static-batch-cards-history">
 
                
                 {% for recovery_batch in recovery_batches %}
@@ -30,7 +47,7 @@
                             </div>
 
                             <div class="value">
-                                <p>{{ recovery_batch.id | upper  }}</p>
+                                <p class="id">{{ recovery_batch.id | upper  }}</p>
                             </div>
                         </div>
 
@@ -41,7 +58,7 @@
 
                             <div class="value">
                                
-                                <p class="recovery_status {% if recovery_batch.status == Status.ACTIVE %} text-green {% else %} text-red {% endif %}">
+                                <p class="expiry_date recovery_status {% if recovery_batch.status == Status.ACTIVE %} text-green {% else %} text-red {% endif %}">
                                         {{ recovery_batch.frontend_status }}
                                       
                                 </p>
@@ -54,7 +71,7 @@
                             </div>
 
                             <div class="value">
-                                <p>{{ recovery_batch.user.username | title }}  </p>
+                                <p class="username">{{ recovery_batch.user.username | title }}  </p>
                             </div>
                         </div>
 
@@ -64,7 +81,7 @@
                             </div>
 
                             <div class="value">
-                                <p>{{ recovery_batch.created_at }}</p>
+                                <p class="created_at">{{ recovery_batch.created_at }}</p>
                             </div>
                         </div>
 
@@ -74,7 +91,7 @@
                             </div>
 
                             <div class="value">
-                                <p>{{ recovery_batch.modified_at }}</p>
+                                <p class="modified_at">{{ recovery_batch.modified_at }}</p>
                             </div>
                         </div>
 
@@ -85,7 +102,7 @@
                             </div>
 
                             <div class="value">
-                                <p>{{ recovery_batch.deleted_at }}</p>
+                                <p class="deleted_at">{{ recovery_batch.deleted_at }}</p>
                             </div>
                         </div>
 
@@ -95,7 +112,7 @@
                             </div>
 
                             <div class="value">
-                                <p>{{ recovery_batch.deleted_by }}</p>
+                                <p class="deleted_by">{{ recovery_batch.deleted_by }}</p>
                             </div>
                         </div>
                         {% endif %}
@@ -104,18 +121,18 @@
                                 <p>Number of Code issued</p>
                             </div>
 
-                            <div class="value">
+                            <div class="value number_issued">
                                 <p>{{ recovery_batch.number_issued }}</p>
                             </div>
                         </div>
 
                         <div class="info-box">
                             <div class="label">
-                                <p>Number of Code used</p>
+                                <p class="number_issued">Number of Code used</p>
                             </div>
 
                             <div class="value">
-                                <p>{{ recovery_batch.number_used }}</p>
+                                <p class="number_used">{{ recovery_batch.number_used }}</p>
                             </div>
                         </div>
 
@@ -124,7 +141,7 @@
                                 <p>Number of deactivated</p>
                             </div>
 
-                            <div class="value">
+                            <div class="value number_invalidated">
                                 <p>{{ recovery_batch.number_invalidated }}</p>
                             </div>
                         </div>
@@ -134,7 +151,7 @@
                                 <p>Number of removed</p>
                             </div>
 
-                            <div class="value">
+                            <div class="value number_removed">
                                 <p>{{ recovery_batch.number_removed }}</p>
                             </div>
                         </div>
@@ -148,8 +165,8 @@
 
                             <div class="value">
                                
-                                <p class="">
-                                        {{ recovery_batch.generated }}
+                                <p class="generated">
+                                    {{ recovery_batch.generated }}
                                 </p>
 
                             </div>
@@ -163,8 +180,8 @@
 
                             <div class="value">
                                
-                                <p class="">
-                                        {{ recovery_batch.viewed }}
+                                <p class="viewed">
+                                    {{ recovery_batch.viewed }}
                                 </p>
 
                             </div>
@@ -179,8 +196,8 @@
 
                             <div class="value">
                                
-                                <p class="">
-                                        {{ recovery_batch.downloaded }}
+                                <p class="downloaded">
+                                    {{ recovery_batch.downloaded }}
                                 </p>
 
                             </div>
@@ -194,8 +211,8 @@
 
                             <div class="value">
                                
-                                <p class="">
-                                        {{ recovery_batch.emailed  }}
+                                <p class="emailed">
+                                    {{ recovery_batch.emailed  }}
                                 </p>
 
                             </div>

@@ -1,5 +1,5 @@
 
-import { warnError } from "./logger.js";
+import { logError, warnError } from "./logger.js";
 import { specialChars } from "./specialChars.js";
 
 /**
@@ -408,10 +408,64 @@ export function prependChild(parent, newChild) {
   if (typeof parent.prepend === "function") {
     // Modern browsers
     parent.prepend(newChild);
-    console.log("I am here 2");
+   
   } else {
     // Fallback for older browsers (like IE)
     parent.insertBefore(newChild, parent.firstChild || null);
-    console.log("I am here 23322");
+   
   }
+}
+
+
+
+/**
+ * Returns the nth child element of a given parent, optionally filtered by tag name.
+ *
+ * @param {HTMLElement} parent - The parent HTML element.
+ * @param {number} n - The 1-based index of the child (1 = first child).
+ * @param {string} [tagName] - Optional tag name to filter by (e.g., 'div', 'span').
+ * @returns {HTMLElement|null} The nth matching child or null if not found.
+ */
+export function getNthChildFast(parent, n, tagName) {
+  if (!checkIfHTMLElement(parent, "getNthChildFast")) return null;
+
+  if (typeof n !== "number" || !Number.isInteger(n) || n < 1) {
+    logError("getNthChildFast", `The value 'n' must be a positive integer. Got: ${n}`);
+    return null;
+  }
+
+  let children = Array.from(parent.children);
+
+  if (tagName) {
+    children = children.filter(child => child.tagName.toLowerCase() === tagName.toLowerCase());
+  }
+
+  return children[n - 1] || null; // 1-based index
+}
+
+
+/**
+ * Returns the nth child of a parent element, optionally filtering by tag name,
+ * and optionally returning a nested child by class name. This is useful 
+ * because it doesn't query the DOM to find a nested element, making it more
+ * efficient for dynamic dashboards.
+ *
+ * @param {HTMLElement} parent - The parent element.
+ * @param {number} n - 1-based index of the child (1 = first child).
+ * @param {string} [tagName] - Optional tag name to filter by (e.g., "div").
+ * @param {string} [nestedClass] - Optional class name to get a nested child of the nth child.
+ * @returns {HTMLElement|null} The element found or null if not found.
+ */
+export function getNthChildNested(parent, n, tagName, nestedClass) {
+    
+  const nthChild = getNthChildFast(parent, n, tagName);
+
+  if (!nthChild) return null;
+
+  if (nestedClass) {
+    // Find the first direct child with the specified class
+    return Array.from(nthChild.children).find(c => c.classList.contains(nestedClass)) || null;
+  }
+
+  return nthChild;
 }

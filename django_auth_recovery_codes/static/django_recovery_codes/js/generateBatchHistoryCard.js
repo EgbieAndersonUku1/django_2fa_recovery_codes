@@ -2,6 +2,19 @@ import { warnError } from "./logger.js";
 import { formatIsoDate } from "./utils.js";
 
 
+/**
+ * Mapping of batch object keys to human-readable labels.
+ *
+ * This object is used to convert the internal field names of a recovery code batch
+ * into user-friendly labels for display in the summary card.
+ *
+ * Keys correspond to the property names in a batch object, and values are
+ * the labels that will appear in the HTML card.
+ *
+ * Example usage:
+ * const label = batchKeysMapping.NUMBER_ISSUED; // "Number of Code issued"
+ */
+
 const batchKeysMapping = {
   ID: "ID",
   NUMBER_ISSUED: "Number of Code issued",
@@ -21,29 +34,34 @@ const batchKeysMapping = {
 
 
 
+/**
+ * Generates an HTML summary card for a batch of recovery codes.
+ *
+ * This function creates a <div> element representing a card that displays
+ * summary information about the provided batch object. Each property
+ * in the batch is converted into an info box within the card header.
+ *
+ * @param {Object} batch - An object representing a batch of recovery codes.
+ *                         Keys correspond to batch fields, and values are the
+ *                         associated data.
+ *
+ * @throws {Error} Throws an error if the input is not an object.
+ *
+ * @returns {HTMLElement} A <div> element representing the summary card, 
+ *                        with child elements containing labelled info boxes 
+ *                        for each field in the batch.
+ *
+ * @example
+ * const batch = { id: 1, issued: 10, used: 2 };
+ * const card = generateRecoveryCodesSummaryCard(batch);
+ * document.body.appendChild(card);
+ */
+export function generateRecoveryCodesSummaryCard(batch) {
 
-
-export function createRecordBatcbCard(batch) {
-
-    if (typeof batch !== "object") {
+     if (typeof batch !== "object") {
         throw new Error(`The batch should be an array. Expected array but got an object with type ${typeof batch}`)
     }
-    const divContainer          = document.createElement("div");
-    const historyCardsContainer = document.createElement("div");
-    const cards                 = document.createElement("div")
-    divContainer.className      = "container";
-    historyCardsContainer.className = "history-cards";
-    cards.className                 = "cards"
-
-    const batchElement = createCard(batch);
-    historyCardsContainer.appendChild(batchElement);
-    divContainer.appendChild(historyCardsContainer);
-    return divContainer;
-
-}
-
-
-function createCard(batch) {
+  
     const cardElement     = document.createElement("div");
     const cardHeadElement = document.createElement("div");
 
@@ -57,7 +75,7 @@ function createCard(batch) {
     
         }
         const value = batch[fieldName];
-        const infoBox = createCardInfoBox(label, value, fieldName); // label, value, field  as the class name for card p info
+        const infoBox = generateRecoveryCodesSummaryCardInfoBox(label, value, fieldName); // label, value, field  as the class name for card p info
         cardHeadElement.appendChild(infoBox)
     }
 
@@ -66,7 +84,32 @@ function createCard(batch) {
 }
 
 
-function createCardInfoBox(label, value, fieldName) {
+
+/**
+ * Generates an individual info box element for a recovery codes summary card.
+ *
+ * This function creates a <div> element representing a single info box that displays
+ * a label and its corresponding value from a batch object.
+ *
+ * @param {string} label - The human-readable label to display (from batchKeysMapping).
+ * @param {*} value - The value corresponding to the label. Dates will be formatted
+ *                    via `formatDateFieldIfApplicable`.
+ * @param {string} fieldName - The key name of the field in the batch object. Used
+ *                             for setting the CSS class on the value element.
+ *
+ * @returns {HTMLElement} A <div> element with class "info-box" containing two
+ *                        child divs: "label" and "value", each with a <p> element
+ *                        for text content.
+ *
+ * @example
+ * const infoBox = generateRecoveryCodesSummaryCardInfoBox(
+ *   "Number of Code issued",
+ *   10,
+ *   "NUMBER_ISSUED"
+ * );
+ * document.body.appendChild(infoBox);
+ */
+function generateRecoveryCodesSummaryCardInfoBox(label, value, fieldName) {
 
     const infoBoxElement = document.createElement("div");
     const labelElement   = document.createElement("div");
@@ -74,7 +117,6 @@ function createCardInfoBox(label, value, fieldName) {
 
     const pLabelElement  = document.createElement("p");
     const pValueElement   = document.createElement("p");
-
 
     infoBoxElement.className = "info-box";
     labelElement.className   = "label";
@@ -87,13 +129,17 @@ function createCardInfoBox(label, value, fieldName) {
         fieldName = fieldName.toLowerCase();
     }
 
-    
+   
     pValueElement.className = fieldName;
 
+    if (label === batchKeysMapping.STATUS  ){
+        pValueElement.classList.add("text-green", "bold")
+    }
+
+  
     labelElement.appendChild(pLabelElement);
     valueElement.appendChild(pValueElement)
 
-    
 
     infoBoxElement.appendChild(labelElement);
     infoBoxElement.appendChild(valueElement);
@@ -101,6 +147,8 @@ function createCardInfoBox(label, value, fieldName) {
     return infoBoxElement;
 
 }
+
+
 
 /**
  * Conditionally formats a value if it belongs to a date field.
@@ -129,6 +177,7 @@ function formatDateFieldIfApplicable(fieldName, value) {
 }
 
 
+
 /**
  * Conditionally formats a value if it belongs to a expiry date field.
  * However, if the field is null, marks it as doesn't expiry. Assumes
@@ -148,3 +197,4 @@ function markCodeWithExpiryDateIfApplicableOrMarkAsDoesNotExpiry(fieldName, valu
 
     return value
 }
+

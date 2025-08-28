@@ -1,5 +1,6 @@
 <!-- pagination -->
 
+{% if is_generated %}
 <section id="pagination" class="flex flex-end margin-bottom-xlg margin-top-lg">
 
     {% if recovery_batches.has_previous %}
@@ -17,4 +18,6 @@
     
 
 </section>
+
+{% endif %}
 

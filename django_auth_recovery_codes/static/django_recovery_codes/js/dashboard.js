@@ -10,6 +10,7 @@ import {
     showEnqueuedMessages,
     downloadFromResponse,
     prependChild,
+    getNthChildNested
   
  
 } from "./utils.js";
@@ -33,9 +34,8 @@ const generaterecoveryBatchSectionElement = document.getElementById("generate-co
 const codeTableElement = document.getElementById("table-code-view");
 const codeActionContainerElement = document.getElementById("page-buttons");
 const tempGeneratedTableContainer = document.getElementById("generated-code-table");
-const dynameicViewBatchHistorySection = document.getElementById("dynamic-view-batch-history");
-const batchHistoryH1Element = document.getElementById("batch-details-history");
-const batchHistoryHrElement = document.getElementById("dividor-batch-details-history")
+const dynamicViewBatchCardHistorySection = document.getElementById("dynamic-cards-card-history");
+
 
 
 // spinner elements
@@ -149,7 +149,7 @@ const GENERATE_CODE_WITH_NO_EXPIRY = "generate-code-with-no-expiry-btn";
 const OPEN_NAV_BAR_HAMBURGERR_ICON = "open-hamburger-nav-icon";
 const CLOSE_NAV_BAR_ICON = "close-nav-icon";
 const enqueueMessages = [];
-const CODE_BATCH_SECTION_ID = "view-batch-history";
+const CODE_BATCH_CARDS_DIV_ID = "static-batch-cards-history";
 
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -159,6 +159,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 let alertMessage;
+let recoveryBatchSectionElement;
 
 // hideViewBatchHistoryHeaders();
 
@@ -1301,32 +1302,67 @@ function pickRightDivAndPopulateTable(tableCodesElement) {
 
 
 function insertBatchCardIntoSection(batch) {
-    const recoveryBatchSectionElement = document.getElementById(CODE_BATCH_SECTION_ID);
+
+    // cache the recoveryBatch element
+    if (!recoveryBatchSectionElement) {
+        recoveryBatchSectionElement = document.getElementById(CODE_BATCH_CARDS_DIV_ID);
+    }
+  
     const historyCard        = createRecordBatcbCard(batch);
+    let secondRecoveryCardBatch;
+    const TAG_NAME = "div";
+    const CLASS_SELECTOR = "card-head";
     
     dynamicBatchSpinnerElement.style.display = "inline-block";
     toggleSpinner(dynamicBatchSpinnerElement);
 
-    console.log(historyCard);
-
+    // if the recoveryBatchSectionElement is null it means that recovery section doesn't
+    // exist. This means that the user has not generated recovery codes so 
+    // the jinja (if-statement)from the backend blocks the code section area from showing up, so from the DOM
+    // prespective that section doesn't exists. If this is the case had the codes to the dynamic temp
+    // history section
     setTimeout(() => {
+
+
         if (recoveryBatchSectionElement !== null) {
             prependChild(recoveryBatchSectionElement, historyCard)
+            secondRecoveryCardBatch = getNthChildNested(recoveryBatchSectionElement, 2, TAG_NAME, CLASS_SELECTOR);
+            console.log(secondRecoveryCardBatch)
+             markCardAsDeleted(secondRecoveryCardBatch)
             toggleSpinner(dynamicBatchSpinnerElement, false);
-
+            console.log("-----------------------------------")
+        
 
         } else {
-            dynameicViewBatchHistorySection.appendChild(historyCard);
-            toggleSpinner(dynamicBatchSpinnerElement, false);
+         
+            dynamicViewBatchCardHistorySection.appendChild(historyCard);
+            secondRecoveryCardBatch = getNthChildNested(dynamicViewBatchCardHistorySection, 2, TAG_NAME, CLASS_SELECTOR)
+            markCardAsDeleted(secondRecoveryCardBatch)
+           
         }
+
+       ;
+        toggleSpinner(dynamicBatchSpinnerElement, false);
 
     }, (MILLI_SECONDS_BEFORE_DISPLAY + MILLI_SECONDS) )
  
 }
 
 
+function markCardAsDeleted(cardElement) {
 
-function hideViewBatchHistoryHeaders() {
-    toggleElement(batchHistoryH1Element);
-    toggleElement(batchHistoryHrElement);
+  if (cardElement === null) return;
+
+  const statusElements = cardElement.querySelectorAll('.card-head .info-box .value p');
+  if (!statusElements.length) return;
+
+
+  for (const pElement of statusElements) {
+    if (p.classList.contains('status')) {
+      pElement.textContent = "Deleted";
+      pElement.classList.remove("text-green");
+      pElement.classList.add("text-red", "bold");
+      break; 
+    }
+  }
 }
