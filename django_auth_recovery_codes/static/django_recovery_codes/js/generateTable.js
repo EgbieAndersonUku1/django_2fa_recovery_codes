@@ -206,7 +206,7 @@ function buildTableBody(rowsDataList) {
 
             colsData.forEach((colData) => {
                 const tdElement = document.createElement("td");
-                tdElement.textContent = toTitle(colData);
+                tdElement.textContent = colData;
                 trElement.appendChild(tdElement);
             })
             tBodyElement.appendChild(trElement);

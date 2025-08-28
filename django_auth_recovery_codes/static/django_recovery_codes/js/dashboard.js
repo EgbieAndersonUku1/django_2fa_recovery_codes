@@ -956,7 +956,7 @@ function handleInputFieldHelper(e) {
 
     const LENGTH_PER_DASH = 6;
 
-    e.target.value = sanitizeText(inputField.value, false, true, ["2", "3", "4", "5", "6", "7", "8", "9"]).toUpperCase();
+    e.target.value = sanitizeText(inputField.value, false, true, ["2", "3", "4", "5", "6", "7", "8", "9"]);
     applyDashToInput(e, LENGTH_PER_DASH);
 
 

@@ -89,7 +89,7 @@ def delete_recovery_code(request):
 
         response_data = {'SUCCESS': False}
 
-        recovery_code  = RecoveryCode.get_by_code(plaintext_code)
+        recovery_code  = RecoveryCode.get_by_code(plaintext_code, request.user)
 
         if not recovery_code:
             return False, response_data
@@ -136,16 +136,15 @@ def invalidate_user_code(request):
     def invalidate_code(plaintext_code: str) -> Tuple[bool, dict]:
 
         response_data = {'SUCCESS': False}
-
-        recovery_code  = RecoveryCode.get_by_code(plaintext_code)
-        
+       
+        recovery_code  = RecoveryCode.get_by_code(plaintext_code, request.user)
         if not recovery_code:
             return False, response_data
 
         recovery_code.invalidate_code()
         
         recovery_batch = recovery_code.batch
-        recovery_batch.update_invalidate_code_count(0)
+        recovery_batch.update_invalidate_code_count()
 
         response_data.update({'SUCCESS': True})
     

@@ -1,21 +1,21 @@
+from __future__ import annotations 
+
 import uuid
 
 from django.db import models, connections
-from django.contrib.auth.hashers import make_password, check_password
 from django.db.models import F
+from django.db import transaction
 from django.utils import timezone
-from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import make_password, check_password
 from django_email_sender.models import EmailBaseLog
 
 from django_auth_recovery_codes.utils.security.generator import generate_2fa_secure_recovery_code
-from django_auth_recovery_codes.utils.security.security import is_already_hashed
+from django_auth_recovery_codes.utils.security.hash import is_already_hashed, make_lookup_hash
 from django_auth_recovery_codes.utils.utils import schedule_future_date, create_json_from_attrs
 
 
 User = get_user_model()
-
-
 
 
 class Status(models.TextChoices):
@@ -342,45 +342,44 @@ class RecoveryCodesBatch(models.Model):
         if days_to_expire and not isinstance(days_to_expire, int):
             raise TypeError(f"Expected int for days_to_expire, got {type(days_to_expire).__name__}")
 
-        # Create batch instance
-        batch_instance = cls(user=user, number_issued=batch_number)
-        if days_to_expire:
-            batch_instance.expiry_date = schedule_future_date(days=days_to_expire)
-        batch_instance.mark_as_generated()
-  
         raw_codes = []
         batch     = []
        
         CHUNK_SIZE = 50
 
-        cls._deactivate_all_batches_except_current(batch_instance)
-
-        for _ in range(batch_number):
-
-            raw_code      = generate_2fa_secure_recovery_code()
-            recovery_code = RecoveryCode(user=user, batch=batch_instance)
-            recovery_code.hash_raw_code(raw_code)
-
+         # Everything inside here is atomic
+         # this means that if creating one model fails it won't create the other
+         # Since the RecoveryCodeBatch and RecoveryCode models must be created.
+         # if one fails The changes will be rolled back
+        with transaction.atomic(): 
+        
+            batch_instance = cls(user=user, number_issued=batch_number)
             if days_to_expire:
-                recovery_code.days_to_expire = days_to_expire
+                batch_instance.expiry_date = schedule_future_date(days=days_to_expire)
+            batch_instance.mark_as_generated()
 
-            # returns a list of list where each list is a row for a table and the elements
-            # inside the rows are the cells or column for table. This allows the frontend
-            # to easily render the table
-            raw_codes.append(["unused", raw_code]) 
-            batch.append(recovery_code)
+            cls._deactivate_all_batches_except_current(batch_instance)
 
-            if len(batch) >= CHUNK_SIZE:
+            for _ in range(batch_number):
+                raw_code = generate_2fa_secure_recovery_code()
+                recovery_code = RecoveryCode(user=user, batch=batch_instance)
+                recovery_code.hash_raw_code(raw_code)
+                if days_to_expire:
+                    recovery_code.days_to_expire = days_to_expire
+
+                raw_codes.append(["unused", raw_code])
+                batch.append(recovery_code)
+
+                if len(batch) >= CHUNK_SIZE:
+                    cls._if_async_supported_async_bulk_create_or_use_sync_bulk_crate(batch)
+                    batch.clear()
+
+            # Insert any remaining codes
+            if batch:
                 cls._if_async_supported_async_bulk_create_or_use_sync_bulk_crate(batch)
-                batch.clear()
 
-        # Insert any remaining codes
-        if batch:
-            cls._if_async_supported_async_bulk_create_or_use_sync_bulk_crate(batch)
-           
-        return raw_codes, batch_instance
-
-
+            return raw_codes, batch_instance
+        
     @classmethod
     def delete_recovery_batch(cls, user: "User"):
         """
@@ -397,7 +396,7 @@ class RecoveryCodesBatch(models.Model):
         """
         
         try:
-            recovery_batch = RecoveryCodesBatch.objects.prefetch_related('recovery_codes').get(user=user, status=Status.ACTIVE)
+            recovery_batch = RecoveryCodesBatch.objects.select_related('recovery_codes').get(user=user, status=Status.ACTIVE)
         except cls.DoesNotExist:
             return False
         
@@ -436,17 +435,34 @@ class RecoveryCodesBatch(models.Model):
 
 class RecoveryCode(models.Model):
     id                = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True, db_index=True)
-    hash_code         = models.CharField(max_length=128, unique=True, db_index=True)
-    mark_for_deletion = models.BooleanField(default=False)
+    hash_code         = models.CharField(max_length=128, db_index=True, null=False, editable=False)
+    look_up_hash      = models.CharField(max_length=128, unique=True, db_index=True, blank=True, editable=False)
+    mark_for_deletion = models.BooleanField(default=False, db_index=True)
     created_at        = models.DateTimeField(auto_now_add=True)
     modified_at       = models.DateTimeField(auto_now=True)
-    status            = models.CharField(choices=Status, max_length=1, default=Status.ACTIVE)
+    status            = models.CharField(choices=Status, max_length=1, default=Status.ACTIVE, db_index=True)
     user              = models.ForeignKey(User, on_delete=models.CASCADE, related_name="recovery_codes")
     batch             = models.ForeignKey(RecoveryCodesBatch, on_delete=models.CASCADE, related_name="recovery_codes")
     automatic_removal = models.BooleanField(default=True)
-    days_to_expire    = models.PositiveSmallIntegerField(default=0)
+    days_to_expire    = models.PositiveSmallIntegerField(default=0, db_index=True)
     code_downloaded   = models.BooleanField(default=False)
     code_emailed      = models.BooleanField(default=False)
+    is_used           = models.BooleanField(default=False)
+    is_deactived      = models.BooleanField(default=False)
+
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["user", "look_up_hash"], name="user_lookup_idx"),
+        ]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'look_up_hash'],
+                name='unique_user_lookup_hash'
+            )
+        ]
+       
 
     def __str__(self):
         """Returns a string representation of the class"""
@@ -509,7 +525,9 @@ class RecoveryCode(models.Model):
             code.some_other_field = "new value"
             code.save()  # Both changes persisted together
         """
-        self.status = Status.INVALIDATE
+        self.status        = Status.INVALIDATE
+        self.is_deactived  = True
+
         if save:
             self.save(update_fields=["status"])
         return True
@@ -542,46 +560,124 @@ class RecoveryCode(models.Model):
             self.save(update_fields=["status"])
         return self
 
-    @classmethod
-    def get_by_code(cls, code: str) -> "RecoveryCode":
+    def verify_recovery_code(self, plaintext_code: str) -> bool:
         """
-        Retrieve the RecoveryCode instance associated with a given plaintext code.
+        Verify a recovery code against its stored Django-hashed value.
 
-        The model stores only hashed codes. This method hashes the provided plaintext code
-        and uses it to looks up the corresponding model instance.
+        Workflow:
+        1. Lookup hash (deterministic HMAC) is used for efficient DB queries.
+        This narrows down the candidate code but is not secure on its own.
 
-        :Parameters
-            code (str):  The plaintext code to be hashed and checked against the database.
+        2. check_password() is used on the Django-hashed code to securely verify
+        the plaintext code entered by the user against their hash password stored
+        on record.
+        
+        Django hashing includes:
+        - Salt (randomized per code)
+        - Multiple iterations
+        - Resistance to brute-force and rainbow attacks
 
-        :Returns
-            
-            RecoveryCode or None
-                Returns the corresponding RecoveryCode instance if found, or None if no matching code exists.
+        Parameters
+        ----------
+        code : str
+            The plaintext recovery code entered by the user.
+
+        Returns
+        -------
+        bool
+            True if the code matches the stored hash, False otherwise.
 
         Notes
-           
-            - The lookup is performed using the hashed code, not the plaintext.
-            - If the provided `code` is not a string, a ValueError is raised.
-            - Uses `select_related('batch')` to efficiently fetch the related batch in the same query.
-
-         Example
-            -------
-            >>> recovery_code = RecoveryCode.get_by_code("ABC123")  # Fetches the code and batch in one query
-            >>> if recovery_code:
-            >>>     print(recovery_code.batch)  # No additional query; batch is already loaded
+        -----
+        - Even if the candidate was retrieved using lookup_hash, skipping check_password
+        would weaken security. Both steps are necessary.
         """
-        if not isinstance(code, str):
+        return check_password(plaintext_code, self.hash_code)
+
+    @classmethod
+    def get_by_code(cls, plaintext_code: str, user: User) -> RecoveryCode | None:
+        """
+        Retrieve a RecoveryCode instance for a user by plaintext code.
+
+        Workflow:
+        1. Compute a deterministic lookup hash (HMAC) for the code to perform a fast
+        database query. This narrows down the candidate record but is NOT secure
+        on its own.
+        2. If a candidate is found, use Django's check_password() on the stored
+        hashed code in the model used by `make_password` to verify the plaintext 
+        code securely. Django hashing includes salt, multiple iterations, and 
+        is resistant to brute-force and rainbow table attacks.
+
+        Args:
+            user (User): The user who owns the recovery code.
+            code (str):  The plaintext recovery code entered by the user.
+
+        Returns:
+
+        RecoveryCode or None
+            Returns the corresponding RecoveryCode instance if found and verified,
+            otherwise None.
+
+        Notes
+        -----
+        - Do NOT attempt to query the DB using make_password(code), as it generates
+        a new salted hash every time and will never match the stored hash.
+
+        - Using both lookup_hash (fast query) and check_password (secure verification)
+        ensures both efficiency and security.
+
+        - select_related('batch') is used for efficient fetching of the related batch.
+
+        Example
+        -------
+        >>> recovery_code = RecoveryCode.get_by_code("ABCD-1234", user)
+        >>> if recovery_code:
+        >>>     print("Code verified!", recovery_code.batch)
+        """
+        if not isinstance(plaintext_code, str):
             raise ValueError(f"The code parameter is not a string. Expected a string but got an object with type {type(code)}")
         
-        hashed_code = make_password(code.strip())
+        plaintext_code = plaintext_code.replace("-", "")
+        lookup = make_lookup_hash(plaintext_code.strip())
 
         try:
-            return cls.objects.select_related("batch").get(hash_code=hashed_code)
+            # Use lookup_hash to narrow down the correct recovery code.
+            # Each user can have multiple codes, so filtering by user alone is insufficient.
+            candidate = cls.objects.select_related("batch").get(user=user, look_up_hash=lookup)
         except cls.DoesNotExist:
             return None
-    
+        
+        is_valid = candidate.verify_recovery_code(plaintext_code)
+        return candidate if is_valid else None
+
     def hash_raw_code(self, code: str):
+        """Hashes a plaintext recovery code and stores it securely in the instance.
+
+        This method uses Django's `make_password` to generate a salted, cryptographically
+        secure hash of the provided code. The result is stored in `self.hash_code` and
+        can later be verified using `check_password`.
+
+        Args:
+            code (str): The plaintext recovery code to be hashed and stored.
+
+        Raises:
+            None
+
+        Notes:
+            - This method is only for storing or updating the hashed code.
+            - Do NOT use this hashed value for database queries; `make_password` generates
+            a new salted hash each time and will not match the stored hash.
+            - For database lookups, use `make_lookup_hash` to find the candidate record,
+            then verify using `check_password`.
+
+        Examples:
+            >>> recovery_code = RecoveryCode()
+            >>> recovery_code.hash_raw_code("ABCD-1234")
+            >>> recovery_code.save()
+        """
         if code:
+            code = code.replace("-", "").strip()
+            self.look_up_hash = make_lookup_hash(code)
             self.hash_code = make_password(code)
     
     def save(self, *args, **kwargs):
@@ -590,7 +686,7 @@ class RecoveryCode(models.Model):
 
         # ensure that is code is always saved as hash and never as a plaintext
         if self.hash_code and not is_already_hashed(self.hash_code):
-            self.hash_code = make_password(self.hash_code)
+            self.hash_code = self.hash_raw_code(self.hash_code)
         super().save(*args, **kwargs)
 
 

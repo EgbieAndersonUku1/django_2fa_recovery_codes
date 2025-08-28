@@ -391,13 +391,13 @@ export async function downloadFromResponse(resp) {
     // Convert response to Blob which would enable it to be downloaded
     const blob = await resp.blob();
     
-    // Trigger download which shows up in the icon on the browser
+    // Trigger download which shows up in the icon on the browser when item is downloading
     const url  = window.URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href     = url;
-    a.download = filename;
-    a.click();
-    a.remove();
+    const aElement    = document.createElement("a");
+    aElement.href     = url;
+    aElement.download = filename;
+    aElement.click();
+    aElement.remove();
     window.URL.revokeObjectURL(url);
 
     return { success, filename };
