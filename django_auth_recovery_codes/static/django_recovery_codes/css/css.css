@@ -335,6 +335,10 @@ xxxl - 64px
     color: var(--red-text-color);
 }
 
+.text-green {
+    color: var(--green-primary);
+}
+
 
 /* ------------------------------------------ */
 /*                 FONT WEIGHTS               */
@@ -1053,12 +1057,14 @@ button {
 
 /* Show spinner when active */
 .loader.show-spinner,
+#dynamic-batch-loader,
 #table-loader-spinner {
     display: inline-block;
 }
 
 
 /* The table loader spinner */
+#dynamic-batch-loader,
 #table-loader {
     width: 30px;
     height: 30px;
@@ -1069,7 +1075,7 @@ button {
    
    
 }
-
+#dynamic-batch-loader,
 #table-container-spinner {
     height: 30px;
     overflow: hidden;
@@ -1418,6 +1424,11 @@ button {
      input {
         font-size: 1rem;
     };
+
+      #invalidate-form-container {
+        display: grid;
+        grid-template-columns: repeat(1, 1fr);
+    }
 }
 
 
@@ -1476,13 +1487,13 @@ button {
     
     .nav-icon {
          display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  color: white;
-  font-size: 1.2rem;
+        justify-content: center;
+        align-items: center;
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        color: white;
+        font-size: 1.2rem;
     }
 
     

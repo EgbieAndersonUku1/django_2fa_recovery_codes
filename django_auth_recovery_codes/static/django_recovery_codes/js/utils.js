@@ -1,5 +1,5 @@
 
-import { warnError } from "./logger.js";
+import { logError, warnError } from "./logger.js";
 import { specialChars } from "./specialChars.js";
 
 /**
@@ -42,8 +42,45 @@ export function toggleSpinner(spinnerElement, show=true) {
     }
 
     spinnerElement.classList.remove("show-spinner");
+    spinnerElement.style.display = "none"; // force hide in case class removal doesn’t work
 
    
+}
+
+
+/**
+ * Converts an ISO 8601 date string into a human-readable, localized format.
+ * 
+ * By default, formats dates in British English (en-GB) with 12-hour time
+ * and lowercase a.m./p.m., e.g., "Aug. 27, 2025, 4:25 p.m.".
+ * 
+ * @param {string} isoDate - The ISO 8601 date string to format, e.g., "2025-08-27T16:25:06.535Z".
+ * @param {string} [locale="en-GB"] - Optional locale code for formatting, e.g., "en-US" or "en-GB".
+ * @returns {string} A formatted, human-readable date string.
+ *
+ * @example
+ * formatIsoDate("2025-08-27T16:25:06.535Z");
+ * // Returns: "Aug. 27, 2025, 4:25 p.m."
+ * 
+ * @example
+ * formatIsoDate("2025-08-27T16:25:06.535Z", "en-US");
+ * // Returns: "Aug. 27, 2025, 4:25 p.m."
+ */
+export function formatIsoDate(isoDate, locale = "en-GB") {
+  const date = new Date(isoDate);
+
+  const formatted = date.toLocaleString(locale, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  })
+  .replace("AM", "a.m.").replace("PM", "p.m.")
+  .replace(/(\w+)\s/, "$1. ");
+
+  return formatted;
 }
 
 
@@ -354,7 +391,7 @@ export async function downloadFromResponse(resp) {
     // Convert response to Blob which would enable it to be downloaded
     const blob = await resp.blob();
     
-    // Trigger download
+    // Trigger download which shows up in the icon on the browser
     const url  = window.URL.createObjectURL(blob);
     const a    = document.createElement("a");
     a.href     = url;
@@ -365,3 +402,163 @@ export async function downloadFromResponse(resp) {
 
     return { success, filename };
 }
+
+
+export function prependChild(parent, newChild) {
+
+  
+  if (typeof parent.prepend === "function") {
+    // Modern browsers
+    parent.prepend(newChild);
+   
+  } else {
+    // Fallback for older browsers (like IE)
+    parent.insertBefore(newChild, parent.firstChild || null);
+   
+  }
+}
+
+
+
+/**
+ * Returns the nth child element of a given parent, optionally filtered by tag name.
+ *
+ * @param {HTMLElement} parent - The parent HTML element.
+ * @param {number} n - The 1-based index of the child (1 = first child).
+ * @param {string} [tagName] - Optional tag name to filter by (e.g., 'div', 'span').
+ * @returns {HTMLElement|null} The nth matching child or null if not found.
+ */
+export function getNthChildFast(parent, n, tagName) {
+  if (!checkIfHTMLElement(parent, "getNthChildFast")) return null;
+
+  if (typeof n !== "number" || !Number.isInteger(n) || n < 1) {
+    logError("getNthChildFast", `The value 'n' must be a positive integer. Got: ${n}`);
+    return null;
+  }
+
+  let children = Array.from(parent.children);
+
+  if (tagName) {
+    children = children.filter(child => child.tagName.toLowerCase() === tagName.toLowerCase());
+  }
+
+  return children[n - 1] || null; // 1-based index
+}
+
+
+/**
+ * Returns the nth child of a parent element, optionally filtering by tag name,
+ * and optionally returning a nested child by class name. This is useful 
+ * because it doesn't query the DOM to find a nested element, making it more
+ * efficient for dynamic dashboards.
+ *
+ * @param {HTMLElement} parent - The parent element.
+ * @param {number} n - 1-based index of the child (1 = first child).
+ * @param {string} [tagName] - Optional tag name to filter by (e.g., "div").
+ * @param {string} [nestedClass] - Optional class name to get a nested child of the nth child.
+ * @returns {HTMLElement|null} The element found or null if not found.
+ */
+export function getNthChildNested(parent, n, tagName, nestedClass) {
+    
+  const nthChild = getNthChildFast(parent, n, tagName);
+
+  if (!nthChild) return null;
+
+  if (nestedClass) {
+    // Find the first direct child with the specified class
+    return Array.from(nthChild.children).find(c => c.classList.contains(nestedClass)) || null;
+  }
+
+  return nthChild;
+}
+
+
+
+/**
+ * Safely removes the last child element from a given parent container.
+0 * 
+ * This function checks whether the parent element has any children
+ * and only removes the last child if it exists. It does not throw
+ * an error if the container is empty.
+ *
+ * @param {HTMLElement} parentElement - The parent container whose last child will be removed.
+ */
+export function removeLastChild(parentElement) {
+    if (parentElement.lastElementChild) {
+        parentElement.removeChild(parentElement.lastElementChild);
+    }
+}
+
+
+/**
+ * Checks if the number of children in the parent exceeds the given page limit.
+ *
+ * @param {HTMLElement} parentElement - The container to check.
+ * @param {number} pageLimit - The maximum number of children allowed.
+ * @returns {boolean} True if the child count exceeds the limit, false otherwise.
+ */
+export function exceedsPaginatorLimit(parentElement, pageLimit) {
+  
+    if (!Number.isInteger(pageLimit)) {
+        logError(
+            "exceedsPaginatorLimit",
+            `The page limit must be an integer. Got: ${pageLimit} (${typeof pageLimit})`
+        );
+        return false;
+    }
+    return parentElement.children.length >= pageLimit;
+}
+
+
+
+/**
+ * Adds a new child element to a parent container while enforcing a maximum 
+ * number of children (paginator limit). If the number of children exceeds 
+ * the specified page limit, the last child elements are removed until the 
+ * count is valid before adding the new element.
+ *
+ * @param {HTMLElement} parentElement - The container to which the new element will be added.
+ * @param {HTMLElement} elementToAdd - The element to append or prepend to the parent container.
+ * @param {number} pageLimit - The maximum number of children allowed in the parent container.
+ * @param {boolean} [appendToTop=false] - If `true`, the element is appended to the bottom of the container; 
+ *                                        if `false`, it is prepended to the top.
+ *
+ * @description
+ * This function ensures that adding new elements to a container never exceeds the 
+ * parent’s paginator limit. It performs the following checks:
+ *   - Validates that `parentElement` and `elementToAdd` are valid HTML elements.
+ *   - Validates that `appendToTop` is a boolean.
+ *   - Removes the last child elements if the container exceeds the `pageLimit`.
+ *   - Adds the new element to the top or bottom of the container depending on `appendToTop`.
+ *
+ * This is particularly useful for dynamically updating UI sections such as 
+ * recovery code batch summaries while ensuring the pagination rules are enforced.
+ */
+export function addChildWithPaginatorLimit(parentElement, elementToAdd, pageLimit, appendToTop = false) {
+
+    if (!checkIfHTMLElement(parentElement) && !checkIfHTMLElement(elementToAdd) ) {
+        warnError("addChildWithPaginatorLimit", "The parentElement or elementToAdd is not a valid HTML");
+        return;
+
+    }
+    
+    if (typeof appendToTop !== "boolean") {
+        warnError("addChildWithPaginatorLimit", `The appendToTop variable must be a boolean, expected a boolean object but got ${appendToTop} `);
+        return;
+    }
+
+    while (exceedsPaginatorLimit(parentElement, pageLimit)) {
+        removeLastChild(parentElement);
+    }
+
+    if (appendToTop) {
+        parentElement.appendChild(elementToAdd)
+    } else {
+        prependChild(parentElement, elementToAdd)
+    }
+
+
+}
+
+
+

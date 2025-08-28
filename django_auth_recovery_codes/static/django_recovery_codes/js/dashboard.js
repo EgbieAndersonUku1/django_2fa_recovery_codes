@@ -8,7 +8,11 @@ import {
     getCsrfToken,
     showTemporaryMessage,
     showEnqueuedMessages,
-    downloadFromResponse
+    downloadFromResponse,
+    getNthChildNested,
+    addChildWithPaginatorLimit,
+  
+ 
 } from "./utils.js";
 
 import { parseFormData } from "./form.js";
@@ -18,6 +22,7 @@ import fetchData from "./fetch.js";
 import { HTMLTableBuilder } from "./generateTable.js";
 import { generateCodeActionAButtons, buttonStates, updateButtonFromConfig } from "./generateCodeActionButtons.js";
 import { notify_user } from "./notify.js";
+import { generateRecoveryCodesSummaryCard } from "./generateBatchHistoryCard.js";
 
 
 
@@ -25,10 +30,12 @@ import { notify_user } from "./notify.js";
 const recovryDashboardElement = document.getElementById("recovery-dashboard");
 const daysToExpiryGroupWrapperElement = document.getElementById("days-to-expiry-group");
 const navigationIconContainerElement = document.getElementById("navigation-icon-elements");
-const generateCodeSectionElement = document.getElementById("generate-code-section");
+const generaterecoveryBatchSectionElement = document.getElementById("generate-code-section");
 const codeTableElement = document.getElementById("table-code-view");
 const codeActionContainerElement = document.getElementById("page-buttons");
 const tempGeneratedTableContainer = document.getElementById("generated-code-table");
+const dynamicViewBatchCardHistorySection = document.getElementById("dynamic-cards-card-history");
+
 
 
 // spinner elements
@@ -42,6 +49,7 @@ const deleteAllCodeButtonSpinnerElement = document.getElementById("delete-all-co
 const downloadCodeButtonElementSpinner = document.getElementById("download-code-loader");
 const invalidateSpinnerElement = document.getElementById("invalidate-code-loader");
 const tableCoderSpinnerElement = document.getElementById("table-loader");
+const dynamicBatchSpinnerElement = document.getElementById("dynamic-batch-loader");
 
 // button elements
 const generateButtonElement = document.getElementById("generate-code-button-wrapper");
@@ -85,7 +93,7 @@ recovryDashboardElement.addEventListener("click", handleEventDelegation);
  * when the page is refreshed. Since the form doesn't exist, 
  * attempting to attach an event listener would cause an error.
  */
-if (generateCodeSectionElement !== null) {
+if (generaterecoveryBatchSectionElement !== null) {
     generateCodeWithExpiryFormElement.addEventListener("submit",
         handleGenerateCodeWithExpiryFormSubmission
     );
@@ -129,6 +137,7 @@ const statsTotalCodesRemovedBoard = document.getElementById("stat__total-codes-r
 
 // constants
 const MILLI_SECONDS_BEFORE_DISPLAY = 1000;
+const MILLI_SECONDS = 6000
 const REGENERATE_BUTTON_ID = "regenerate-code-btn";
 const EMAIL_BUTTON_ID = "email-code-btn";
 const DELETE_CURRENT_CODE_BUTTON_ID = "delete-current-code-btn";
@@ -140,6 +149,7 @@ const GENERATE_CODE_WITH_NO_EXPIRY = "generate-code-with-no-expiry-btn";
 const OPEN_NAV_BAR_HAMBURGERR_ICON = "open-hamburger-nav-icon";
 const CLOSE_NAV_BAR_ICON = "close-nav-icon";
 const enqueueMessages = [];
+const CODE_BATCH_CARDS_DIV_ID = "static-batch-cards-history";
 
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -149,6 +159,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 let alertMessage;
+let recoveryBatchSectionElement;
+
+// hideViewBatchHistoryHeaders();
 
 
 // configuration
@@ -398,7 +411,7 @@ async function handleDownloadButtonClick(e) {
             url: "/auth/recovery-codes/download-codes/",
             csrfToken: getCsrfToken(),
             method: "POST",
-            body: {},
+            body: {forceUpdate: true},
             returnRawResponse: true,
         });
 
@@ -470,7 +483,7 @@ async function handleInvalidateButtonClick(e) {
             url: "/auth/recovery-codes/invalidate-codes/",
             csrfToken: getCsrfToken(),
             method: "POST",
-            body: { code },
+            body: { code: code, forceUpdate: true },
             throwOnError: false,
         });
         return data;
@@ -538,7 +551,7 @@ async function handleDeleteCodeeButtonClick(e) {
                 url: "/auth/recovery-codes/delete-codes/",
                 csrfToken: getCsrfToken(),
                 method: "POST",
-                body: { code },
+                body: { code : code, forceUpdate: "1"},
                 throwOnError: false,
             });
 
@@ -644,7 +657,8 @@ async function handleEmailCodeeButtonClick(e) {
 
 
     const handleEmailFetchApiSend = async () => {
-        const url = "/auth/recovery-codes/email/"
+        const url = "/auth/recovery-codes/email/";
+
         return await sendPostFetchWithoutBody(url, "The email wasn't sent")
     }
 
@@ -698,7 +712,9 @@ async function handlDeleteAllCodeButtonClick(e) {
             url: "/auth/recovery-codes/mark-batch-as-deleted/",
             csrfToken: getCsrfToken(),
             method: "POST",
-            body: {},
+            body: {
+               forceUpdate: true
+            },
         });
 
         return resp;
@@ -851,27 +867,6 @@ function handleDeleteFormSubmission(e) {
 
 
 
-/**
- * Handles the submission event for the "invalidating a code" form.
- *
- * The function allows the user to submit a request to invalidate a single recovery
- * codes via a fetch API request when the form is submitted.
- * 
- *
- *
- * @param {Event} e - The submit event triggered by the form.
- * @returns {void}
- */
-function handleInvalidatingFormSubmission(e) {
-    return handleFormSubmissionHelper(e, invalidateFormElement, ["invalidate_code"]);
-
-}
-
-
-
-
-
-
 
 
 /**
@@ -1013,9 +1008,12 @@ async function handleRecoveryCodesAction({ e,
     const body = {};
 
     if (daysToExpiry !== null && typeof daysToExpiry === "number") {
-        body.daysToExpiry = daysToExpiry
+        body.daysToExpiry = daysToExpiry;
+     
+   
     }
 
+    body.forceUpdate  =  true;
 
     const handleGenerateCodeFetchApi = async () => {
 
@@ -1042,14 +1040,16 @@ async function handleRecoveryCodesAction({ e,
     if (resp.SUCCESS) {
 
         statsTotalCodesIssuedBoard.textContent = resp.TOTAL_ISSUED;
-        toggleElement(generateCodeSectionElement);
-
+        toggleElement(generaterecoveryBatchSectionElement);
+    
         const isPopulated = populateTableWithUserCodes(resp.CODES);
 
         if (isPopulated) {
             sendPostFetchWithoutBody("/auth/recovery-codes/viewed/",
                 "Failed to mark code as viewed "
             );
+            
+            insertBatchCardIntoSection(resp.BATCH, resp.ITEM_PER_PAGE);
         }
         return true;
 
@@ -1216,9 +1216,6 @@ function populateTableWithUserCodes(codes) {
 
     const tableElement = HTMLTableBuilder(colHeaders, codes, tableObjectData);
 
-
-
-
     if (tableElement) {
         messageContainerElement.classList.add("show");
         messagePTag.textContent = "Your recovery codes are now ready...";
@@ -1239,9 +1236,9 @@ function populateTableWithUserCodes(codes) {
                 generateCodeActionAButtons();
                 codeActionContainerElement.appendChild(generateCodeActionAButtons());
             }
-            console.log(generateCodeSectionElement);
+            
 
-            if (generateCodeSectionElement === null) {
+            if (generaterecoveryBatchSectionElement === null) {
                 codeActionContainerElement.innerHTML = "";
 
             }
@@ -1272,7 +1269,7 @@ async function sendPostFetchWithoutBody(url, msg = "") {
             url: url,
             csrfToken: getCsrfToken(),
             method: "POST",
-            body: {}             // fetchData will handle stringifying and headers
+            body: {forceUpdate : true}  // fetchData will handle stringifying and headers
         });
     } catch (error) {
         console.warn(msg, error);
@@ -1302,5 +1299,63 @@ function pickRightDivAndPopulateTable(tableCodesElement) {
 }
 
 
+function insertBatchCardIntoSection(batch, batchPerPage = 5) {
 
+    // cache the recoveryBatch element
+    if (!recoveryBatchSectionElement) {
+        recoveryBatchSectionElement = document.getElementById(CODE_BATCH_CARDS_DIV_ID);
+    }
+  
+    const historyCardElement        = generateRecoveryCodesSummaryCard(batch);
+    let secondRecoveryCardBatch;
+    const TAG_NAME = "div";
+    const CLASS_SELECTOR = "card-head";
+    
+    dynamicBatchSpinnerElement.style.display = "inline-block";
+    toggleSpinner(dynamicBatchSpinnerElement);
+
+    // If recoveryBatchSectionElement is null, the recovery section isn't in the DOM.
+    // This happens when the user hasn't generated recovery codes (the backend Jinja hides it).
+    // In that case, add the codes to the dynamic temporary history section instead.
+    setTimeout(() => {
+
+
+        if (recoveryBatchSectionElement !== null) {
+
+            addChildWithPaginatorLimit(recoveryBatchSectionElement, historyCardElement, batchPerPage)
+            secondRecoveryCardBatch = getNthChildNested(recoveryBatchSectionElement, 2, TAG_NAME, CLASS_SELECTOR);
+            markCardAsDeleted(secondRecoveryCardBatch)
+            toggleSpinner(dynamicBatchSpinnerElement, false);
+        
+
+        } else {
+            addChildWithPaginatorLimit(dynamicViewBatchCardHistorySection, historyCardElement, batchPerPage, true);
+            secondRecoveryCardBatch = getNthChildNested(dynamicViewBatchCardHistorySection, 2, TAG_NAME, CLASS_SELECTOR)
+            markCardAsDeleted(secondRecoveryCardBatch)
+           
+        };
+        toggleSpinner(dynamicBatchSpinnerElement, false);
+
+    }, (MILLI_SECONDS_BEFORE_DISPLAY + MILLI_SECONDS) )
+ 
+}
+
+
+function markCardAsDeleted(cardElement) {
+
+  if (cardElement === null) return;
+
+  const statusElements = cardElement.querySelectorAll('.card-head .info-box .value p');
+  if (!statusElements.length) return;
+
+
+  for (const pElement of statusElements) {
+    if (pElement.classList.contains('status')) {
+      pElement.textContent = "Deleted";
+      pElement.classList.remove("text-green");
+      pElement.classList.add("text-red", "bold");
+      break; 
+    }
+  }
+}
 

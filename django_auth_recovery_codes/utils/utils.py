@@ -67,3 +67,52 @@ def flatten_to_lines(data):
         else:
             lines.append(str(item))
     return lines
+
+
+
+def create_json_from_attrs(instance, keys: list = None, capitalise_keys: bool = False):
+    """
+    Create a dictionary from an object's attributes.
+
+    Extracts specified attributes from an object instance and returns them
+    as a dictionary. If no keys are provided, all attributes are included.
+    Optionally, dictionary keys can be capitalised.
+
+    Args:
+        instance (object): The object instance to extract attributes from.
+        keys (list, optional): List of attribute names to include. If None,
+            all instance attributes are included.
+        capitalise_keys (bool, optional): If True, converts dictionary keys
+            to uppercase. Defaults to False.
+
+    Returns:
+        dict: A dictionary containing the requested attributes and their values.
+            Missing attributes in `keys` are set to None.
+
+    Raises:
+        TypeError: If `instance` is not an object instance or if `keys` is not a list.
+
+    Examples:
+        >>> class Person:
+        ...     def __init__(self, name, city):
+        ...         self.name = name
+        ...         self.city = city
+
+        >>> p = Person("Alice", "London")
+        >>> create_json_from_attrs(p, keys=["name"], capitalise_keys=True)
+        {'NAME': 'Alice'}
+        >>>
+        >>> create_json_from_attrs(p)
+        {'name': 'Alice', 'city': "London"}
+    """
+    if not hasattr(instance, "__class__"):
+        raise TypeError(f"Expected an instance of a class, got {type(instance).__name__}")
+
+    if keys is not None and not isinstance(keys, list):
+        raise TypeError(f"Keys must be a list, got {type(keys).__name__}")
+
+    if keys:
+        return {key.upper() if capitalise_keys else key: getattr(instance, key, None)
+                for key in keys}
+
+    return instance.__dict__.copy()
