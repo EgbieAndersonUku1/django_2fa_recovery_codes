@@ -11,7 +11,7 @@ from .utils.cache.safe_cache import set_cache_with_retry, get_cache_with_retry, 
 
 
 RECOVERY_CODES_BATCH_HISTORY_KEY = 'recovery_codes_batch_history_{}'
-PAGE_SIZE = 25
+ITEM_PER_PAGE                   = 5  # This will be taking from teh settings for now constant
  
 
 def _generate_recovery_codes_with_expiry_date_helper(request, user) -> list:
@@ -81,7 +81,8 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
             "TOTAL_ISSUED": 1,
             "SUCCESS": True,
             "CODES": raw_codes,
-            "BATCH": batch.get_json_values()
+            "BATCH": batch.get_json_values(), 
+            "ITEM_PER_PAGE": ITEM_PER_PAGE,
         })
 
         request.session["recovery_codes_state"] = {"codes": raw_codes}

@@ -391,7 +391,7 @@ export async function downloadFromResponse(resp) {
     // Convert response to Blob which would enable it to be downloaded
     const blob = await resp.blob();
     
-    // Trigger download
+    // Trigger download which shows up in the icon on the browser
     const url  = window.URL.createObjectURL(blob);
     const a    = document.createElement("a");
     a.href     = url;
@@ -405,6 +405,8 @@ export async function downloadFromResponse(resp) {
 
 
 export function prependChild(parent, newChild) {
+
+  
   if (typeof parent.prepend === "function") {
     // Modern browsers
     parent.prepend(newChild);
@@ -469,3 +471,94 @@ export function getNthChildNested(parent, n, tagName, nestedClass) {
 
   return nthChild;
 }
+
+
+
+/**
+ * Safely removes the last child element from a given parent container.
+0 * 
+ * This function checks whether the parent element has any children
+ * and only removes the last child if it exists. It does not throw
+ * an error if the container is empty.
+ *
+ * @param {HTMLElement} parentElement - The parent container whose last child will be removed.
+ */
+export function removeLastChild(parentElement) {
+    if (parentElement.lastElementChild) {
+        parentElement.removeChild(parentElement.lastElementChild);
+    }
+}
+
+
+/**
+ * Checks if the number of children in the parent exceeds the given page limit.
+ *
+ * @param {HTMLElement} parentElement - The container to check.
+ * @param {number} pageLimit - The maximum number of children allowed.
+ * @returns {boolean} True if the child count exceeds the limit, false otherwise.
+ */
+export function exceedsPaginatorLimit(parentElement, pageLimit) {
+  
+    if (!Number.isInteger(pageLimit)) {
+        logError(
+            "exceedsPaginatorLimit",
+            `The page limit must be an integer. Got: ${pageLimit} (${typeof pageLimit})`
+        );
+        return false;
+    }
+    return parentElement.children.length >= pageLimit;
+}
+
+
+
+/**
+ * Adds a new child element to a parent container while enforcing a maximum 
+ * number of children (paginator limit). If the number of children exceeds 
+ * the specified page limit, the last child elements are removed until the 
+ * count is valid before adding the new element.
+ *
+ * @param {HTMLElement} parentElement - The container to which the new element will be added.
+ * @param {HTMLElement} elementToAdd - The element to append or prepend to the parent container.
+ * @param {number} pageLimit - The maximum number of children allowed in the parent container.
+ * @param {boolean} [appendToTop=false] - If `true`, the element is appended to the bottom of the container; 
+ *                                        if `false`, it is prepended to the top.
+ *
+ * @description
+ * This function ensures that adding new elements to a container never exceeds the 
+ * parent’s paginator limit. It performs the following checks:
+ *   - Validates that `parentElement` and `elementToAdd` are valid HTML elements.
+ *   - Validates that `appendToTop` is a boolean.
+ *   - Removes the last child elements if the container exceeds the `pageLimit`.
+ *   - Adds the new element to the top or bottom of the container depending on `appendToTop`.
+ *
+ * This is particularly useful for dynamically updating UI sections such as 
+ * recovery code batch summaries while ensuring the pagination rules are enforced.
+ */
+export function addChildWithPaginatorLimit(parentElement, elementToAdd, pageLimit, appendToTop = false) {
+
+    if (!checkIfHTMLElement(parentElement) && !checkIfHTMLElement(elementToAdd) ) {
+        warnError("addChildWithPaginatorLimit", "The parentElement or elementToAdd is not a valid HTML");
+        return;
+
+    }
+    
+    if (typeof appendToTop !== "boolean") {
+        warnError("addChildWithPaginatorLimit", `The appendToTop variable must be a boolean, expected a boolean object but got ${appendToTop} `);
+        return;
+    }
+
+    while (exceedsPaginatorLimit(parentElement, pageLimit)) {
+        removeLastChild(parentElement);
+    }
+
+    if (appendToTop) {
+        parentElement.appendChild(elementToAdd)
+    } else {
+        prependChild(parentElement, elementToAdd)
+    }
+
+
+}
+
+
+

@@ -9,8 +9,8 @@ import {
     showTemporaryMessage,
     showEnqueuedMessages,
     downloadFromResponse,
-    prependChild,
-    getNthChildNested
+    getNthChildNested,
+    addChildWithPaginatorLimit,
   
  
 } from "./utils.js";
@@ -22,7 +22,7 @@ import fetchData from "./fetch.js";
 import { HTMLTableBuilder } from "./generateTable.js";
 import { generateCodeActionAButtons, buttonStates, updateButtonFromConfig } from "./generateCodeActionButtons.js";
 import { notify_user } from "./notify.js";
-import { createRecordBatcbCard } from "./generateBatchHistoryCard.js";
+import { generateRecoveryCodesSummaryCard } from "./generateBatchHistoryCard.js";
 
 
 
@@ -1044,14 +1044,12 @@ async function handleRecoveryCodesAction({ e,
     
         const isPopulated = populateTableWithUserCodes(resp.CODES);
 
-    
-        console.log(resp.BATCH)
         if (isPopulated) {
             sendPostFetchWithoutBody("/auth/recovery-codes/viewed/",
                 "Failed to mark code as viewed "
             );
             
-            insertBatchCardIntoSection(resp.BATCH);
+            insertBatchCardIntoSection(resp.BATCH, resp.ITEM_PER_PAGE);
         }
         return true;
 
@@ -1301,14 +1299,14 @@ function pickRightDivAndPopulateTable(tableCodesElement) {
 }
 
 
-function insertBatchCardIntoSection(batch) {
+function insertBatchCardIntoSection(batch, batchPerPage = 5) {
 
     // cache the recoveryBatch element
     if (!recoveryBatchSectionElement) {
         recoveryBatchSectionElement = document.getElementById(CODE_BATCH_CARDS_DIV_ID);
     }
   
-    const historyCard        = createRecordBatcbCard(batch);
+    const historyCardElement        = generateRecoveryCodesSummaryCard(batch);
     let secondRecoveryCardBatch;
     const TAG_NAME = "div";
     const CLASS_SELECTOR = "card-head";
@@ -1316,32 +1314,26 @@ function insertBatchCardIntoSection(batch) {
     dynamicBatchSpinnerElement.style.display = "inline-block";
     toggleSpinner(dynamicBatchSpinnerElement);
 
-    // if the recoveryBatchSectionElement is null it means that recovery section doesn't
-    // exist. This means that the user has not generated recovery codes so 
-    // the jinja (if-statement)from the backend blocks the code section area from showing up, so from the DOM
-    // prespective that section doesn't exists. If this is the case had the codes to the dynamic temp
-    // history section
+    // If recoveryBatchSectionElement is null, the recovery section isn't in the DOM.
+    // This happens when the user hasn't generated recovery codes (the backend Jinja hides it).
+    // In that case, add the codes to the dynamic temporary history section instead.
     setTimeout(() => {
 
 
         if (recoveryBatchSectionElement !== null) {
-            prependChild(recoveryBatchSectionElement, historyCard)
+
+            addChildWithPaginatorLimit(recoveryBatchSectionElement, historyCardElement, batchPerPage)
             secondRecoveryCardBatch = getNthChildNested(recoveryBatchSectionElement, 2, TAG_NAME, CLASS_SELECTOR);
-            console.log(secondRecoveryCardBatch)
-             markCardAsDeleted(secondRecoveryCardBatch)
+            markCardAsDeleted(secondRecoveryCardBatch)
             toggleSpinner(dynamicBatchSpinnerElement, false);
-            console.log("-----------------------------------")
         
 
         } else {
-         
-            dynamicViewBatchCardHistorySection.appendChild(historyCard);
+            addChildWithPaginatorLimit(dynamicViewBatchCardHistorySection, historyCardElement, batchPerPage, true);
             secondRecoveryCardBatch = getNthChildNested(dynamicViewBatchCardHistorySection, 2, TAG_NAME, CLASS_SELECTOR)
             markCardAsDeleted(secondRecoveryCardBatch)
            
-        }
-
-       ;
+        };
         toggleSpinner(dynamicBatchSpinnerElement, false);
 
     }, (MILLI_SECONDS_BEFORE_DISPLAY + MILLI_SECONDS) )
@@ -1358,7 +1350,7 @@ function markCardAsDeleted(cardElement) {
 
 
   for (const pElement of statusElements) {
-    if (p.classList.contains('status')) {
+    if (pElement.classList.contains('status')) {
       pElement.textContent = "Deleted";
       pElement.classList.remove("text-green");
       pElement.classList.add("text-red", "bold");
@@ -1366,3 +1358,4 @@ function markCardAsDeleted(cardElement) {
     }
   }
 }
+
