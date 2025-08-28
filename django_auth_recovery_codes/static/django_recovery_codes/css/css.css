@@ -833,14 +833,11 @@ td {
     font-weight: 500;
     font-style: normal;
     white-space: nowrap;
-    text-transform: uppercase;
 }
 
 
-/* the table that displays the genrated code */
-#generated-codes-table tbody tr {
-    text-transform: uppercase;
-}
+/* the table that displays the genrated code
+
 
 /* ------------------------------------------ */
 /*                  PAGINATION                */

@@ -43,6 +43,7 @@ class RecoveryCodeAdmin(admin.ModelAdmin):
     readonly_fields    = ["id", "created_at", "modified_at", "hash_code", "days_to_expire"]
     list_filter        = ["automatic_removal", "status"]
     search_fields      = ["id", "status", "user__email", "user__username"]
+    exclude            = ("look_up_hash", )
 
     fieldsets = [
         ("Identification", {

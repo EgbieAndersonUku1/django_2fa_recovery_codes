@@ -1,6 +1,10 @@
 import secrets
 
-SAFE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+from django.conf import settings
+
+
+SAFE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijklmnopqrstuvwzyz23456789"
 
 def generate_2fa_secure_recovery_code(code_length: int = 6, group_size: int = 6, separator: str = "-") -> str:
     """
