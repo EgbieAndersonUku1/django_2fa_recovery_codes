@@ -341,6 +341,8 @@ class RecoveryCodesBatch(models.Model):
             raise TypeError(f"Expected int for batch_number, got {type(batch_number).__name__}")
         if days_to_expire and not isinstance(days_to_expire, int):
             raise TypeError(f"Expected int for days_to_expire, got {type(days_to_expire).__name__}")
+        if days_to_expire and days_to_expire < 0:
+            raise ValueError("daysToExpiry must be a positive integer")
 
         raw_codes = []
         batch     = []
@@ -445,10 +447,8 @@ class RecoveryCode(models.Model):
     batch             = models.ForeignKey(RecoveryCodesBatch, on_delete=models.CASCADE, related_name="recovery_codes")
     automatic_removal = models.BooleanField(default=True)
     days_to_expire    = models.PositiveSmallIntegerField(default=0, db_index=True)
-    code_downloaded   = models.BooleanField(default=False)
-    code_emailed      = models.BooleanField(default=False)
     is_used           = models.BooleanField(default=False)
-    is_deactived      = models.BooleanField(default=False)
+    is_deactivated      = models.BooleanField(default=False)
 
 
     class Meta:
@@ -526,10 +526,10 @@ class RecoveryCode(models.Model):
             code.save()  # Both changes persisted together
         """
         self.status        = Status.INVALIDATE
-        self.is_deactived  = True
+        self.is_deactivated  = True
 
         if save:
-            self.save(update_fields=["status"])
+            self.save(update_fields=["status", "is_deactivated"])
         return True
 
     def delete_code(self, save: bool = True) -> "RecoveryCode":
