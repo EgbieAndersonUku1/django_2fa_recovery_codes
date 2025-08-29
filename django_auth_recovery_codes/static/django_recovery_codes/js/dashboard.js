@@ -486,10 +486,11 @@ async function handleInvalidateButtonClick(e) {
             body: { code: code, forceUpdate: true },
             throwOnError: false,
         });
+
         return data;
     };
-
-    const resp = await handleButtonAlertClickHelper(
+    // console.log(data)
+    const data = await handleButtonAlertClickHelper(
         e,
         INVALIDATE_CODE_BTN,
         invalidateSpinnerElement,
@@ -497,23 +498,36 @@ async function handleInvalidateButtonClick(e) {
         handleInvalidateCodeFetchAPI
     );
 
-    const data = resp.data;
 
-    if (!data.SUCCESS) {
-        AlertUtils.showAlert({
-            title: "Error",
-            text: data.MESSAGE || `Failed to invalidate code "${code}".`,
+    if (data && Object.hasOwn(data, "SUCCESS")) {
+    
+        if (data.OPERATION_SUCCESS) {
+             const icon = data.ALERT_TEXT === "Code successfully deactivated" ? "success": "info";
+
+             AlertUtils.showAlert({
+                title: data.ALERT_TEXT,
+                text: data.MESSAGE,
+                icon: icon,
+                confirmButtonText: "Ok"
+            });
+        } else {
+            AlertUtils.showAlert({
+                title: data.ALERT_TEXT,
+                text: data.MESSAGE,
+                icon: "error",
+                confirmButtonText: "Ok"
+            });
+        } 
+    } else {
+         AlertUtils.showAlert({
+            title: "The code is invalid",
+            text: "The code entered is an invalid code",
             icon: "error",
             confirmButtonText: "Ok"
         });
-    } else {
-        AlertUtils.showAlert({
-            title: "Success",
-            text: data.MESSAGE || `Code "${code}" was successfully invalidated.`,
-            icon: "success",
-            confirmButtonText: "Ok"
-        });
     }
+
+    invalidateFormElement.reset();
 }
 
 

@@ -37,7 +37,7 @@ class RecoveryCodesBatchAdmin(admin.ModelAdmin):
 
 class RecoveryCodeAdmin(admin.ModelAdmin):
 
-    list_display       = ["id", "status", "mark_for_deletion", "automatic_removal", "created_at", "modified_at"]
+    list_display       = ["id", "status", "is_deactivated", "mark_for_deletion", "automatic_removal", "created_at", "modified_at"]
     list_display_links = ["id"]
     list_per_page      = 25
     readonly_fields    = ["id", "created_at", "modified_at", "hash_code", "days_to_expire"]
@@ -47,7 +47,7 @@ class RecoveryCodeAdmin(admin.ModelAdmin):
 
     fieldsets = [
         ("Identification", {
-            "fields": ("id", "hash_code", "mark_for_deletion", "status", "days_to_expire"),
+            "fields": ("id", "hash_code", "is_deactivated", "is_used", "mark_for_deletion", "status", "days_to_expire"),
         }),
         ("Batch details", {
             "fields": ("batch", ),

@@ -103,7 +103,7 @@ def delete_recovery_code(request):
     
         return True, response_data
     
-    delete_code.operation_name = "Deactivate"  # Assign a custom attribute to the function for the helper to use
+    delete_code.operation_name = "deleted"  # Assign a custom attribute to the function for the helper to use
     return recovery_code_operation_helper(request, delete_code)
 
 
@@ -133,24 +133,31 @@ def invalidate_user_code(request):
         messages or errors.
     """
 
-    def invalidate_code(plaintext_code: str) -> Tuple[bool, dict]:
+    def invalidate_code(recovery_code: RecoveryCode) -> dict:
 
-        response_data = {'SUCCESS': False}
-       
-        recovery_code  = RecoveryCode.get_by_code(plaintext_code, request.user)
         if not recovery_code:
-            return False, response_data
-
-        recovery_code.invalidate_code()
+            raise TypeError("The reocvery code instance must not be none")
         
-        recovery_batch = recovery_code.batch
-        recovery_batch.update_invalidate_code_count()
+        if not isinstance(recovery_code, RecoveryCode):
+            raise TypeError(f"The recovery code must be an instance of the Recovery Model",
+                            f"Expected a recovery model instance but got object with type: {type(recovery_code.__name__)}"
+                            )
+        
+        recovery_code.invalidate_code()
+        recovery_code_batch = recovery_code.batch
+        recovery_code_batch.update_invalidate_code_count(save=True)
 
-        response_data.update({'SUCCESS': True})
-    
-        return True, response_data
-    
-    invalidate_code.operation_name = "Deactivate"  # Assign a custom attribute to the function for the helper to use
+        response_data = {
+            "SUCCESS": True,
+            "OPERATION_SUCCESS": True,
+            "TITLE": "Code deactivated",
+            "MESSAGE": "The code has been successfully deactivated.",
+            "ALERT_TEXT": "Code successfully deactivated"
+        }
+
+        return response_data
+
+    invalidate_code.operation_name = "deactivate"  # Assign a custom attribute to the function for the helper to use
     return recovery_code_operation_helper(request, invalidate_code)
 
 
@@ -174,8 +181,6 @@ def download_code(request):
         request.session["is_downloaded"] = True     # set to the session to be able to hide download button in the UI
         response = HttpResponse(content=b"", content_type="application/octet-stream")
         response["X-Success"] = True
-
-      
         return response
     
     raw_codes = request.session.get("recovery_codes_state", {}).get("codes", [])
@@ -229,7 +234,6 @@ def download_code(request):
 @login_required
 def mark_all_recovery_codes_as_pending_delete(request):
     
-
     recovery_batch  = RecoveryCodesBatch.delete_recovery_batch(request.user)
     status          = None
     data   = { "SUCCESS": False, "MESSAGE": ""}
