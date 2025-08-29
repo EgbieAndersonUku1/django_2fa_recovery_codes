@@ -483,7 +483,7 @@ async function handleInvalidateButtonClick(e) {
             url: "/auth/recovery-codes/invalidate-codes/",
             csrfToken: getCsrfToken(),
             method: "POST",
-            body: { code: code, forceUpdate: true },
+            body: { code: code },
             throwOnError: false,
         });
 
@@ -498,34 +498,7 @@ async function handleInvalidateButtonClick(e) {
         handleInvalidateCodeFetchAPI
     );
 
-
-    if (data && Object.hasOwn(data, "SUCCESS")) {
-    
-        if (data.OPERATION_SUCCESS) {
-             const icon = data.ALERT_TEXT === "Code successfully deactivated" ? "success": "info";
-
-             AlertUtils.showAlert({
-                title: data.ALERT_TEXT,
-                text: data.MESSAGE,
-                icon: icon,
-                confirmButtonText: "Ok"
-            });
-        } else {
-            AlertUtils.showAlert({
-                title: data.ALERT_TEXT,
-                text: data.MESSAGE,
-                icon: "error",
-                confirmButtonText: "Ok"
-            });
-        } 
-    } else {
-         AlertUtils.showAlert({
-            title: "The code is invalid",
-            text: "The code entered is an invalid code",
-            icon: "error",
-            confirmButtonText: "Ok"
-        });
-    }
+     handleRecoveryCodeAlert(data, "Code successfully deactivated")
 
     invalidateFormElement.reset();
 }
@@ -551,10 +524,10 @@ async function handleDeleteCodeeButtonClick(e) {
     if (formData) {
         const alertAttributes = {
             title: "Delete code",
-            text: "Doing this will delete this current code. This action cannot be reversed. Are you sure you want to go ahead?",
+            text: `Doing this will delete the code "${code}". This action cannot be reversed. Are you sure you want to go ahead?`,
             icon: "warning",
             cancelMessage: "No worries! Your code is safe.",
-            messageToDisplayOnSuccess: "Awesome! Your code has been deleted.",
+            messageToDisplayOnSuccess: "Awesome! Your code is being processed, please wait...",
             confirmButtonText: "Yes, delete code",
             denyButtonText: "No, don't delete code"
         }
@@ -565,39 +538,24 @@ async function handleDeleteCodeeButtonClick(e) {
                 url: "/auth/recovery-codes/delete-codes/",
                 csrfToken: getCsrfToken(),
                 method: "POST",
-                body: { code : code, forceUpdate: "1"},
+                body: { code : code},
                 throwOnError: false,
             });
 
             return data
-        }
+        };
 
-        const resp = await handleButtonAlertClickHelper(e,
+        const data = await handleButtonAlertClickHelper(e,
             DELETE_CURRENT_CODE_BUTTON_ID,
             deleteCodeButtonSpinnerElement,
             alertAttributes,
-            handleRemoveRecoveryCodeApiRequest)
+            handleRemoveRecoveryCodeApiRequest
+        );        
 
-        const data = resp.data;
-        if (!data.SUCCESS) {
-            AlertUtils.showAlert({
-                title: "Error",
-                text: data.MESSAGE || `Failed to delete code "${code}".`,
-                icon: "error",
-                confirmButtonText: "Ok"
-            });
-            deleteFormElement.reset();
-        } else {
-            AlertUtils.showAlert({
-                title: "Success",
-                text: data.MESSAGE || `Code "${code}" was successfully deleted.`,
-                icon: "success",
-                confirmButtonText: "Ok"
-            });
-        }
+        handleRecoveryCodeAlert(data, "Code successfully deleted");
+        deleteFormElement.reset()
 
-    }
-
+    };
 
 
 }
@@ -1373,3 +1331,63 @@ function markCardAsDeleted(cardElement) {
   }
 }
 
+
+
+
+
+/**
+ * Displays a standardised alert for recovery code operations (e.g., deactivate, delete).
+ *
+ * The function determines whether to show a ✅ success, ℹ️ info, or ❌ error alert
+ * based on the operation outcome and the expected success message.
+ *
+ * @param {Object} data - The response data object returned from the backend.
+ * @param {boolean} data.OPERATION_SUCCESS - Indicates whether the operation succeeded.
+ * @param {string} data.ALERT_TEXT - A short alert title (shown as the modal heading).
+ * @param {string} data.MESSAGE - The main message displayed in the alert body.
+ * @param {string} expectedSuccessMessage - The success message that determines
+ *        whether the alert should use a "success" (✅ green tick) or "info" (ℹ️ icon).
+ *
+ * Example:
+ * handleRecoveryCodeAlert(data, "Code successfully deactivated");
+ * handleRecoveryCodeAlert(data, "Code successfully deleted");
+ */
+function handleRecoveryCodeAlert(data, successCompareMessage) {
+    console.log(data)
+    console.log(data.ALERT_TEXT === successCompareMessage)
+    console.log(data.ALERT_TEXT)
+    if (data && Object.hasOwn(data, "SUCCESS")) {
+        
+        if (data.OPERATION_SUCCESS) {
+             const icon = data.ALERT_TEXT === successCompareMessage ? "success": "info";
+
+             AlertUtils.showAlert({
+                title: data.ALERT_TEXT,
+                text: data.MESSAGE,
+                icon: icon,
+                confirmButtonText: "Ok"
+            });
+
+            return; 
+
+        } else {
+            AlertUtils.showAlert({
+                title: data.ALERT_TEXT,
+                text: data.MESSAGE,
+                icon: "error",
+                confirmButtonText: "Ok"
+            });
+            return;
+        } 
+    } 
+    
+    
+         AlertUtils.showAlert({
+            title: "The code is invalid",
+            text: "The code entered is an invalid code",
+            icon: "error",
+            confirmButtonText: "Ok"
+        });
+    
+
+}
