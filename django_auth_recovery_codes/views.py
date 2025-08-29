@@ -85,25 +85,32 @@ def delete_recovery_code(request):
         messages or errors.
     """
 
-    def delete_code(plaintext_code: str) -> Tuple[bool, dict]:
-
-        response_data = {'SUCCESS': False}
-
-        recovery_code  = RecoveryCode.get_by_code(plaintext_code, request.user)
+    def delete_code(recovery_code: RecoveryCode) -> Tuple[bool, dict]:
 
         if not recovery_code:
-            return False, response_data
-
-        recovery_code.delete_code()
+            raise TypeError("The reocvery code instance must not be none")
         
-        recovery_batch = recovery_code.batch
-        recovery_batch.update_delete_code_count()
+        if not isinstance(recovery_code, RecoveryCode):
+            raise TypeError(f"The recovery code must be an instance of the Recovery Model",
+                            f"Expected a recovery model instance but got object with type: {type(recovery_code.__name__)}"
+                            )
+        
+        recovery_code.delete_code()
+        recovery_code_batch = recovery_code.batch
+        recovery_code_batch.update_delete_code_count(save=True)
 
-        response_data.update({'SUCCESS': True})
+        response_data = {
+            "SUCCESS": True,
+            "OPERATION_SUCCESS": True,
+            "TITLE": "Code deleted",
+            "MESSAGE": "The code has been successfully deleted.",
+            "ALERT_TEXT": "Code successfully deleted"
+        }
+
+        return response_data
+        
     
-        return True, response_data
-    
-    delete_code.operation_name = "deleted"  # Assign a custom attribute to the function for the helper to use
+    delete_code.operation_name = "delete"  # Assign a custom attribute to the function for the helper to use
     return recovery_code_operation_helper(request, delete_code)
 
 

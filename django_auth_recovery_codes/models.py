@@ -451,6 +451,7 @@ class RecoveryCode(models.Model):
     is_deactivated      = models.BooleanField(default=False)
 
 
+
     class Meta:
         indexes = [
             models.Index(fields=["user", "look_up_hash"], name="user_lookup_idx"),
@@ -555,9 +556,11 @@ class RecoveryCode(models.Model):
             code.some_other_field = "new value"
             code.save()  # Both changes persisted together
         """
-        self.status = Status.INVALIDATE
+        self.status            = Status.PENDING_DELETE
+        self.mark_for_deletion = True
+        
         if save:
-            self.save(update_fields=["status"])
+            self.save(update_fields=["status", "mark_for_deletion"])
         return self
 
     def verify_recovery_code(self, plaintext_code: str) -> bool:
