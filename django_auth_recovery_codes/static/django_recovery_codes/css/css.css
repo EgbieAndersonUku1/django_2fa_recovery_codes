@@ -634,6 +634,7 @@ input:focus {
    - Width control classes
    - Small notes and paragraph line height
    - hiding elements
+   - highlighting elements
 */
 
 /* center elements */
@@ -726,6 +727,14 @@ section {
   font-size: 1.2rem;   
   line-height: 1.4;  
 }
+
+
+.highlight {
+    background-color: rgba(144, 238, 144, 0.5); /* light green flash */
+    transition: background-color 0.8s ease;
+}
+
+
 
 /* ------------------------------------------ */
 /*                   TITLE                    */

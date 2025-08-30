@@ -28,39 +28,40 @@ This section serves as the container for all recovery batch history cards.
 </section>
 
 {% if request.session.show_batch %}
- 
+
 <section id="view-batch-history" class="margin-top-xlg">
     <div class="container">
 
         <div class="history-cards">
             <div class="cards" id="static-batch-cards-history">
 
-               
+
                 {% for recovery_batch in recovery_batches %}
                 <div class="card">
 
                     <div class="card-head">
-                        
+
                         <div class="info-box">
                             <div class="label">
                                 <p>Batch id</p>
                             </div>
 
                             <div class="value">
-                                <p class="id">{{ recovery_batch.id | upper  }}</p>
+                                <p class="id">{{ recovery_batch.id | upper }}</p>
                             </div>
                         </div>
 
-                          <div class="info-box">
+                        <div class="info-box">
                             <div class="label">
                                 <p>Expiry info</p>
                             </div>
 
                             <div class="value">
-                               
-                                <p class="expiry_date recovery_status {% if recovery_batch.status == Status.ACTIVE %} text-green {% else %} text-red {% endif %}">
-                                        {{ recovery_batch.frontend_status }}
-                                      
+
+                                <p
+                                    class="expiry_date recovery_status {% if recovery_batch.status == Status.ACTIVE %} text-green {% else %} text-red {% endif %}">
+                                    {{ recovery_batch.frontend_status }}
+
                                 </p>
 
                             </div>
@@ -71,7 +72,7 @@ This section serves as the container for all recovery batch history cards.
                             </div>
 
                             <div class="value">
-                                <p class="username">{{ recovery_batch.user.username | title }}  </p>
+                                <p class="username">{{ recovery_batch.user.username | title }} </p>
                             </div>
                         </div>
 
@@ -85,7 +86,7 @@ This section serves as the container for all recovery batch history cards.
                             </div>
                         </div>
 
-                          <div class="info-box">
+                        <div class="info-box">
                             <div class="label">
                                 <p>Date modified </p>
                             </div>
@@ -141,8 +142,8 @@ This section serves as the container for all recovery batch history cards.
                                 <p>Number of deactivated</p>
                             </div>
 
-                            <div class="value number_invalidated">
-                                <p>{{ recovery_batch.number_invalidated }}</p>
+                            <div class="value">
+                                <p class="number_invalidated">{{ recovery_batch.number_invalidated }}</p>
                             </div>
                         </div>
 
@@ -151,72 +152,72 @@ This section serves as the container for all recovery batch history cards.
                                 <p>Number of removed</p>
                             </div>
 
-                            <div class="value number_removed">
-                                <p>{{ recovery_batch.number_removed }}</p>
+                            <div class="value">
+                                <p class="number_removed">{{ recovery_batch.number_removed }}</p>
                             </div>
                         </div>
 
-                      
 
-                            <div class="info-box">
+
+                        <div class="info-box">
                             <div class="label">
                                 <p>Has generated code batch</p>
                             </div>
 
                             <div class="value">
-                               
+
                                 <p class="generated">
                                     {{ recovery_batch.generated }}
                                 </p>
 
                             </div>
-                            
+
                         </div>
 
-                          <div class="info-box">
+                        <div class="info-box">
                             <div class="label">
                                 <p>Has viewed code batch</p>
                             </div>
 
                             <div class="value">
-                               
+
                                 <p class="viewed">
                                     {{ recovery_batch.viewed }}
                                 </p>
 
                             </div>
-                            
+
                         </div>
 
 
-                         <div class="info-box">
+                        <div class="info-box">
                             <div class="label">
                                 <p>Has downloaded code batch</p>
                             </div>
 
                             <div class="value">
-                               
+
                                 <p class="downloaded">
                                     {{ recovery_batch.downloaded }}
                                 </p>
 
                             </div>
-                            
+
                         </div>
 
-                          <div class="info-box">
+                        <div class="info-box">
                             <div class="label">
                                 <p>Has emailed code batch</p>
                             </div>
 
                             <div class="value">
-                               
+
                                 <p class="emailed">
-                                    {{ recovery_batch.emailed  }}
+                                    {{ recovery_batch.emailed }}
                                 </p>
 
                             </div>
-                            
+
                         </div>
 
                     </div>
@@ -224,13 +225,13 @@ This section serves as the container for all recovery batch history cards.
                     <hr class="dividor margin-top-lg margin-bottom-lg">
 
 
-            
+
 
                 </div>
 
                 {% endfor %}
 
-             
+
             </div>
 
 
