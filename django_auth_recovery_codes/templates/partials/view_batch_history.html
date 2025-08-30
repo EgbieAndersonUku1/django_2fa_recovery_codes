@@ -4,32 +4,14 @@
 {% endif %}
 
 
-<!-- 
-Dynamic Recovery Batch History Section
 
-This section serves as the container for all recovery batch history cards.
-- The structure is static to maintain consistent layout and styling.
-- The loader (<span id="dynamic-batch-loader">) is shown while batches are being fetched or generated.
-- The <div class="cards"> container holds individual batch cards, which are added dynamically via JavaScript.
-- Helper functions like `prependChild` and `getNthChildFast` are used to manipulate the cards efficiently.
--->
-<section id="dynamic-view-batch-history" class="">
-    <div class="center">
-        <span span class="loader" id="dynamic-batch-loader"></span>
-    </div>
-    <div class="container">
-        <div class="history-cards">
-            <div class="cards" id="dynamic-cards-card-history">
 
-            </div>
-        </div>
-    </div>
-
-</section>
-
-{% if request.session.show_batch %}
+<!-- {% if request.session.show_batch %} -->
 
 <section id="view-batch-history" class="margin-top-xlg">
+      <div class="center">
+        <span span class="loader" id="dynamic-batch-loader"></span>
+    </div>
     <div class="container">
 
         <div class="history-cards">
@@ -59,7 +41,7 @@ This section serves as the container for all recovery batch history cards.
                             <div class="value">
 
                                 <p
-                                    class="expiry_date recovery_status {% if recovery_batch.status == Status.ACTIVE %} text-green {% else %} text-red {% endif %}">
+                                    class="expiry_date status recovery_status {% if recovery_batch.status == Status.ACTIVE %} text-green {% else %} text-red {% endif %}">
                                     {{ recovery_batch.frontend_status }}
 
                                 </p>
@@ -242,4 +224,4 @@ This section serves as the container for all recovery batch history cards.
 
 <hr class="dividor margin-top-md margin-bottom-md">
 
-{% endif %}
+<!-- {% endif %} -->

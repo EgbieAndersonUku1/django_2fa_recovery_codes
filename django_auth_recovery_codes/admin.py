@@ -1,6 +1,19 @@
 from django.contrib import admin
 
-from .models import RecoveryCode, RecoveryCodeCleanUpScheduler, RecoveryCodesBatch
+from .models import RecoveryCode, RecoveryCodeCleanUpScheduler, RecoveryCodesBatch, RecoveryCodeAudit
+
+
+
+
+
+class RecoveryCodeAuditAdmin(admin.ModelAdmin):
+    list_display          = ["id", "action", "deleted_by", "user", "deleted_by", "batch", "timestamped"]
+    list_display_links    = ["id", "user"]
+    list_per_page         = 25
+    readonly_fields       = ["id", "timestamped", "modified_at"]
+    list_filter           = ["action", ]
+    search_fields         = ["id", "user__username", "user__email", "action"]
+    ordering              = ["-timestamped",]
 
 
 class RecoveryCodesBatchAdmin(admin.ModelAdmin):
@@ -65,3 +78,4 @@ class RecoveryCodeAdmin(admin.ModelAdmin):
 
 admin.site.register(RecoveryCodesBatch, RecoveryCodesBatchAdmin)
 admin.site.register(RecoveryCode, RecoveryCodeAdmin)
+admin.site.register(RecoveryCodeAudit, RecoveryCodeAuditAdmin)

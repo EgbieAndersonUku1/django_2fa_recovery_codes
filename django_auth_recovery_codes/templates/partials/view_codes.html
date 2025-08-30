@@ -45,38 +45,15 @@
     </div>
 
 
-
-    <!-- 
-    This table is dynamically generated and populated when the user clicks 
-    "Regenerate Code". 
-
-    Why this is needed:
-    - When a code is first generated, it is displayed to the user.
-    - If the page is refreshed, the `{if not is_viewed }` condition is triggered, 
-    which removes the div container (and the table) from the DOM.
-    - Without the container, regenerated codes cannot be inserted into the table.
-
-    How this div helps:
-    - The div below acts as a temporary container for dynamically generated codes.
-    - It exists only until the page is refreshed.
-    - On refresh, the container is removed, and the Jinja template logic 
-    takes over seamlessly.
-    -->
-    <div class="table-wrapper" id="generated-code-table">
-    </div>
-
-
-
-    {% if not is_viewed %}
     <div class="table-wrapper" id="table-code-view">
-
+        <!-- Generated dynamically via JS -->
     </div>
 
-    {% else %}
+    {% if is_viewed %}
 
-    <p class="alert-message" id="alert-message">
+   <p class="alert-message" id="alert-message">
         <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
-        You have already viewed these codes and cannot view them again.
+        You’ve already checked these codes. No worries, you can explore the other available codes options instead!
     </p>
 
 
