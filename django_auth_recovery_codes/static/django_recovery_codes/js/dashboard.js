@@ -11,8 +11,8 @@ import {
     downloadFromResponse,
     getNthChildNested,
     addChildWithPaginatorLimit,
-  
- 
+
+
 } from "./utils.js";
 
 import { parseFormData } from "./form.js";
@@ -411,7 +411,7 @@ async function handleDownloadButtonClick(e) {
             url: "/auth/recovery-codes/download-codes/",
             csrfToken: getCsrfToken(),
             method: "POST",
-            body: {forceUpdate: true},
+            body: { forceUpdate: true },
             returnRawResponse: true,
         });
 
@@ -498,7 +498,7 @@ async function handleInvalidateButtonClick(e) {
         handleInvalidateCodeFetchAPI
     );
 
-     handleRecoveryCodeAlert(data, "Code successfully deactivated")
+    handleRecoveryCodeAlert(data, "Code successfully deactivated");
 
     invalidateFormElement.reset();
 }
@@ -538,7 +538,7 @@ async function handleDeleteCodeeButtonClick(e) {
                 url: "/auth/recovery-codes/delete-codes/",
                 csrfToken: getCsrfToken(),
                 method: "POST",
-                body: { code : code},
+                body: { code: code },
                 throwOnError: false,
             });
 
@@ -550,7 +550,7 @@ async function handleDeleteCodeeButtonClick(e) {
             deleteCodeButtonSpinnerElement,
             alertAttributes,
             handleRemoveRecoveryCodeApiRequest
-        );        
+        );
 
         handleRecoveryCodeAlert(data, "Code successfully deleted");
         deleteFormElement.reset()
@@ -685,7 +685,7 @@ async function handlDeleteAllCodeButtonClick(e) {
             csrfToken: getCsrfToken(),
             method: "POST",
             body: {
-               forceUpdate: true
+                forceUpdate: true
             },
         });
 
@@ -981,11 +981,11 @@ async function handleRecoveryCodesAction({ e,
 
     if (daysToExpiry !== null && typeof daysToExpiry === "number") {
         body.daysToExpiry = daysToExpiry;
-     
-   
+
+
     }
 
-    body.forceUpdate  =  true;
+    body.forceUpdate = true;
 
     const handleGenerateCodeFetchApi = async () => {
 
@@ -1013,14 +1013,14 @@ async function handleRecoveryCodesAction({ e,
 
         statsTotalCodesIssuedBoard.textContent = resp.TOTAL_ISSUED;
         toggleElement(generaterecoveryBatchSectionElement);
-    
+
         const isPopulated = populateTableWithUserCodes(resp.CODES);
 
         if (isPopulated) {
             sendPostFetchWithoutBody("/auth/recovery-codes/viewed/",
                 "Failed to mark code as viewed "
             );
-            
+
             insertBatchCardIntoSection(resp.BATCH, resp.ITEM_PER_PAGE);
         }
         return true;
@@ -1208,7 +1208,7 @@ function populateTableWithUserCodes(codes) {
                 generateCodeActionAButtons();
                 codeActionContainerElement.appendChild(generateCodeActionAButtons());
             }
-            
+
 
             if (generaterecoveryBatchSectionElement === null) {
                 codeActionContainerElement.innerHTML = "";
@@ -1241,7 +1241,7 @@ async function sendPostFetchWithoutBody(url, msg = "") {
             url: url,
             csrfToken: getCsrfToken(),
             method: "POST",
-            body: {forceUpdate : true}  // fetchData will handle stringifying and headers
+            body: { forceUpdate: true }  // fetchData will handle stringifying and headers
         });
     } catch (error) {
         console.warn(msg, error);
@@ -1277,12 +1277,12 @@ function insertBatchCardIntoSection(batch, batchPerPage = 5) {
     if (!recoveryBatchSectionElement) {
         recoveryBatchSectionElement = document.getElementById(CODE_BATCH_CARDS_DIV_ID);
     }
-  
-    const historyCardElement        = generateRecoveryCodesSummaryCard(batch);
+
+    const historyCardElement = generateRecoveryCodesSummaryCard(batch);
     let secondRecoveryCardBatch;
     const TAG_NAME = "div";
     const CLASS_SELECTOR = "card-head";
-    
+
     dynamicBatchSpinnerElement.style.display = "inline-block";
     toggleSpinner(dynamicBatchSpinnerElement);
 
@@ -1298,37 +1298,37 @@ function insertBatchCardIntoSection(batch, batchPerPage = 5) {
             secondRecoveryCardBatch = getNthChildNested(recoveryBatchSectionElement, 2, TAG_NAME, CLASS_SELECTOR);
             markCardAsDeleted(secondRecoveryCardBatch)
             toggleSpinner(dynamicBatchSpinnerElement, false);
-        
+
 
         } else {
             addChildWithPaginatorLimit(dynamicViewBatchCardHistorySection, historyCardElement, batchPerPage, true);
             secondRecoveryCardBatch = getNthChildNested(dynamicViewBatchCardHistorySection, 2, TAG_NAME, CLASS_SELECTOR)
             markCardAsDeleted(secondRecoveryCardBatch)
-           
+
         };
         toggleSpinner(dynamicBatchSpinnerElement, false);
 
-    }, (MILLI_SECONDS_BEFORE_DISPLAY + MILLI_SECONDS) )
- 
+    }, (MILLI_SECONDS_BEFORE_DISPLAY + MILLI_SECONDS))
+
 }
 
 
 function markCardAsDeleted(cardElement) {
 
-  if (cardElement === null) return;
+    if (cardElement === null) return;
 
-  const statusElements = cardElement.querySelectorAll('.card-head .info-box .value p');
-  if (!statusElements.length) return;
+    const statusElements = cardElement.querySelectorAll('.card-head .info-box .value p');
+    if (!statusElements.length) return;
 
 
-  for (const pElement of statusElements) {
-    if (pElement.classList.contains('status')) {
-      pElement.textContent = "Deleted";
-      pElement.classList.remove("text-green");
-      pElement.classList.add("text-red", "bold");
-      break; 
+    for (const pElement of statusElements) {
+        if (pElement.classList.contains('status')) {
+            pElement.textContent = "Deleted";
+            pElement.classList.remove("text-green");
+            pElement.classList.add("text-red", "bold");
+            break;
+        }
     }
-  }
 }
 
 
@@ -1339,7 +1339,10 @@ function markCardAsDeleted(cardElement) {
  * Displays a standardised alert for recovery code operations (e.g., deactivate, delete).
  *
  * The function determines whether to show a ✅ success, ℹ️ info, or ❌ error alert
- * based on the operation outcome and the expected success message.
+ * based on the operation outcome and the expected success message. It also increments
+ * the field corresponding card batch value by one. The field increment depends 
+ * on the form calling it. For example, if is being called by the `invalidate form` or `
+ * `delete code form`
  *
  * @param {Object} data - The response data object returned from the backend.
  * @param {boolean} data.OPERATION_SUCCESS - Indicates whether the operation succeeded.
@@ -1353,22 +1356,31 @@ function markCardAsDeleted(cardElement) {
  * handleRecoveryCodeAlert(data, "Code successfully deleted");
  */
 function handleRecoveryCodeAlert(data, successCompareMessage) {
-    console.log(data)
-    console.log(data.ALERT_TEXT === successCompareMessage)
-    console.log(data.ALERT_TEXT)
+  
     if (data && Object.hasOwn(data, "SUCCESS")) {
-        
-        if (data.OPERATION_SUCCESS) {
-             const icon = data.ALERT_TEXT === successCompareMessage ? "success": "info";
 
-             AlertUtils.showAlert({
+        if (data.OPERATION_SUCCESS) {
+            const icon = data.ALERT_TEXT === successCompareMessage ? "success" : "info";
+            console.log(data.ALERT_TEXT)
+
+            AlertUtils.showAlert({
                 title: data.ALERT_TEXT,
                 text: data.MESSAGE,
                 icon: icon,
                 confirmButtonText: "Ok"
             });
 
-            return; 
+            
+            // Only increment the frontend number when the operation is truly successful.
+            // Reason: The backend returns true for non-error states like `deleted`, 
+            // `already deleted`, or `already invalidated`. 
+            // The  `successCompareMessage` ensures that the frontend only visually 
+            // increments the number when the intended action (e.g., deletion or invalidation) has actually occurred.
+            if (icon === "success") {
+                updateCurrentRecoveryCodeBatchCard();
+            }
+          
+            return;
 
         } else {
             AlertUtils.showAlert({
@@ -1378,16 +1390,76 @@ function handleRecoveryCodeAlert(data, successCompareMessage) {
                 confirmButtonText: "Ok"
             });
             return;
-        } 
-    } 
-    
-    
-         AlertUtils.showAlert({
-            title: "The code is invalid",
-            text: "The code entered is an invalid code",
-            icon: "error",
-            confirmButtonText: "Ok"
-        });
+        }
+    }
+
+
+    AlertUtils.showAlert({
+        title: "The code is invalid",
+        text: "The code entered is an invalid code",
+        icon: "error",
+        confirmButtonText: "Ok"
+    });
+
+
+}
+
+
+
+function updateCurrentRecoveryCodeBatchCard() {
+    let currentCardBatch;
+    const TAG_NAME = "div";
+    const CLASS_SELECTOR = "card-head";
+
+    toggleSpinner(dynamicBatchSpinnerElement);
+
+    if (!recoveryBatchSectionElement) {
+        recoveryBatchSectionElement = document.getElementById(CODE_BATCH_CARDS_DIV_ID);
+    }
+
+    if (recoveryBatchSectionElement !== null) {
+        console.log("getting the current static batch...")
+        currentCardBatch = getNthChildNested(recoveryBatchSectionElement, 1, TAG_NAME, CLASS_SELECTOR);
+
+        
+    } else {
+        console.log("getting the current batch from the dynamic card batch...")
+        currentCardBatch = getNthChildNested(dynamicViewBatchCardHistorySection, 1, TAG_NAME, CLASS_SELECTOR)
+
+    };
+    incrementRecoveryCardField(currentCardBatch);
+    toggleSpinner(dynamicBatchSpinnerElement, false);
+}
+
+
+function incrementRecoveryCardField(cardBatchElement) {
+    if (!checkIfHTMLElement(cardBatchElement)) {
+        warnError(
+            "incrementRecoveryCardField",
+            `Expected a field p Element. Got object with type ${typeof cardBatchElement}`
+        );
+        return; // Exit if not a valid element
+    }
+
+    const PElements = cardBatchElement.querySelectorAll('.card-head .info-box .value p');
+    const keys      = ["number_invalidated", "number_removed"];
     
 
+    for (const pElement of PElements) {
+        // Only increment fields with the correct class
+        const t = keys.some(key => pElement.classList.contains(key))
+
+        if (keys.some(key => pElement.classList.contains(key))) {
+            const currentValue = parseInt(pElement.textContent || "0", 10);
+            pElement.textContent = currentValue + 1;
+        
+            pElement.classList.add("text-green", "bold", "highlight");
+            
+            setTimeout(() => {
+                pElement.classList.remove("highlight");
+            }, MILLI_SECONDS);
+
+            break;
+        }
+    }
 }
