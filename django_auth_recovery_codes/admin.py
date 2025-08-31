@@ -1,29 +1,56 @@
 from django.contrib import admin
+from django.core.exceptions import ValidationError
 
-from .models import RecoveryCode, RecoveryCodeCleanUpScheduler, RecoveryCodesBatch, RecoveryCodeAudit
+from django_auth_recovery_codes.forms.schedule_form import RecoveryCodeCleanUpSchedulerForm
+
+from .models import (RecoveryCode, 
+                     RecoveryCodeCleanUpScheduler, 
+                     RecoveryCodesBatch, 
+                     RecoveryCodeAudit, 
+                     RecoveryCodePurgeHistory
+                     )
 
 
 
+class RecoveryCodePurgeHistoryAdmin(admin.ModelAdmin):
+    """"""
+    list_display     = ["id", "name", "timestamp", "total_batches_purged", "retention_days"]
+    readonly_fields  = ["total_codes_purged", "retention_days", "total_batches_purged"]
+   
+
+class RecoveryCodeCleanupSchedulerAdmin(admin.ModelAdmin):
+    """"""
+    form = RecoveryCodeCleanUpSchedulerForm
+    list_display  = ["id", "name", "enable_scheduler", "run_at", "next_run", "retention_days", "log_per_code", "schedule_type"]   
+    help_texts = {
+            'schedule': 'Choose the frequency for this task (admin-only help text).'
+        }
+
+    def save_form(self, request, form, change):
+        return super().save_form(request, form, change)
+   
+    
 
 
 class RecoveryCodeAuditAdmin(admin.ModelAdmin):
-    list_display          = ["id", "action", "deleted_by", "user", "deleted_by", "batch", "timestamped"]
-    list_display_links    = ["id", "user"]
+    list_display          = ["id", "action", "deleted_by", "user_issued_to", "number_deleted", "number_issued", "timestamp", "updated_at"]
+    list_display_links    = ["id", "user_issued_to"]
     list_per_page         = 25
-    readonly_fields       = ["id", "timestamped", "modified_at"]
+    readonly_fields       = ["id", "timestamp"]
     list_filter           = ["action", ]
     search_fields         = ["id", "user__username", "user__email", "action"]
-    ordering              = ["-timestamped",]
+    ordering              = ["-timestamp",]
 
 
 class RecoveryCodesBatchAdmin(admin.ModelAdmin):
     list_display          = ["id", "user", "number_issued", "status", "number_removed", "created_at", "modified_at"]
     list_display_links    = ["id", "user"]
     list_per_page         = 25
-    readonly_fields       = ["id", "created_at", "modified_at"]
+    readonly_fields       = ["id", "created_at", "modified_at", "number_removed"]
     list_filter           = ["status", "automatic_removal", ]
     search_fields         = ["id", "user__username", "user__email"]
     ordering              = ["-created_at",]
+  
 
     fieldsets = [
         ("Identification", {
@@ -79,3 +106,5 @@ class RecoveryCodeAdmin(admin.ModelAdmin):
 admin.site.register(RecoveryCodesBatch, RecoveryCodesBatchAdmin)
 admin.site.register(RecoveryCode, RecoveryCodeAdmin)
 admin.site.register(RecoveryCodeAudit, RecoveryCodeAuditAdmin)
+admin.site.register(RecoveryCodeCleanUpScheduler, RecoveryCodeCleanupSchedulerAdmin)
+admin.site.register(RecoveryCodePurgeHistory, RecoveryCodePurgeHistoryAdmin)

@@ -3,7 +3,7 @@ import logging
 from django_email_sender.email_logger import EmailSenderLogger
 from django_email_sender.email_sender import EmailSender
 from django_email_sender.email_logger import LoggerType
-from django_q.tasks import schedule, Schedule
+
 from django.utils import timezone
 from django_auth_recovery_codes import notify_user
 from django_auth_recovery_codes.models import RecoveryCodePurgeHistory, RecoveryCodesBatch
@@ -35,9 +35,9 @@ def send_recovery_codes_email(sender_email, user, codes, subject= "Your account 
 
         raise 
 
+DJANGO_AUTH_RETENTION_DAYS = 0
 
-
-def purge_all_batches_task(retention_days=30, bulk_delete=True, log_per_code=False, delete_empty_batch=True):
+def purge_all_expired_batches(retention_days=DJANGO_AUTH_RETENTION_DAYS, bulk_delete=True, log_per_code=False, delete_empty_batch=True):
     """
     Scheduled task to purge all expired recovery codes in all batches.
     Returns a summary of totals removed.
@@ -47,18 +47,18 @@ def purge_all_batches_task(retention_days=30, bulk_delete=True, log_per_code=Fal
 
     batches = RecoveryCodesBatch.objects.all()
     for batch in batches:
-        purged_count = batch.purge_expired_codes(
+        purged_count, _ = batch.purge_expired_codes(
             bulk_delete=bulk_delete,
             log_per_code=log_per_code,
             retention_days=retention_days,
             delete_empty_batch=delete_empty_batch
         )
-        if purged_count > 0:
+        if purged_count >= 0:
             total_purged += purged_count
             total_batches += 1
-            
+        
+      
 
-    
     RecoveryCodePurgeHistory.objects.create(
         total_codes_purged=total_purged,
         total_batches_purged=total_batches,
