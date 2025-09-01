@@ -3,20 +3,121 @@ from __future__ import annotations
 import uuid
 
 from django.db import models, connections
+from django.db.models.query import QuerySet
 from django.db.models import F
 from django.db import transaction
 from django.utils import timezone
+from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password, check_password
 from django_email_sender.models import EmailBaseLog
 
+from django_auth_recovery_codes.base_models import AbstractCleanUpScheduler
 from django_auth_recovery_codes.utils.security.generator import generate_2fa_secure_recovery_code
 from django_auth_recovery_codes.utils.security.hash import is_already_hashed, make_lookup_hash
-from django_auth_recovery_codes.utils.utils import schedule_future_date, create_json_from_attrs
+from django_auth_recovery_codes.utils.utils import schedule_future_date, create_json_from_attrs, create_unique_string
 
 
 User = get_user_model()
 
+
+
+class RecoveryCodeAudit(models.Model):
+    class Action(models.TextChoices):
+        DELETED                   = "deleted", "Deleted"
+        INVALIDATED               = "invalidated", "Invalidated"
+        ALREADY_DELETED           = "already_deleted", "Already deleted"
+        ALREADY_INVALIDATED       = "already_invalidated", "Already invalidated"
+        INVALID_CODE              = "invalid_code", "Invalid code entered"
+        BATCH_MARKED_FOR_DELETION = "batch_marked_for_deletion", "Batch marked for deletion"
+        BATCH_PURGED              = "batch_purged", "Batch purged (async deletion)"
+
+    action         = models.CharField(max_length=50, choices=Action)
+    deleted_by     = models.ForeignKey(User, on_delete=models.SET_NULL,null=True, blank=True,  related_name="performed_recovery_code_actions")
+    user_issued_to = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="recovery_code_audits")
+    batch          = models.ForeignKey("RecoveryCodesBatch", on_delete=models.SET_NULL, null=True, blank=True, related_name="audit_logs")
+    number_deleted = models.PositiveSmallIntegerField(default=0)
+    number_issued  = models.PositiveSmallIntegerField(default=0)
+    reason         = models.TextField(blank=True, null=True)
+    timestamp      = models.DateTimeField(auto_now_add=True)   
+    updated_at     = models.DateTimeField(auto_now=True)     
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["-timestamp"], name="recoverycodeaudit_ts_idx"),
+            models.Index(fields=["action"], name="recoverycodeaudit_action_idx"),
+            models.Index(fields=["user_issued_to"], name="recoverycodeaudit_user_idx"),
+            models.Index(fields=["batch"], name="recoverycodeaudit_batch_idx"),
+        ]
+        ordering = ["-timestamp"]
+
+    def __str__(self):
+        return f"{self.get_action_display()} for {self.user_issued_to or 'Unknown User'} at {self.timestamp:%Y-%m-%d %H:%M:%S}"
+
+    @classmethod
+    def log_action(cls, user_issued_to=None, action=None, deleted_by=None, batch=None, number_deleted=0, number_issued=0, reason=None):
+    
+        if action is None:
+            raise ValueError("Action is required.")
+
+        if not isinstance(action, cls.Action):
+            raise ValueError(f"Invalid action '{action}'. Use RecoveryCodeAudit.Action constants.")
+
+        if user_issued_to is not None and not isinstance(user_issued_to, models.Model):
+            raise TypeError("user_issued_to must be a User instance or None.")
+
+        if deleted_by is not None and not isinstance(deleted_by, models.Model):
+            raise TypeError("deleted_by must be a User instance or None.")
+
+        if batch is not None and not isinstance(batch, models.Model):
+            raise TypeError("batch must be a RecoveryCodesBatch instance or None.")
+
+        return cls.objects.create(
+            user_issued_to=user_issued_to,
+            action=action,
+            deleted_by=deleted_by,
+            batch=batch,
+            number_deleted=number_deleted,
+            number_issued=number_issued,
+            reason=reason,
+        )
+    
+    @classmethod
+    def clean_up_audit_records(cls, retention_days = 0):
+        """Delete RecoveryCodeAudit rows older than retention period, if configured."""
+
+        if retention_days != 0 and retention_days and not isinstance(retention_days, int):
+            raise TypeError(f"Expected the retention days to be int but got object with type ({type(retention_days).__name__})")
+        
+        if retention_days == 0:
+            num_deleted, _ = cls.objects.all().delete()  
+            return  True, num_deleted# test to see if it works remove this to return 0
+        
+        cut_of_date       = timezone.now() - timedelta(days=retention_days)
+        old_recovery_audit_qs = cls.objects.filter(updated_at__lt=cut_of_date)
+
+        if old_recovery_audit_qs:
+            count = old_recovery_audit_qs.count()
+
+            old_recovery_audit_qs.delete()
+            return True, count
+        return False, 0
+
+
+class RecoveryCodePurgeHistory(models.Model):
+    name                 = models.CharField(max_length=128, default="Recovery code purged history log")
+    timestamp            = models.DateTimeField(auto_now_add=True)
+    total_codes_purged   = models.PositiveIntegerField(default=0)
+    total_batches_purged = models.PositiveIntegerField(default=0)
+    retention_days       = models.PositiveIntegerField(default=30)
+
+    class Meta:
+        verbose_name         = "RecoveryCodePurgeHistory"
+        verbose_name_plural  = "RecoveryCodePurgeHistories"
+
+    def __str__(self):
+        return f"Purge on {self.timestamp}: {self.total_codes_purged} codes from {self.total_batches_purged} batches"
+    
 
 class Status(models.TextChoices):
     ACTIVE         = "a", "Active"
@@ -25,32 +126,18 @@ class Status(models.TextChoices):
     PENDING_DELETE = "p", "Pending Delete"
 
 
-class RecoveryCodeCleanUpScheduler(models.Model):
-    class Status(models.TextChoices):
-        SUCCESS        = "s", "Success"
-        FAILURE        = "f", "Failure"
-        DELETED        = "d", "Deleted"
-    
-    class Schedule(models.TextChoices):
-        ONCE    = "O", "Once"
-        MINUTES = "T", "Minutes"
-        HOURLY  = "H", "Hourly"
-        DAILY   = "D", "Daily"
-        WEEKLY  = "W", "Weekly"
-        QUARTERLY = "Q", "Quarterly"
-        YEARLY  = "Y", "Yearly"
+class RecoveryCodeCleanUpScheduler(AbstractCleanUpScheduler):
+    name               = models.CharField(max_length=180, default=create_unique_string("Purge Expired Recovery Codes"), unique=True)
+    bulk_delete        = models.BooleanField(default=True)
+    log_per_code       = models.BooleanField(default=False)
+    delete_empty_batch = models.BooleanField(default=True)
+    next_run           = models.DateTimeField(blank=True, null=True)
+    deleted_count      = models.PositiveIntegerField(default=0, editable=False)
 
-    run_at           = models.DateTimeField()
-    deleted_count    = models.PositiveIntegerField(default=0)
-    enable_scheduler = models.BooleanField(default=True)
-    status           = models.CharField(max_length=1, choices=Status)
-    error_message    = models.TextField()
-
-    class Meta:
-        ordering = ['-run_at']
-
-    def __str__(self):
-        return f"{self.run_at} - {self.status} - Deleted {self.deleted_count}"
+  
+class RecoveryCodeAuditScheduler(AbstractCleanUpScheduler):
+     DEFAULT_NAME = "Clean up recovery codes audit"
+     name         = models.CharField(max_length=180, default=create_unique_string("Remove Recovery code audit"), unique=True)
 
 
 
@@ -61,8 +148,7 @@ class RecoveryCodesBatch(models.Model):
                   "emailed", "generated", 
                   ]
 
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True, db_index=True)
-
+    id                 = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True, db_index=True)
     number_issued      = models.PositiveSmallIntegerField(default=10)
     number_removed     = models.PositiveSmallIntegerField(default=0)
     number_invalidated = models.PositiveSmallIntegerField(default=0)
@@ -74,7 +160,7 @@ class RecoveryCodesBatch(models.Model):
     automatic_removal  = models.BooleanField(default=True)
     expiry_date        = models.DateTimeField(blank=True, null=True)
     deleted_at         = models.DateTimeField(null=True, blank=True)
-    deleted_by         = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="deleted_batches")
+    deleted_by         = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name="deleted_batches")
 
      # Action tracking
     viewed            = models.BooleanField(default=False)
@@ -82,12 +168,145 @@ class RecoveryCodesBatch(models.Model):
     emailed           = models.BooleanField(default=False)
     generated         = models.BooleanField(default=False)
 
+    # constant field
+    STATUS_FIELD             = "status"
+    MARK_FOR_DELETION_FIELD  = "mark_for_deletion"
+    MODIFIED_AT_FIELD        = "modified_at"
+    DELETED_AT_FIELD         = "deleted_at"
+    DELETED_BY_FIELD         = "deleted_by"
+    
+    # constant flags
+    VIEWED_FLAG              = "viewed"
+    DOWNLOADED_FLAG          = "downloaded"
+    EMAILED_FLAG             = "emailed"
+    GENERATED_FLAG           = "generated"
+
     class Meta:
-        ordering = ["-created_at"]
+        ordering             = ["-created_at"]
+        verbose_name         = "RecoveryCodesBatch"
+        verbose_name_plural  = "RecoveryCodeBatches"
 
     def __str__(self):
         return f"Batch {self.id} for {self.user or 'Deleted User'}"
     
+    def purge_expired_codes(self, bulk_delete=True, log_per_code=False, retention_days=1, delete_empty_batch=False):
+        """
+        Hard-delete recovery codes in this batch marked for deletion or invalidated,
+        optionally logging per code or in bulk. Deletes batch if empty.
+
+        Args:
+            bulk_delete (bool): Delete all codes in one query if True, else one by one.
+            log_per_code (bool): Log each code deletion individually if True.
+            retention_days (int): Number of days to keep soft-deleted codes.
+            delete_empty_batch (bool): Delete batch if it becomes empty.
+        Returns:
+            int: Number of codes deleted.
+        """
+       
+        expired_codes = self._get_expired_recovery_codes_qs(retention_days)
+
+        if not expired_codes.exists():
+            print(f"[{timezone.now()}] No codes to purge for batch {self.id}") # will change to logger afterwards for now keep
+            return 0, expired_codes.count() == 0
+
+        if log_per_code and not bulk_delete:
+           deleted_count = self._delete_expired_codes_by_scheduler_helper(expired_codes)
+        else:
+           deleted_count = self._bulk_delete_expired_codes_by_scheduler_helper(expired_codes)
+
+        # Delete the batch if no codes remain
+        is_empty = (expired_codes.count() - deleted_count ) == 0
+        print(is_empty)
+
+        if delete_empty_batch and is_empty:
+            print(f"[{timezone.now()}] Batch {self.id} is empty and will be deleted.") # will change to logger after for now keep
+            self.delete()
+
+        return deleted_count, is_empty
+
+    def _get_expired_recovery_codes_qs(self, retention_days: int = None) -> QuerySet[RecoveryCode]:
+        """
+        Return a queryset of recovery codes eligible for automatic removal with two extra conditions.
+
+        The queryset returned is filtered based on two conditions:
+
+        1. If `retention_days` is None or less than 0, the queryset returns all codes
+        that are invalidated or marked for deletion, regardless of age.
+
+        2. If `retention_days` is a positive number, only codes older than or equal to the
+        retention period are returned.
+
+        Example:
+        If a code is marked for deletion or invalidation on 30th August 2025 and
+        `retention_days` is set to 30, the code will not be returned before 29th September 2025.
+
+        Args:
+            retention_days (int): The number of days for the codes to stay in the database
+                                  before it is removed
+        
+        Raises:
+            TypeError: Raised if the retention days is not an integer. Note an error is not
+            raised if the number is a negative number since the method assumes that the 
+            user wants all expired codes regrdless of age.
+
+
+        Returns:
+        QuerySet[RecoveryCode]: The filtered recovery codes queryset.
+
+        """
+
+        if retention_days is not None and not isinstance(retention_days, int):
+            raise TypeError(f"Expected a int for retention_days parameter but got object with type f{type(retention_days).__name__}")
+        
+        qs = self.recovery_codes.filter(
+            automatic_removal=True,
+            status__in=self.terminal_statuses()
+        )
+        if retention_days > 0:
+            qs = qs.filter(modified_at__lt=self.get_expiry_threshold(retention_days))
+        return qs
+
+    def _delete_expired_codes_by_scheduler_helper(self, expired_codes):
+        """"""
+        deleted_count = 0
+        for code in expired_codes:
+                RecoveryCodeAudit.log_action(
+                    user_issued_to=self.user,
+                    action=RecoveryCodeAudit.Action.BATCH_PURGED,
+                    deleted_by=self.user,
+                    batch=self,
+                    number_deleted=1,
+                    number_issued=self.number_issued,
+                    reason="Batch of expired or invalidated codes removed by scheduler",
+                )
+                code.delete()
+                deleted_count += 1
+        return deleted_count
+
+    def _bulk_delete_expired_codes_by_scheduler_helper(self, expired_codes):
+        """"""
+        number_to_delete = expired_codes.count()
+        if number_to_delete > 0:
+                expired_codes.delete()
+                RecoveryCodeAudit.log_action(
+                    user_issued_to=self.user,
+                    action=RecoveryCodeAudit.Action.BATCH_PURGED,
+                    deleted_by=self.user,
+                    batch=self,
+                    number_deleted=1,
+                    number_issued=self.number_issued,
+                    reason="Batch of expired or invalidated codes removed by scheduler",
+                )
+        return number_to_delete
+
+    @staticmethod
+    def get_expiry_threshold(days=30):
+        return timezone.now() - timedelta(days=days) 
+    
+    @staticmethod
+    def terminal_statuses():
+        """Statuses meaning the batch is no longer valid."""
+        return [Status.PENDING_DELETE, Status.INVALIDATE]
 
     @property
     def frontend_status(self):
@@ -278,8 +497,6 @@ class RecoveryCodesBatch(models.Model):
             return json_cache
         return {}
     
-   
-
     def reset_cache_values(self):
         """
         Resets all cache-related values to False.
@@ -289,19 +506,19 @@ class RecoveryCodesBatch(models.Model):
 
     def mark_as_viewed(self, save : bool = True):
         self.viewed = True
-        return self._update_field_helper(fields_list=['viewed'], save=save)
+        return self._update_field_helper(fields_list=[self.VIEWED_FLAG], save=save)
 
     def mark_as_downloaded(self, save : bool = True):
         self.downloaded = True
-        return self._update_field_helper(fields_list=['downloaded'], save=save)
+        return self._update_field_helper(fields_list=[self.DOWNLOADED_FLAG], save=save)
 
     def mark_as_emailed(self, save: bool = True):
         self.emailed = True
-        return self._update_field_helper(fields_list=['emailed'], save=save)
+        return self._update_field_helper(fields_list=[self.EMAILED_FLAG], save=save)
     
     def mark_as_generated(self, save: bool = True):
         self.generated = True
-        self._update_field_helper(fields_list=['generated'], save=save)
+        self._update_field_helper(fields_list=[self.GENERATED_FLAG], save=save)
     
     def _update_field_helper(self, fields_list: list, save : bool = True):
 
@@ -398,17 +615,39 @@ class RecoveryCodesBatch(models.Model):
         """
         
         try:
-            recovery_batch = RecoveryCodesBatch.objects.select_related('recovery_codes').get(user=user, status=Status.ACTIVE)
+          
+            recovery_batch = (
+                cls.objects
+                .select_related('user')  
+                .prefetch_related('recovery_codes')   
+                .get(user=user, status=Status.ACTIVE)
+            )
         except cls.DoesNotExist:
             return False
-        
-        recovery_batch.recovery_codes.update(status=Status.PENDING_DELETE)
 
-        recovery_batch.status=Status.PENDING_DELETE
-        recovery_batch.deleted_at=timezone.now()
-        recovery_batch.deleted_by=user
-        recovery_batch.number_removed = 10
-        recovery_batch.save()
+        # Wrap in a transaction to ensure consistency and only update if both models
+        # are saved
+        with transaction.atomic():
+
+            # Update all related recovery codes
+            recovery_batch.recovery_codes.update(status=Status.PENDING_DELETE)
+
+            # Update the batch itself
+            recovery_batch.status         = Status.PENDING_DELETE
+            recovery_batch.deleted_at     = timezone.now()
+            recovery_batch.deleted_by     = user
+            recovery_batch.number_removed = recovery_batch.recovery_codes.count()
+            recovery_batch.save()
+
+            # log the action
+            RecoveryCodeAudit.log_action(  user_issued_to=user,
+                                            action=RecoveryCodeAudit.Action.BATCH_PURGED,
+                                            deleted_by=user,
+                                            batch=recovery_batch,
+                                            number_deleted=1,
+                                            number_issued=recovery_batch.number_issued,
+                                            reason="The entire batch is being deleted by the user",
+                                         )
                                                 
         return recovery_batch
     
@@ -448,9 +687,18 @@ class RecoveryCode(models.Model):
     automatic_removal = models.BooleanField(default=True)
     days_to_expire    = models.PositiveSmallIntegerField(default=0, db_index=True)
     is_used           = models.BooleanField(default=False)
-    is_deactivated      = models.BooleanField(default=False)
-
-
+    is_deactivated    = models.BooleanField(default=False)
+    deleted_at        = models.DateTimeField(blank=True, null=True)
+    deleted_by        = models.ForeignKey(User, on_delete=models.CASCADE, related_name="recovery_code", null=True, blank=True)
+    
+     # constant field
+    STATUS_FIELD             = "status"
+    MARK_FOR_DELETION_FIELD  = "mark_for_deletion"
+    MODIFIED_AT_FIELD        = "modified_at"
+    DELETED_AT_FIELD         = "deleted_at"
+    DELETED_BY_FIELD         = "deleted_by"
+    IS_DEACTIVATED_FIELD     = "is_deactivated"
+    USER_FIELD               = "user"
 
     class Meta:
         indexes = [
@@ -526,11 +774,28 @@ class RecoveryCode(models.Model):
             code.some_other_field = "new value"
             code.save()  # Both changes persisted together
         """
-        self.status        = Status.INVALIDATE
+        # set the various to the model, the save will then save it right away or defer it.
+        self.status          = Status.INVALIDATE
         self.is_deactivated  = True
+        self.deleted_by      = self.user
+        self.deleted_at      = timezone.now()
+       
 
+        RecoveryCodeAudit.log_action(user_issued_to=self.user,
+                                    action=RecoveryCodeAudit.Action.BATCH_PURGED,
+                                    deleted_by=self.user,
+                                    batch=self,
+                                    number_deleted=1,
+                                    number_issued=self.number_issued,
+                                    reason="The code has been invalidated by the user",
+                                     )
         if save:
-            self.save(update_fields=["status", "is_deactivated"])
+            self.save(update_fields=[self.STATUS_FIELD, 
+                                     self.IS_DEACTIVATED_FIELD, 
+                                     self.DELETED_BY_FIELD, 
+                                     self.DELETED_AT_FIELD,
+                                     self.USER_FIELD
+                                     ])
         return True
 
     def delete_code(self, save: bool = True) -> "RecoveryCode":
@@ -556,11 +821,29 @@ class RecoveryCode(models.Model):
             code.some_other_field = "new value"
             code.save()  # Both changes persisted together
         """
+
         self.status            = Status.PENDING_DELETE
         self.mark_for_deletion = True
+        self.deleted_by        = self.user
         
         if save:
-            self.save(update_fields=["status", "mark_for_deletion"])
+            self.save(update_fields=[self.STATUS_FIELD,
+                                     self.MARK_FOR_DELETION_FIELD,
+                                     self.MODIFIED_AT_FIELD,
+                                     self.DELETED_AT_FIELD,
+                                     self.DELETED_BY_FIELD
+                                      ])
+          
+        
+        RecoveryCodeAudit.log_action( user_issued_to=self.user,
+                                    action=RecoveryCodeAudit.Action.BATCH_PURGED,
+                                    deleted_by=self.user,
+                                    batch=self,
+                                    number_deleted=1,
+                                    number_issued=self.number_issued,
+                                    reason="The code was deleted by the userr"
+
+                                     )
         return self
 
     def verify_recovery_code(self, plaintext_code: str) -> bool:
@@ -691,6 +974,8 @@ class RecoveryCode(models.Model):
         if self.hash_code and not is_already_hashed(self.hash_code):
             self.hash_code = self.hash_raw_code(self.hash_code)
         super().save(*args, **kwargs)
+
+
 
 
 

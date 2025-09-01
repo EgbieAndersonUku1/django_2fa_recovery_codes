@@ -252,7 +252,12 @@ def mark_all_recovery_codes_as_pending_delete(request):
         recovery_batch.save()
         request.session["is_downloaded"] = False
         request.session["is_emailed"]    = False
-        request.session["force_update"] = True
+        request.session["force_update"]  = True
+
+        # removes the raw codes from the session to ensure that it can't be downloaded or emailed 
+        # when the frontend buttons are clicked
+        request.session.get("recovery_codes_state", {}).pop("codes")   
+
         set_cache(CACHE_KEY.format(request.user.id), recovery_batch.get_cache_values(), TTL)
 
         data.update({

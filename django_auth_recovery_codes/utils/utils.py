@@ -1,4 +1,4 @@
-
+import uuid
 import logging
 from datetime import timedelta
 from django.utils import timezone
@@ -116,3 +116,16 @@ def create_json_from_attrs(instance, keys: list = None, capitalise_keys: bool = 
                 for key in keys}
 
     return instance.__dict__.copy()
+
+
+
+
+def create_unique_string(base: str, length: int = 18) -> str:
+    """Append a short unique UUID string to a base name."""
+
+    if not isinstance(base, str):
+        raise TypeError(f"Expected a string but got {type(base).__name__}")
+    
+    # Generate a hex string from UUID, trimmed to `length` chars
+    unique_suffix = uuid.uuid4().hex[:length]
+    return f"{base}_{unique_suffix}"

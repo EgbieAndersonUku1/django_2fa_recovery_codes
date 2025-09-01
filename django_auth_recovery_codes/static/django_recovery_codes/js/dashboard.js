@@ -33,8 +33,8 @@ const navigationIconContainerElement = document.getElementById("navigation-icon-
 const generaterecoveryBatchSectionElement = document.getElementById("generate-code-section");
 const codeTableElement = document.getElementById("table-code-view");
 const codeActionContainerElement = document.getElementById("page-buttons");
-const tempGeneratedTableContainer = document.getElementById("generated-code-table");
-const dynamicViewBatchCardHistorySection = document.getElementById("dynamic-cards-card-history");
+const tableCodeContainerDiv = document.getElementById("table-code-view");
+const recoveryBatchSectionElement = document.getElementById("static-batch-cards-history")
 
 
 
@@ -75,29 +75,6 @@ const deleteInputFieldElement = document.getElementById("delete-code-input")
 // event handlers
 recovryDashboardElement.addEventListener("click", handleEventDelegation);
 
-
-// form elements event handlers
-/**
- * Prevents an error if the form is not present when the page loads.
- * 
- * Why this happens:
- * The application behaves like a SPA (Single Page Application), 
- * meaning parts of the page can be updated, changed, or removed 
- * without a full page refresh.
- * 
- * How it affects this page:
- * On initial load, a "generate code" form exists in the DOM and 
- * allows the user to generate a recovery code with an expiry date. 
- * After generating a code, the form is removed from the DOM via 
- * Jinja template logic (if-statement) which takes into effect 
- * when the page is refreshed. Since the form doesn't exist, 
- * attempting to attach an event listener would cause an error.
- */
-if (generaterecoveryBatchSectionElement !== null) {
-    generateCodeWithExpiryFormElement.addEventListener("submit",
-        handleGenerateCodeWithExpiryFormSubmission
-    );
-}
 
 
 invalidateInputFieldElement.addEventListener("input", handleInputFieldHelper);
@@ -149,7 +126,8 @@ const GENERATE_CODE_WITH_NO_EXPIRY = "generate-code-with-no-expiry-btn";
 const OPEN_NAV_BAR_HAMBURGERR_ICON = "open-hamburger-nav-icon";
 const CLOSE_NAV_BAR_ICON = "close-nav-icon";
 const enqueueMessages = [];
-const CODE_BATCH_CARDS_DIV_ID = "static-batch-cards-history";
+const TAG_NAME       = "div";
+const CLASS_SELECTOR = "card-head";
 
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -159,7 +137,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 let alertMessage;
-let recoveryBatchSectionElement;
+
 
 // hideViewBatchHistoryHeaders();
 
@@ -1264,8 +1242,8 @@ function pickRightDivAndPopulateTable(tableCodesElement) {
     }
 
 
-    tempGeneratedTableContainer.innerHTML = "";
-    tempGeneratedTableContainer.appendChild(tableCodesElement);
+    tableCodeContainerDiv.innerHTML = "";
+    tableCodeContainerDiv.appendChild(tableCodesElement);
 
 
 }
@@ -1273,39 +1251,23 @@ function pickRightDivAndPopulateTable(tableCodesElement) {
 
 function insertBatchCardIntoSection(batch, batchPerPage = 5) {
 
-    // cache the recoveryBatch element
-    if (!recoveryBatchSectionElement) {
-        recoveryBatchSectionElement = document.getElementById(CODE_BATCH_CARDS_DIV_ID);
-    }
-
+  
     const historyCardElement = generateRecoveryCodesSummaryCard(batch);
     let secondRecoveryCardBatch;
-    const TAG_NAME = "div";
-    const CLASS_SELECTOR = "card-head";
+   
 
     dynamicBatchSpinnerElement.style.display = "inline-block";
     toggleSpinner(dynamicBatchSpinnerElement);
 
-    // If recoveryBatchSectionElement is null, the recovery section isn't in the DOM.
-    // This happens when the user hasn't generated recovery codes (the backend Jinja hides it).
-    // In that case, add the codes to the dynamic temporary history section instead.
     setTimeout(() => {
 
 
-        if (recoveryBatchSectionElement !== null) {
-
-            addChildWithPaginatorLimit(recoveryBatchSectionElement, historyCardElement, batchPerPage)
-            secondRecoveryCardBatch = getNthChildNested(recoveryBatchSectionElement, 2, TAG_NAME, CLASS_SELECTOR);
+          addChildWithPaginatorLimit(recoveryBatchSectionElement, historyCardElement, batchPerPage)
+           secondRecoveryCardBatch = getNthChildNested(recoveryBatchSectionElement, 2, TAG_NAME, CLASS_SELECTOR);
             markCardAsDeleted(secondRecoveryCardBatch)
             toggleSpinner(dynamicBatchSpinnerElement, false);
 
-
-        } else {
-            addChildWithPaginatorLimit(dynamicViewBatchCardHistorySection, historyCardElement, batchPerPage, true);
-            secondRecoveryCardBatch = getNthChildNested(dynamicViewBatchCardHistorySection, 2, TAG_NAME, CLASS_SELECTOR)
-            markCardAsDeleted(secondRecoveryCardBatch)
-
-        };
+      
         toggleSpinner(dynamicBatchSpinnerElement, false);
 
     }, (MILLI_SECONDS_BEFORE_DISPLAY + MILLI_SECONDS))
@@ -1356,7 +1318,8 @@ function markCardAsDeleted(cardElement) {
  * handleRecoveryCodeAlert(data, "Code successfully deleted");
  */
 function handleRecoveryCodeAlert(data, successCompareMessage) {
-  
+    
+    console.log(data)
     if (data && Object.hasOwn(data, "SUCCESS")) {
 
         if (data.OPERATION_SUCCESS) {
@@ -1365,7 +1328,7 @@ function handleRecoveryCodeAlert(data, successCompareMessage) {
 
             AlertUtils.showAlert({
                 title: data.ALERT_TEXT,
-                text: data.MESSAGE,
+                text: data.MESSAGE ,
                 icon: icon,
                 confirmButtonText: "Ok"
             });
@@ -1384,8 +1347,8 @@ function handleRecoveryCodeAlert(data, successCompareMessage) {
 
         } else {
             AlertUtils.showAlert({
-                title: data.ALERT_TEXT,
-                text: data.MESSAGE,
+                title: data.ALERT_TEXT || "Code not valid",
+                text: data.MESSAGE || "The code entered is no longer valid",
                 icon: "error",
                 confirmButtonText: "Ok"
             });
@@ -1407,28 +1370,9 @@ function handleRecoveryCodeAlert(data, successCompareMessage) {
 
 
 function updateCurrentRecoveryCodeBatchCard() {
-    let currentCardBatch;
-    const TAG_NAME = "div";
-    const CLASS_SELECTOR = "card-head";
-
-    toggleSpinner(dynamicBatchSpinnerElement);
-
-    if (!recoveryBatchSectionElement) {
-        recoveryBatchSectionElement = document.getElementById(CODE_BATCH_CARDS_DIV_ID);
-    }
-
-    if (recoveryBatchSectionElement !== null) {
-        console.log("getting the current static batch...")
-        currentCardBatch = getNthChildNested(recoveryBatchSectionElement, 1, TAG_NAME, CLASS_SELECTOR);
-
-        
-    } else {
-        console.log("getting the current batch from the dynamic card batch...")
-        currentCardBatch = getNthChildNested(dynamicViewBatchCardHistorySection, 1, TAG_NAME, CLASS_SELECTOR)
-
-    };
+  
+    const currentCardBatch = getNthChildNested(recoveryBatchSectionElement, 1, TAG_NAME, CLASS_SELECTOR);
     incrementRecoveryCardField(currentCardBatch);
-    toggleSpinner(dynamicBatchSpinnerElement, false);
 }
 
 
@@ -1463,3 +1407,4 @@ function incrementRecoveryCardField(cardBatchElement) {
         }
     }
 }
+
