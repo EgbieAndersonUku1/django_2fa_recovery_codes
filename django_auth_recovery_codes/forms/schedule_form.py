@@ -1,5 +1,7 @@
 from django import forms
-from django_auth_recovery_codes.models import RecoveryCodeCleanUpScheduler
+from django_auth_recovery_codes.models import RecoveryCodeCleanUpScheduler, RecoveryCodeAuditScheduler
+
+
 
 
 class RecoveryCodeCleanUpSchedulerForm(forms.ModelForm):
@@ -23,4 +25,17 @@ class RecoveryCodeCleanUpSchedulerForm(forms.ModelForm):
         return next_run
 
 
+
+
+
+class RecoveryCodeAuditForm(forms.ModelForm):
+    class Meta:
+        model = RecoveryCodeAuditScheduler
+        fields = "__all__"
+
+    def clean_name(self):
+        name = self.cleaned_data.get("name")
+        if RecoveryCodeAuditScheduler.objects.filter(name=name).exists():
+            raise forms.ValidationError("A scheduler with this name already exists. Please choose another.")
+        return name
 

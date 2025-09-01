@@ -15,13 +15,16 @@ class DjangoAuthRecoveryCodesConfig(AppConfig):
 
     def ready(self):
 
+        import django_auth_recovery_codes.signals
+        from django_auth_recovery_codes.utils.schedulers import schedule_recovery_code_cleanup, schedule_cleanup_audit
+
         from django.conf import settings
         from django.template import context_processors
             
         from django_auth_recovery_codes.models import RecoveryCodeCleanUpScheduler
         from django_auth_recovery_codes.tasks import purge_all_expired_batches
         from django_q.tasks import schedule
-        import django_auth_recovery_codes.signals
+       
 
 
         if hasattr(settings, 'TEMPLATES'):
@@ -34,22 +37,5 @@ class DjangoAuthRecoveryCodesConfig(AppConfig):
         
 
         # Schedule cleanup tasks
-        try:
-            from django_auth_recovery_codes.models import RecoveryCodeCleanUpScheduler
-        
-            from django_q.tasks import schedule
-
-            for scheduler in RecoveryCodeCleanUpScheduler.get_schedulers():
-                if scheduler.enable_scheduler:
-                    schedule(
-                         'django_auth_recovery_codes.tasks.purge_all_expired_batches',
-                        schedule_type=scheduler.schedule_type,
-                        next_run=scheduler.run_at,
-                        retention_days=scheduler.retention_days,
-                        bulk_delete=scheduler.bulk_delete,
-                        log_per_code=scheduler.log_per_code,
-                        delete_empty_batch=scheduler.delete_empty_batch,
-                       
-                    )
-        except Exception as e:
-            logger.error(f"Error scheduling purge_all_expired_batches: {e}")
+        schedule_recovery_code_cleanup()
+        schedule_cleanup_audit()

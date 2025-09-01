@@ -7,7 +7,8 @@ from .models import (RecoveryCode,
                      RecoveryCodeCleanUpScheduler, 
                      RecoveryCodesBatch, 
                      RecoveryCodeAudit, 
-                     RecoveryCodePurgeHistory
+                     RecoveryCodePurgeHistory,
+                     RecoveryCodeAuditScheduler
                      )
 
 
@@ -29,7 +30,20 @@ class RecoveryCodeCleanupSchedulerAdmin(admin.ModelAdmin):
     def save_form(self, request, form, change):
         return super().save_form(request, form, change)
    
-    
+
+class RecoveryCodeAuditSchedulerAdmin(admin.ModelAdmin):
+    """"""
+    form = RecoveryCodeCleanUpSchedulerForm
+    list_display  = ["id", "name", "enable_scheduler", "run_at", "next_run", "retention_days", "schedule_type"]   
+    help_texts = {
+            'schedule': 'Choose the frequency for this task (admin-only help text).'
+        }
+
+    def save_form(self, request, form, change):
+        return super().save_form(request, form, change)
+   
+        
+
 
 
 class RecoveryCodeAuditAdmin(admin.ModelAdmin):
@@ -108,3 +122,4 @@ admin.site.register(RecoveryCode, RecoveryCodeAdmin)
 admin.site.register(RecoveryCodeAudit, RecoveryCodeAuditAdmin)
 admin.site.register(RecoveryCodeCleanUpScheduler, RecoveryCodeCleanupSchedulerAdmin)
 admin.site.register(RecoveryCodePurgeHistory, RecoveryCodePurgeHistoryAdmin)
+admin.site.register(RecoveryCodeAuditScheduler, RecoveryCodeAuditSchedulerAdmin)
