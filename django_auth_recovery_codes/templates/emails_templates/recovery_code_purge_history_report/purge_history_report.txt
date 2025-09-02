@@ -1,0 +1,16 @@
+Recovery Code Purge History Cleanup Report
+
+Dear Admin,
+
+The scheduled cleanup task for RecoveryCodePurgeHistories has completed successfully. Here are the details:
+
+Cutoff Date: {{ cutoff_date }}
+Deleted Histories: {{ deleted_count }}
+Remaining Histories: {{ remaining_count }}
+Executed At: {{ ran_at }}
+Initiated By: {{ initiated_by }}
+
+If this cleanup was not expected or if the numbers look unusual, please review the system logs.
+
+Best regards,
+Your System
