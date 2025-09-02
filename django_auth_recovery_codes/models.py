@@ -1,7 +1,7 @@
 from __future__ import annotations 
 
 import uuid
-
+import logging
 from django.db import models, connections
 from django.db.models.query import QuerySet
 from django.db.models import F
@@ -18,8 +18,8 @@ from django_auth_recovery_codes.utils.security.hash import is_already_hashed, ma
 from django_auth_recovery_codes.utils.utils import schedule_future_date, create_json_from_attrs, create_unique_string
 
 
-User = get_user_model()
-
+User   = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 class RecoveryCodeAudit(models.Model):
@@ -216,8 +216,7 @@ class RecoveryCodesBatch(models.Model):
 
         # Delete the batch if no codes remain
         is_empty = (expired_codes.count() - deleted_count ) == 0
-        print(is_empty)
-
+    
         if delete_empty_batch and is_empty:
             print(f"[{timezone.now()}] Batch {self.id} is empty and will be deleted.") # will change to logger after for now keep
             self.delete()
@@ -322,7 +321,6 @@ class RecoveryCodesBatch(models.Model):
         overrides = {Status.PENDING_DELETE: "Deleted"}
         return overrides.get(Status(self.status), Status(self.status).label)
  
-            
     def update_invalidate_code_count(self, save = False) -> "RecoveryCode":
         """
         Increment the count of invalidated codes by 1.
@@ -464,8 +462,6 @@ class RecoveryCodesBatch(models.Model):
 
             # DB-level increment (avoids race conditions)
             self.__class__.objects.filter(pk=self.pk).update(**{field_name: F(field_name) + 1})
-
-            # Refresh this instance from DB so it's up to date
             return self.refresh_from_db()
 
         # In-memory increment (not concurrency-safe) especially if the user tries to update the valuse using multiple tabs
@@ -636,11 +632,11 @@ class RecoveryCodesBatch(models.Model):
             recovery_batch.status         = Status.PENDING_DELETE
             recovery_batch.deleted_at     = timezone.now()
             recovery_batch.deleted_by     = user
-            recovery_batch.number_removed = recovery_batch.recovery_codes.count()
+            recovery_batch.number_removed = recovery_batch.number_issued
             recovery_batch.save()
 
             # log the action
-            RecoveryCodeAudit.log_action(  user_issued_to=user,
+            RecoveryCodeAudit.log_action(  user_issued_to=recovery_batch.user,
                                             action=RecoveryCodeAudit.Action.BATCH_PURGED,
                                             deleted_by=user,
                                             batch=recovery_batch,

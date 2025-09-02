@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>2FA Recovery Codes – Purge Report</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: #f6f7f9; margin: 0; padding: 0; }
+    .container { max-width: 680px; margin: 24px auto; background: #ffffff; border-radius: 8px; border: 1px solid #e9edf3; overflow: hidden; }
+    .header { background: #0f172a; color: #ffffff; padding: 20px; }
+    .header h1 { margin: 0; font-size: 18px; }
+    .content { padding: 24px; color: #0f172a; }
+    .footer { padding: 16px 24px; font-size: 12px; color: #64748b; }
+    .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; background: #fef3c7; color: #92400e; }
+  </style>
+</head>
+<body>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+    <tr>
+      <td align="center">
+        <div class="container">
+          <div class="header">
+            <h1>2FA Recovery Codes – Purge Report</h1>
+          </div>
+          <div class="content">
+            <p>Hello Admin,</p>
+            <p>
+              The latest purge operation has completed. <span class="badge">No codes were found</span> for purging.
+            </p>
+            <p>
+              This means all batches currently have active codes, or there were no expired codes to remove.
+            </p>
+          </div>
+          <div class="footer">
+            Environment: {{ environment|default:"production" }}<br>
+            Generated: {{ now|date:"Y-m-d H:i:s T" }}
+          </div>
+        </div>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

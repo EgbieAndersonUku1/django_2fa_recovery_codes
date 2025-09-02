@@ -49,7 +49,7 @@ def schedule_cleanup_audit():
             
             from django_q.tasks import schedule
 
-            schedule('django_auth_recovery_codes.tasks.clean_up_old_audits_tasks',
+            schedule('django_auth_recovery_codes.tasks.clean_up_old_audits_task',
                     name="RecoveryCodeAudit cleanup",
                     )
        
