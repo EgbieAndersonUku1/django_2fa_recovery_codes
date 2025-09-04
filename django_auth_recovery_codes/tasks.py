@@ -4,10 +4,17 @@ from django.conf import settings
 from django_email_sender.email_logger import EmailSenderLogger
 from django_email_sender.email_sender import EmailSender
 from django_email_sender.email_logger import LoggerType
-
 from django.utils import timezone
+
+from django_q.models import Task, Schedule
 from django_auth_recovery_codes import notify_user
-from django_auth_recovery_codes.models import RecoveryCodePurgeHistory, RecoveryCodesBatch, RecoveryCodeAudit
+from django_auth_recovery_codes.models import (RecoveryCodePurgeHistory, 
+                                               RecoveryCodesBatch, 
+                                               RecoveryCodeAudit, 
+                                               RecoveryCodeAuditScheduler,
+                                               RecoveryCodeCleanUpScheduler,
+                                               )
+
 from django_auth_recovery_codes.app_settings import app_settings
 
 
@@ -41,18 +48,25 @@ def send_recovery_codes_email(sender_email, user, codes, subject= "Your account 
 
        
 
-DJANGO_AUTH_RETENTION_DAYS = 0
-
-
-def purge_all_expired_batches(retention_days=DJANGO_AUTH_RETENTION_DAYS, bulk_delete=True, log_per_code=False, delete_empty_batch=True):
+def purge_all_expired_batches(*args, **kwargs):
     """
-    Scheduled task to purge all expired recovery codes in all batches.
-    Returns a summary of totals removed.
+    Scheduled task to purge all expired recovery codes.
+    Uses kwargs to ensure all arguments reach the function reliably.
     """
-    total_batches          = 0
-    total_purged           = 0
-    purged_batches_info    = [] 
-    username               = None
+    retention_days = kwargs.get(
+        "retention_days", settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS
+    )
+    bulk_delete = kwargs.get("bulk_delete", True)
+    log_per_code = kwargs.get("log_per_code", False)
+    delete_empty_batch = kwargs.get("delete_empty_batch", True)
+    use_with_logger = kwargs.get(
+        "use_with_logger",
+        settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER,
+    )
+
+    total_batches = 0
+    total_purged = 0
+    purged_batches_info = []
 
     batches = RecoveryCodesBatch.objects.select_related("user").all()
     for batch in batches:
@@ -60,34 +74,31 @@ def purge_all_expired_batches(retention_days=DJANGO_AUTH_RETENTION_DAYS, bulk_de
             bulk_delete=bulk_delete,
             log_per_code=log_per_code,
             retention_days=retention_days,
-            delete_empty_batch=delete_empty_batch
+            delete_empty_batch=delete_empty_batch,
         )
         if purged_count >= 0:
             total_purged += purged_count
             total_batches += 1
-            
-            batch_purged_report = _generate_purged_batch_code_json_report(batch=batch, 
-                                                                          purged_count=purged_count, 
-                                                                          is_empty=is_empty
-                                                                          )
-            purged_batches_info.append(batch_purged_report)
+            purged_batches_info.append(
+                _generate_purged_batch_code_json_report(batch, purged_count, is_empty)
+            )
 
-        if not username:
-            username = batch.user.username       
-    
     RecoveryCodePurgeHistory.objects.create(
         total_codes_purged=total_purged,
         total_batches_purged=total_batches,
-        retention_days=retention_days
+        retention_days=retention_days,
     )
 
     return {
-       "reports": purged_batches_info,
+        "reports": purged_batches_info,
+        "use_with_logger": bool(use_with_logger),  
     }
+
 
 
 def clean_up_old_audits_task():  
     """Task to clean up old RecoveryCodeAudit records based on retention settings."""
+
     if not getattr(app_settings, "ENABLE_AUTO_CLEANUP", False):
         audit_logger.info("Auto cleanup disabled. Skipping cleanup task.")
         return
@@ -205,51 +216,132 @@ def _generate_purged_batch_code_json_report(batch: RecoveryCodesBatch, purged_co
     return purged_batch_info
 
 
+def _if_set_to_true_use_logger(use_logger: bool, email_sender_logger: EmailSenderLogger) -> None:
+    """
+    Decides if a logger should be turned on for a given scheduled action.
+
+    Args:
+        use_logger (bool): Flag that determines if the logger should be run.
+        email_sender_logger (EmailSenderLogger): The email logger instance.
+
+    Raises:
+        TypeError: If `use_logger` is not a bool or if `email_sender_logger`
+                   is not an instance of EmailSenderLogger.
+    """
+
+    if not isinstance(use_logger, bool):
+        raise TypeError(
+            f"The `use_logger` must be a bool. Got {type(use_logger).__name__}"
+        )
+
+    if not isinstance(email_sender_logger, EmailSenderLogger):
+        raise TypeError(
+            f"The `email_sender_logger` must be an instance of `EmailSenderLogger`. "
+            f"Got {type(email_sender_logger).__name__}"
+        )
+
+    if use_logger or settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER:
+        purge_email_logger.info(
+            "Sending email with logger turned on. All actions will be logged."
+        )
+        email_sender_logger.config_logger(logger, log_level=LoggerType.INFO)
+        email_sender_logger.start_logging_session()
+    else:
+        purge_email_logger.info(
+            "Sending email with logger turned off. No actions will be logged."
+        )
+
+
 
 def hook_email_purge_report(task):
     """
     Hook to send purge summary report by email.
     """
+    email_sender_logger = EmailSenderLogger.create()
 
-    email_sender_logger = EmailSenderLogger.create() 
+    result = task.result or {}
+    reports = result.get("reports", [])
+    use_with_logger = result.get("use_with_logger")
+
+    if use_with_logger is None:
+        use_with_logger = settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER
+
+    _if_set_to_true_use_logger(use_with_logger, email_sender_logger)
+
+    subject, html, text = _get_email_attribrutes(reports)
+    email_sender = EmailSender.create()
+    if not email_sender:
+        logger.error("EmailSender.create() returned None! Cannot send email.")
+        return
+
+    (
+        email_sender_logger
+        .add_email_sender_instance(email_sender)
+        .from_address(settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER)
+        .to(settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL)
+        .with_context({"report": reports, "username": settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL})
+        .with_subject(subject)
+        .with_html_template(html, "recovery_codes_deletion")
+        .with_text_template(text, "recovery_codes_deletion")
+        .send()
+    )
+
+    logger.info("Purge summary email sent successfully")
+
+
+def _get_email_attribrutes(reports: list):
+    """
+    """
+    if not reports:
+        subject = "Recovery Code Purge: No Expired Codes Found"
+        html    = "no_purge.html"
+        text    = "no_purge.txt"
+
+    else:
+        subject = f"Recovery Code Purge: {len(reports)} Batch(es) Processed"
+        html    = "deleted_codes.html"
+        text    = "deleted_codes.txt"
+    
+    return subject, html, text
+
+
+
+def unschedule_task(schedule_name):
+    """
+    Delete all queued tasks and the schedule for a given Django-Q schedule name.
+    Returns the number of tasks deleted (0 if none).
+    """
     try:
-        result = task.result or {}
-        reports = result.get("reports", [])
-
-        if not reports:
-            subject = "Recovery Code Purge: No Expired Codes Found"
-            html    = "no_purge.html"
-            text    = "no_purge.txt"
-
-        else:
-            subject = f"Recovery Code Purge: {len(reports)} Batch(es) Processed"
-            html    = "deleted_codes.html"
-            text    = "deleted_codes.txt"
-
-        email_sender = EmailSender.create()
-        if not email_sender:
-            logger.error("EmailSender.create() returned None! Cannot send email.")
-            return 
+       
+        deleted_tasks, _ = clear_queued_tasks(schedule_name)
+        Schedule.objects.filter(name=schedule_name).delete()
+        return deleted_tasks
         
-        ( 
-            email_sender_logger
-            .add_email_sender_instance(EmailSender.create()) 
-            .start_logging_session()
-            .config_logger(logger, log_level=LoggerType.INFO)
-            .from_address(settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER) 
-            .to(settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL) 
-            .with_context({"report": reports, "username": settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL}) 
-            .with_subject(subject) 
-            .with_html_template(html, "recovery_codes_deletion") 
-            .with_text_template(text, "recovery_codes_deletion") 
-            .send()
-        )
+    except Task.DoesNotExist:
+        return False  
 
-      
-      
-            
-          
-        logger.info("Purge summary email sent successfully")
 
-    except Exception as e:
-        logger.error(f"Failed to send purge summary email: {e}", exc_info=True)
+def clear_queued_tasks(schedule_name: str):
+    """
+    Delete all queued tasks for a given Django-Q schedule.
+
+    Why this is necessary?:
+
+    Django-Q does NOT automatically remove old tasks from the queue
+    when a schedule is updated. If an admin updates `next_run` or other
+    schedule parameters in the admin interface **before the existing task
+    has executed**, Django-Q will enqueue a new task **without removing the old one**. 
+    This leads to duplicate tasks in the queue.
+
+    Always call this function **before updating a schedule** to ensure
+    that only a single task is queued for that schedule.
+
+    Args:
+        schedule_name (str): The name of the schedule whose queued tasks
+                             should be deleted.
+
+    Returns:
+        tuple: Number of deleted tasks and a dictionary with deletion details
+               (same as `QuerySet.delete()`).
+    """
+    return Task.objects.filter(name=schedule_name).delete()
