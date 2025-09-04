@@ -26,7 +26,7 @@ class RecoveryCodeCleanupSchedulerAdmin(admin.ModelAdmin):
     help_texts = {
             'schedule': 'Choose the frequency for this task (admin-only help text).'
         }
-
+    
     def save_form(self, request, form, change):
         return super().save_form(request, form, change)
    
@@ -104,7 +104,7 @@ class RecoveryCodeAdmin(admin.ModelAdmin):
             "fields": ("id", "hash_code", "is_deactivated", "is_used", "mark_for_deletion", "status", "days_to_expire"),
         }),
         ("Batch details", {
-            "fields": ("batch", ),
+            "fields": ("batch", "automatic_removal" ),
         }),
         ("User associations", {
             "fields": ("user",),

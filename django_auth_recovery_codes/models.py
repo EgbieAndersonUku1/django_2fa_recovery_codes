@@ -11,6 +11,7 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password, check_password
 from django_email_sender.models import EmailBaseLog
+from django.conf import settings
 
 from django_auth_recovery_codes.base_models import AbstractCleanUpScheduler
 from django_auth_recovery_codes.utils.security.generator import generate_2fa_secure_recovery_code
@@ -133,12 +134,11 @@ class RecoveryCodeCleanUpScheduler(AbstractCleanUpScheduler):
     delete_empty_batch = models.BooleanField(default=True)
     next_run           = models.DateTimeField(blank=True, null=True)
     deleted_count      = models.PositiveIntegerField(default=0, editable=False)
-
+  
   
 class RecoveryCodeAuditScheduler(AbstractCleanUpScheduler):
      DEFAULT_NAME = "Clean up recovery codes audit"
      name         = models.CharField(max_length=180, default=create_unique_string("Remove Recovery code audit"), unique=True)
-
 
 
 class RecoveryCodesBatch(models.Model):
@@ -626,13 +626,16 @@ class RecoveryCodesBatch(models.Model):
         with transaction.atomic():
 
             # Update all related recovery codes
-            recovery_batch.recovery_codes.update(status=Status.PENDING_DELETE)
-
+          
             # Update the batch itself
             recovery_batch.status         = Status.PENDING_DELETE
             recovery_batch.deleted_at     = timezone.now()
             recovery_batch.deleted_by     = user
             recovery_batch.number_removed = recovery_batch.number_issued
+            recovery_batch.recovery_codes.update(status=Status.PENDING_DELETE, 
+                                                 is_deactivated=True,
+                                                 mark_for_deletion=True,
+                                                 )
             recovery_batch.save()
 
             # log the action
@@ -820,11 +823,13 @@ class RecoveryCode(models.Model):
 
         self.status            = Status.PENDING_DELETE
         self.mark_for_deletion = True
+        self.is_deactivated    = True
         self.deleted_by        = self.user
         
         if save:
             self.save(update_fields=[self.STATUS_FIELD,
                                      self.MARK_FOR_DELETION_FIELD,
+                                     self.IS_DEACTIVATED_FIELD,
                                      self.MODIFIED_AT_FIELD,
                                      self.DELETED_AT_FIELD,
                                      self.DELETED_BY_FIELD
