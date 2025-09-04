@@ -25,20 +25,23 @@ purge_email_logger = logging.getLogger(__name__)
 
 
 def send_recovery_codes_email(sender_email, user, codes, subject= "Your account recovery codes"):
-   
+    
+    email_sender_logger = EmailSenderLogger.create()
+    _store_user_email_log(email_sender_logger)
+
     try:
         ( 
-                 EmailSenderLogger.create() 
-                .add_email_sender_instance(EmailSender.create()) 
-                .start_logging_session()
-                .config_logger(logger, log_level=LoggerType.INFO)
-                .from_address(sender_email) 
-                .to(user.username) 
-                .with_context({"codes": codes, "username": user.username}) 
-                .with_subject(subject) 
-                .with_html_template("recovery_codes_email.html", "recovery_codes") 
-                .with_text_template("recovery_codes_email.txt", "recovery_codes") 
-                .send()
+            email_sender_logger
+            .add_email_sender_instance(EmailSender.create()) 
+            .start_logging_session()
+            .config_logger(logger, log_level=LoggerType.INFO)
+            .from_address(sender_email) 
+            .to(user.username) 
+            .with_context({"codes": codes, "username": user.username}) 
+            .with_subject(subject) 
+            .with_html_template("recovery_codes_email.html", "recovery_codes") 
+            .with_text_template("recovery_codes_email.txt", "recovery_codes") 
+            .send()
             )
         notify_user(user.id, "Recovery codes email sent successfully!")
   
@@ -276,7 +279,7 @@ def hook_email_purge_report(task):
 
     (
         email_sender_logger
-        .add_email_sender_instance(email_sender)
+        .add_email_sender_instance(email_sender)    
         .from_address(settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER)
         .to(settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL)
         .with_context({"report": reports, "username": settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL})
@@ -345,3 +348,41 @@ def clear_queued_tasks(schedule_name: str):
                (same as `QuerySet.delete()`).
     """
     return Task.objects.filter(name=schedule_name).delete()
+
+
+def _store_user_email_log(email_sender_logger: EmailSenderLogger):
+    """
+    Store user email logs conditionally based on settings.
+
+    This private helper inspects the `DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG`
+    setting. If the flag is enabled, the user's email (associated with the account
+    requesting a recovery code) will be stored in the database. If the flag is 
+    disabled, the email will not be stored.
+
+    Args:
+        email_sender_logger (EmailSenderLogger): 
+            The logger instance responsible for handling email logging behaviour.
+
+    Raises:
+        TypeError: If `email_sender_logger` is not an instance of EmailSenderLogger.
+
+    Returns:
+        None: This function does not return anything. Its effect is to optionally
+              configure the logger to persist email metadata.
+
+    Example:
+        # If DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG is True, the logger will be
+        # configured to store the email metadata in the database.
+        # If False, no database storage occurs.
+    """
+    if not isinstance(email_sender_logger, EmailSenderLogger):
+        raise TypeError(
+            f"Expected an instance of EmailSenderLogger, "
+            f"but got {type(email_sender_logger).__name__}"
+        )
+
+    if settings.DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG:
+        from django_auth_recovery_codes.models import RecoveryCodeEmailLog
+
+        email_sender_logger.add_log_model(RecoveryCodeEmailLog)
+        email_sender_logger.enable_email_meta_data_save()

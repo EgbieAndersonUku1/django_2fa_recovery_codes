@@ -135,7 +135,7 @@ class RecoveryCodeCleanUpScheduler(AbstractCleanUpScheduler):
     next_run           = models.DateTimeField(blank=True, null=True)
     deleted_count      = models.PositiveIntegerField(default=0, editable=False)
   
-  
+    
 class RecoveryCodeAuditScheduler(AbstractCleanUpScheduler):
      DEFAULT_NAME = "Clean up recovery codes audit"
      name         = models.CharField(max_length=180, default=create_unique_string("Remove Recovery code audit"), unique=True)

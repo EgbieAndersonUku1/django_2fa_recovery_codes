@@ -8,9 +8,14 @@ from .models import (RecoveryCode,
                      RecoveryCodesBatch, 
                      RecoveryCodeAudit, 
                      RecoveryCodePurgeHistory,
-                     RecoveryCodeAuditScheduler
+                     RecoveryCodeAuditScheduler,
+                     RecoveryCodeEmailLog,
                      )
 
+
+
+class RecoveryCodeEmailLogAdmin(admin.ModelAdmin):
+    list_display = ["id", "from_email", "to_email", "subject", "status", "created_on"]
 
 
 class RecoveryCodePurgeHistoryAdmin(admin.ModelAdmin):
@@ -123,3 +128,4 @@ admin.site.register(RecoveryCodeAudit, RecoveryCodeAuditAdmin)
 admin.site.register(RecoveryCodeCleanUpScheduler, RecoveryCodeCleanupSchedulerAdmin)
 admin.site.register(RecoveryCodePurgeHistory, RecoveryCodePurgeHistoryAdmin)
 admin.site.register(RecoveryCodeAuditScheduler, RecoveryCodeAuditSchedulerAdmin)
+admin.site.register(RecoveryCodeEmailLog, RecoveryCodeEmailLogAdmin)
