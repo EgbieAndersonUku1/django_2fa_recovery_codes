@@ -12,15 +12,19 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password, check_password
 from django_email_sender.models import EmailBaseLog
 from django.conf import settings
+from django.core.cache import cache
+
 
 from django_auth_recovery_codes.base_models import AbstractCleanUpScheduler
 from django_auth_recovery_codes.utils.security.generator import generate_2fa_secure_recovery_code
 from django_auth_recovery_codes.utils.security.hash import is_already_hashed, make_lookup_hash
-from django_auth_recovery_codes.utils.utils import schedule_future_date, create_json_from_attrs, create_unique_string
+from django_auth_recovery_codes.utils.utils import schedule_future_date, create_json_from_attrs, create_unique_string, default_cooldown_minutes
+from django_auth_recovery_codes.utils.cache.safe_cache import delete_cache_with_retry
+
 
 
 User   = get_user_model()
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("auth.recovery_codes")
 
 
 class RecoveryCodeAudit(models.Model):
@@ -161,6 +165,9 @@ class RecoveryCodesBatch(models.Model):
     expiry_date        = models.DateTimeField(blank=True, null=True)
     deleted_at         = models.DateTimeField(null=True, blank=True)
     deleted_by         = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name="deleted_batches")
+    last_generated     = models.DateTimeField(auto_now=True)
+    cooldown_minutes   = models.PositiveSmallIntegerField(default=default_cooldown_minutes)
+    requested_attempt  = models.PositiveSmallIntegerField(default=0)
 
      # Action tracking
     viewed            = models.BooleanField(default=False)
@@ -174,13 +181,14 @@ class RecoveryCodesBatch(models.Model):
     MODIFIED_AT_FIELD        = "modified_at"
     DELETED_AT_FIELD         = "deleted_at"
     DELETED_BY_FIELD         = "deleted_by"
-    
+    REQUEST_ATTEMPT_FIELD    = "requested_attempt"
+
     # constant flags
     VIEWED_FLAG              = "viewed"
     DOWNLOADED_FLAG          = "downloaded"
     EMAILED_FLAG             = "emailed"
     GENERATED_FLAG           = "generated"
-
+    
     class Meta:
         ordering             = ["-created_at"]
         verbose_name         = "RecoveryCodesBatch"
@@ -189,6 +197,161 @@ class RecoveryCodesBatch(models.Model):
     def __str__(self):
         return f"Batch {self.id} for {self.user or 'Deleted User'}"
     
+    def _get_next_allowed_time_to_generate_code(self):
+        """"""
+        return self.last_generated + timedelta(minutes=self.cooldown_minutes)
+
+    def _get_remaining_time_till_generate_code(self):
+        """"""
+        next_allowed_time = self._get_next_allowed_time_to_generate_code()
+        current_time_now  = timezone.now()
+
+        return max(int((next_allowed_time - current_time_now).total_seconds()), 0)
+    
+    def _increment_request_attempt(self, save: bool = True):
+        """
+        Increment the number of request attempts made by the user
+        by a value of one. The method can either save on the spot 
+        (if save = true) or defers saving to later if saving = False. 
+        This is usefulif you want to perform other actions before hitting 
+        the database.
+
+        Args:
+            save (bool): Saves on the spot or defers to later
+
+        """
+        self.requested_attempt += 1
+        if save:
+            self.update_fields=[self.REQUEST_ATTEMPT_FIELD]
+        return self
+
+    @classmethod
+    def _flush_attempts_to_db(cls, batch, cache_key: str):
+        """
+        Add cached attempts to the batch and clear cache.
+        """
+        
+        attempts = cache.get(cache_key, 0)
+        if attempts > 0:
+            batch.requested_attempt += attempts
+            batch.save(update_fields=[batch.REQUEST_ATTEMPT_FIELD])
+            delete_cache_with_retry(cache_key)
+
+    @staticmethod
+    def _update_recovery_cooldown(cache_key: str) -> int:
+        """
+        Increment cached recovery attempts and extend cooldown 
+        using progressive back-off without hitting the db.
+
+        - Increments the attempt counter stored in cache.
+        - Extends the TTL (time-to-live) by multiplying the 
+        current TTL with a configured multiplier.
+        - Caps the TTL at a maximum cutoff.
+
+        Returns:
+            int: The new TTL (in seconds) for the cooldown.
+        """
+        multiplier  = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER", 2)
+        cutoff      = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT", 3600)
+
+        current_ttl = cache.ttl(cache_key) or 0
+        new_ttl     = min(int(current_ttl * multiplier), cutoff)
+
+        cache.incr(cache_key)
+        cache.expire(cache_key, new_ttl)
+
+        return new_ttl
+    
+    @staticmethod
+    def _start_recovery_cooldown(current_batch: RecoveryCodesBatch, cache_key: str, remaining_seconds: int) -> tuple[bool, int]:
+        """
+        Handle the first attempt during cooldown:
+        - Increment DB requested_attempt
+        - Save current_batch
+        - Seed cache with initial attempt
+
+        Args:
+            current_batch (RecoverCodeBatch): The current batch each user has, only one batch is active batch at any given time. 
+                                              Needed to mark the attempts when a user is attempting to create a new batch.
+                                              When a new batch is requested it disables the last current one.
+
+            cache_key: str: The cache key associated with the user, used to cache the remaining seconds left before they can
+                            request a new batch. 
+            
+            remaining_seconds: int, The remaining seconds left before a user can make a request to the app to generate a set
+                                    of new codes. As long as the cooling period (remaining seconds) is active the user can't create 
+                                    a new batch.
+        """
+        FIRST_ATTEMPT = 1
+
+        current_batch._increment_request_attempt()
+        current_batch.save(update_fields=[current_batch.REQUEST_ATTEMPT_FIELD])
+
+        cache.set(cache_key, FIRST_ATTEMPT, timeout=remaining_seconds)
+        return False, remaining_seconds
+
+    @classmethod
+    def can_generate_new_code(cls, user: User) -> tuple[bool, int]:
+        """
+        Decide if the user can generate a new recovery code.
+
+        Returns:
+            (bool, int):
+                - bool: True if allowed, False otherwise
+                - int:  Remaining cooldown (0 if allowed)
+
+        ⚠️ Note:
+
+        This method may *look simple*, but it orchestrates a mini-engine:
+
+        - checks the cache
+        - increments attempts
+        - updates TTLs with progressive back-off
+        - may write to the DB if necessary otherwise cache is used avoiding hiting the db
+
+        Helpers used to navigate the mini-engine:
+        - _update_recovery_cooldown
+        - _start_recovery_cooldown
+        - _flush_attempts_to_db
+
+        Without the helper functions the can_generate_new_code` is doing:
+
+        - Checking cache
+        - Reading TTL
+        - Multiplying cooldown
+        - Incrementing DB field
+        - Setting cache keys
+
+        That’s a lot of moving parts hidden behind a simple-sounding method name.
+        By pulling those steps into helpers it enables `can_generate_new_code` to 
+        stay true to its name (returns yes/no + wait time) because it delegates 
+        the heavy lifting to the functions 
+
+        Example usage:
+
+        >>> user = User.objects.get(username="eu") # assume that you already have a user model
+        >>> can_generate_new_codes = Recovery.can_generate_new_code(user)
+        >>> True
+        >>>
+
+        """
+        cache_key = f"can_generate_code:{user.id}"
+        attempts  = cache.get(cache_key, 0)
+
+        if attempts > 0:
+            return False, cls._update_recovery_cooldown(cache_key)
+
+        current_batch = cls.get_by_user(user)
+        if current_batch is None:
+            raise ValueError("No recovery code batch for this user")
+
+        remaining = current_batch._get_remaining_time_till_generate_code()
+        if remaining > 0:
+            return cls._start_recovery_cooldown(current_batch, cache_key, remaining)
+
+        cls._flush_attempts_to_db(current_batch, cache_key)
+        return True, 0
+         
     def purge_expired_codes(self, bulk_delete=True, log_per_code=False, retention_days=1, delete_empty_batch=False):
         """
         Hard-delete recovery codes in this batch marked for deletion or invalidated,
@@ -564,13 +727,15 @@ class RecoveryCodesBatch(models.Model):
 
          # Everything inside here is atomic
          # this means that if creating one model fails it won't create the other
-         # Since the RecoveryCodeBatch and RecoveryCode models must be created.
-         # if one fails The changes will be rolled back
+         # Since the RecoveryCodeBatch and RecoveryCode models must be created, 
+         # since it makes no sense for one to be created and not the other.
+         # if one fails none is created and the changes are rolled back
         with transaction.atomic(): 
         
             batch_instance = cls(user=user, number_issued=batch_number)
             if days_to_expire:
                 batch_instance.expiry_date = schedule_future_date(days=days_to_expire)
+            batch_instance.last_generated = timezone.now()
             batch_instance.mark_as_generated()
 
             cls._deactivate_all_batches_except_current(batch_instance)
@@ -593,8 +758,10 @@ class RecoveryCodesBatch(models.Model):
             if batch:
                 cls._if_async_supported_async_bulk_create_or_use_sync_bulk_crate(batch)
 
+
             return raw_codes, batch_instance
-        
+    
+    
     @classmethod
     def delete_recovery_batch(cls, user: "User"):
         """
@@ -638,7 +805,7 @@ class RecoveryCodesBatch(models.Model):
                                                  )
             recovery_batch.save()
 
-            # log the action
+          
             RecoveryCodeAudit.log_action(  user_issued_to=recovery_batch.user,
                                             action=RecoveryCodeAudit.Action.BATCH_PURGED,
                                             deleted_by=user,

@@ -3,6 +3,7 @@ import logging
 from datetime import timedelta
 from django.utils import timezone
 from django_q.models import Schedule, Task
+from django.conf import settings
 
 
 def schedule_future_date(days: int = 0, hours: int = 0, minutes: int = 0):
@@ -217,3 +218,10 @@ def create_unique_string(base: str, length: int = 18) -> str:
     # Generate a hex string from UUID, trimmed to `length` chars
     unique_suffix = uuid.uuid4().hex[:length]
     return f"{base}_{unique_suffix}"
+
+
+
+def default_cooldown_minutes():
+    base       = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN", 15)
+    multiplier = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER", 1)
+    return base * multiplier

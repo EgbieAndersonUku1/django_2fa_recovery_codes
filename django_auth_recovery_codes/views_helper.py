@@ -101,11 +101,17 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
         JsonResponse: A JSON response containing the status, issued codes, and any error messages.
     """
     
+    # check the cache to see if an attempt has been made
+    # if an attempt has been made increase the wait time
+
+    # RecoveryCodesBatch.get_by_user(request.user)
+    
     if generate_with_expiry_date and not isinstance(generate_with_expiry_date, bool):
         raise TypeError(f"Expected `generate_with_expiry_date` flag to be a bool but got object with type {type(generate_with_expiry_date).__name__} ")
     
     if not isinstance(cache_key, str):
         raise TypeError(f"Expected the cache parameter to be a string but got object with type {type(cache_key).__name__} ")
+        
           
     try:
         resp = {"TOTAL_ISSUED": 0, 
@@ -114,7 +120,6 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
              }
 
         user  = request.user
-        batch = None
 
         if generate_with_expiry_date:
            

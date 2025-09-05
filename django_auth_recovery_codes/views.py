@@ -390,7 +390,6 @@ def recovery_dashboard(request):
     
     recovery_batch_context = get_recovery_batches_context(request)
 
-  
     if user_data is None:
         # cache has expired, get data and re-add to cache
         recovery_batch = RecoveryCodesBatch.get_by_user(user)

@@ -11,8 +11,6 @@ from django_auth_recovery_codes import notify_user
 from django_auth_recovery_codes.models import (RecoveryCodePurgeHistory, 
                                                RecoveryCodesBatch, 
                                                RecoveryCodeAudit, 
-                                               RecoveryCodeAuditScheduler,
-                                               RecoveryCodeCleanUpScheduler,
                                                )
 
 from django_auth_recovery_codes.app_settings import app_settings
@@ -59,10 +57,10 @@ def purge_all_expired_batches(*args, **kwargs):
     retention_days = kwargs.get(
         "retention_days", settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS
     )
-    bulk_delete = kwargs.get("bulk_delete", True)
-    log_per_code = kwargs.get("log_per_code", False)
+    bulk_delete        = kwargs.get("bulk_delete", True)
+    log_per_code       = kwargs.get("log_per_code", False)
     delete_empty_batch = kwargs.get("delete_empty_batch", True)
-    use_with_logger = kwargs.get(
+    use_with_logger    = kwargs.get(
         "use_with_logger",
         settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER,
     )
