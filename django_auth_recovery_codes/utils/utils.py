@@ -225,3 +225,7 @@ def default_cooldown_minutes():
     base       = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN", 15)
     multiplier = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER", 1)
     return base * multiplier
+
+
+def default_multiplier():
+    return getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER", 1)

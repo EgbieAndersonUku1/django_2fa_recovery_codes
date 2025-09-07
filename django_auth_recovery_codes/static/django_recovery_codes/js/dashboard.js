@@ -959,8 +959,6 @@ async function handleRecoveryCodesAction({ e,
 
     if (daysToExpiry !== null && typeof daysToExpiry === "number") {
         body.daysToExpiry = daysToExpiry;
-
-
     }
 
     body.forceUpdate = true;
@@ -989,24 +987,43 @@ async function handleRecoveryCodesAction({ e,
 
     if (resp.SUCCESS) {
 
-        statsTotalCodesIssuedBoard.textContent = resp.TOTAL_ISSUED;
-        toggleElement(generaterecoveryBatchSectionElement);
+        if (resp.CAN_GENERATE) {
+            statsTotalCodesIssuedBoard.textContent = resp.TOTAL_ISSUED;
+            toggleElement(generaterecoveryBatchSectionElement);
 
-        const isPopulated = populateTableWithUserCodes(resp.CODES);
+            const isPopulated = populateTableWithUserCodes(resp.CODES);
 
-        if (isPopulated) {
-            sendPostFetchWithoutBody("/auth/recovery-codes/viewed/",
-                "Failed to mark code as viewed "
-            );
+            if (isPopulated) {
+                sendPostFetchWithoutBody("/auth/recovery-codes/viewed/",
+                    "Failed to mark code as viewed "
+                );
 
-            insertBatchCardIntoSection(resp.BATCH, resp.ITEM_PER_PAGE);
+                insertBatchCardIntoSection(resp.BATCH, resp.ITEM_PER_PAGE);
+            }
+            return true;
         }
-        return true;
+        
+        messageContainerElement.classList.add("show");
+         messageContainerElement.textContent = resp.MESSAGE;
+        tableCoderSpinnerElement.style.display = "none";
+        toggleSpinner(tableCoderSpinnerElement, false);
+
+        setTimeout(() => {
+            messageContainerElement.classList.remove("show");
+        }, 5000)
+      
+
 
     } else {
+        const DEFAULT_MESSAGE = "Something went wrong and we couldn't generate your recovery codes"
         messageContainerElement.classList.add("show");
-        messageContainerElement.textContent = "Something went wrong and we couldn't generate your recovery codes"
+        messageContainerElement.textContent = DEFAULT_MESSAGE;
         tableCoderSpinnerElement.style.display = "none";
+        toggleSpinner(tableCoderSpinnerElement, false);
+
+        setTimeout(() => {
+            messageContainerElement.classList.remove("show");
+        }, 5000)
         return false;
     }
 }

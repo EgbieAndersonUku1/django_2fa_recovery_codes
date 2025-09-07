@@ -1119,11 +1119,15 @@ button {
     border-left: 4px solid var(--red-primary);
     box-shadow: var(--box-shadow-primary);
     border-right: 2px solid var(--red-primary);
+
     box-shadow:
         rgba(0, 0, 0, 0.35) 0 5px 15px,
         rgb(38, 57, 77) 0 20px 30px -10px;
 }
 
+#messages {
+    width: 40%;
+}
 /* Content wrapper inside the message box */
 .message-container {
     padding: var(--sm-spacing);

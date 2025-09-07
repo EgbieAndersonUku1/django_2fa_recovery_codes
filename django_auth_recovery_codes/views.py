@@ -1,3 +1,4 @@
+import logging
 import json
 import threading
 
@@ -30,9 +31,11 @@ TTL = getattr(settings, 'DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL', MINUTES_IN_SECON
 TTL = TTL if isinstance(TTL, int) else MINUTES_IN_SECONDS
 
 SENDER_EMAIL =  settings.DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL
+
+
 # Create your views here.
 
-logger = getLogger()
+logger = logging.getLogger("app.views")
 
 
 
@@ -243,13 +246,11 @@ def mark_all_recovery_codes_as_pending_delete(request):
     
     recovery_batch  = RecoveryCodesBatch.delete_recovery_batch(request.user)
     status          = None
-    data   = { "SUCCESS": False, "MESSAGE": ""}
+    data            = { "SUCCESS": False, "MESSAGE": ""}
     
     # reset the cache values
     if recovery_batch:
 
-        recovery_batch.reset_cache_values()
-        recovery_batch.save()
         request.session["is_downloaded"] = False
         request.session["is_emailed"]    = False
         request.session["force_update"]  = True

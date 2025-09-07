@@ -1,3 +1,4 @@
+import logging
 import json
 from django.http import JsonResponse
 from django.db import IntegrityError
@@ -9,13 +10,16 @@ from typing import TypedDict
 
 from .models import RecoveryCode, RecoveryCodesBatch, Status
 from .utils.cache.safe_cache import set_cache_with_retry, get_cache_with_retry, delete_cache_with_retry
-
+from .loggers.loggers import view_logger
 
 User = get_user_model()
+
 
 RECOVERY_CODES_BATCH_HISTORY_KEY = 'recovery_codes_batch_history_{}'
 ITEM_PER_PAGE                   = 5  # This will be taking from teh settings for now constant
  
+
+
 
 class ResponseDict(TypedDict):
     SUCCESS: bool
@@ -23,6 +27,16 @@ class ResponseDict(TypedDict):
     TITLE: str
     MESSAGE: str
     ALERT_TEXT: str
+
+
+def _can_codes_be_generated_yet(user):
+    try:
+        can_generate_code, wait_time = RecoveryCodesBatch.can_generate_new_code(user)
+        view_logger.debug(f"[RecoveryCodes] User={user.id} can_generate={can_generate_code}, wait_time={wait_time}")
+    except ValueError:
+        can_generate_code, wait_time = True, 0
+        view_logger.warning(f"[RecoveryCodes] ValueError handled for user={user.id}, defaulting can_generate=True")
+    return can_generate_code, wait_time
 
 
 def _generate_recovery_codes_with_expiry_date_helper(
@@ -76,6 +90,16 @@ def _generate_recovery_codes_with_expiry_date_helper(
     return raw_codes, batch_instance
 
 
+def _generate_code_batch(request, generate_with_expiry_date):
+    user = request.user
+    if generate_with_expiry_date:
+        raw_codes, batch_instance = _generate_recovery_codes_with_expiry_date_helper(request, user)
+    else:
+        raw_codes, batch_instance = RecoveryCodesBatch.create_recovery_batch(user)
+    return raw_codes, batch_instance
+
+
+
 def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  generate_with_expiry_date: bool = False):
     """
     Generate recovery codes for a user, optionally with an expiry date.
@@ -100,41 +124,60 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
     Returns:
         JsonResponse: A JSON response containing the status, issued codes, and any error messages.
     """
-    
-    # check the cache to see if an attempt has been made
-    # if an attempt has been made increase the wait time
-
-    # RecoveryCodesBatch.get_by_user(request.user)
-    
     if generate_with_expiry_date and not isinstance(generate_with_expiry_date, bool):
-        raise TypeError(f"Expected `generate_with_expiry_date` flag to be a bool but got object with type {type(generate_with_expiry_date).__name__} ")
-    
+        raise TypeError(
+            f"Expected `generate_with_expiry_date` flag to be a bool but got object with type {type(generate_with_expiry_date).__name__} "
+        )
+
     if not isinstance(cache_key, str):
-        raise TypeError(f"Expected the cache parameter to be a string but got object with type {type(cache_key).__name__} ")
-        
-          
+        raise TypeError(
+            f"Expected the cache parameter to be a string but got object with type {type(cache_key).__name__} "
+        )
+
+    resp = {
+            "TOTAL_ISSUED": 0,
+            "SUCCESS": False,
+            "ERROR": "",
+            "codes": [],
+            "MESSAGE": "",
+            "CAN_GENERATE": False,
+            }
+
     try:
-        resp = {"TOTAL_ISSUED": 0, 
-                "SUCCESS": False,
-                 "ERROR": "", "codes": []
-             }
+        user                         = request.user
+        raw_codes                    = []
+        can_generate_code            = None
+        wait_time                    = None
+        can_generate_code, wait_time = _can_codes_be_generated_yet(user)
+   
+        if can_generate_code:
 
-        user  = request.user
+            raw_codes, batch_instance = _generate_code_batch(request, generate_with_expiry_date)
 
-        if generate_with_expiry_date:
-           
-            raw_codes, batch_instance = _generate_recovery_codes_with_expiry_date_helper(request, user)
+            resp.update(
+                {
+                    "TOTAL_ISSUED": 1,
+                    "SUCCESS": True,
+                    "CODES": raw_codes,
+                    "BATCH": batch_instance.get_json_values(),
+                    "ITEM_PER_PAGE": ITEM_PER_PAGE,
+                    "CAN_GENERATE": True,
+                    "MESSAGE": "Your recovery code has been generated",
+                }
+            )
+            view_logger.info(f"[RecoveryCodes] Generated new codes for user={user.id}, batch_id={batch_instance.id}")
+
         else:
-            raw_codes, batch_instance = RecoveryCodesBatch.create_recovery_batch(user)
+            resp.update(
+                {
+                    "MESSAGE": f"You have to wait {wait_time} seconds before you can request a new code",
+                    "SUCCESS": True,
+                    "CAN_GENERATE": False,
+                }
+            )
+            view_logger.info(f"[RecoveryCodes] User={user.id} must wait {wait_time}s before generating a new code")
 
-        resp.update({
-            "TOTAL_ISSUED": 1,
-            "SUCCESS": True,
-            "CODES": raw_codes,
-            "BATCH": batch_instance.get_json_values(), 
-            "ITEM_PER_PAGE": ITEM_PER_PAGE,
-        })
-
+        # session state
         request.session["recovery_codes_state"] = {"codes": raw_codes}
         request.session["is_emailed"]           = False
         request.session["is_downloaded"]        = False
@@ -144,20 +187,24 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
             "generated": True,
             "downloaded": False,
             "emailed": False,
-            "viewed": False
+            "viewed": False,
         }
-        
         set_cache_with_retry(cache_key.format(user.id), value=values_to_save_in_cache)
-        
-        data                             = json.loads(request.body.decode("utf-8"))   
-        request.session["force_update"]  = data.get("forceUpdate", False)
+        view_logger.debug(f"[RecoveryCodes] Updated cache for user={user.id}, key={cache_key}")
+
+        # request flags
+        data = json.loads(request.body.decode("utf-8"))
+        request.session["force_update"] = data.get("forceUpdate", False)
 
     except IntegrityError as e:
         resp["ERROR"] = str(e)
+        view_logger.error(f"[RecoveryCodes] IntegrityError for user={request.user.id}: {e}")
     except json.JSONDecodeError:
         resp["ERROR"] = "Invalid JSON body"
+        view_logger.error(f"[RecoveryCodes] Invalid JSON body for user={request.user.id}")
     except Exception as e:
-        resp["ERROR"] = str(e)
+        resp["ERROR"] = "Exception error " + str(e)
+        view_logger.exception(f"[RecoveryCodes] Unexpected error for user={request.user.id}")
 
     return JsonResponse(resp, status=201 if resp["SUCCESS"] else 400)
 
@@ -398,8 +445,7 @@ def get_recovery_batches_context(request):
     PAGE_SIZE = 20
     PER_PAGE  = 5
 
-    # fetch from cache or DB
-   
+    # fetch from cache or DB   
     force_update = request.session.get("force_update", False)
 
     if not force_update:

@@ -11,15 +11,18 @@ from django_auth_recovery_codes import notify_user
 from django_auth_recovery_codes.models import (RecoveryCodePurgeHistory, 
                                                RecoveryCodesBatch, 
                                                RecoveryCodeAudit, 
+                                               RecoveryCodeCleanUpScheduler,
+                                               Status
                                                )
 
 from django_auth_recovery_codes.app_settings import app_settings
+from django_auth_recovery_codes.loggers.loggers import (email_logger,
+                                                         purge_code_logger, 
+                                                         audit_logger, 
+                                                         purge_email_logger)
 
 
 
-logger             = logging.getLogger("email_sender")
-audit_logger       = logging.getLogger("audits")
-purge_email_logger = logging.getLogger(__name__)
 
 
 def send_recovery_codes_email(sender_email, user, codes, subject= "Your account recovery codes"):
@@ -32,7 +35,7 @@ def send_recovery_codes_email(sender_email, user, codes, subject= "Your account 
             email_sender_logger
             .add_email_sender_instance(EmailSender.create()) 
             .start_logging_session()
-            .config_logger(logger, log_level=LoggerType.INFO)
+            .config_logger(email_logger, log_level=LoggerType.INFO)
             .from_address(sender_email) 
             .to(user.username) 
             .with_context({"codes": codes, "username": user.username}) 
@@ -44,7 +47,7 @@ def send_recovery_codes_email(sender_email, user, codes, subject= "Your account 
         notify_user(user.id, "Recovery codes email sent successfully!")
   
     except Exception as e:
-        logger.error(f"Failed to send recovery codes: {e}")
+        email_logger.error(f"Failed to send recovery codes: {e}")
         notify_user(user.id, f"Failed to send recovery codes: {e}")
 
        
@@ -54,22 +57,27 @@ def purge_all_expired_batches(*args, **kwargs):
     Scheduled task to purge all expired recovery codes.
     Uses kwargs to ensure all arguments reach the function reliably.
     """
-    retention_days = kwargs.get(
-        "retention_days", settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS
-    )
+    retention_days = kwargs.get("retention_days", settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS)
+
     bulk_delete        = kwargs.get("bulk_delete", True)
     log_per_code       = kwargs.get("log_per_code", False)
+    use_with_logger    = kwargs.get("use_with_logger", settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER)
     delete_empty_batch = kwargs.get("delete_empty_batch", True)
-    use_with_logger    = kwargs.get(
-        "use_with_logger",
-        settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER,
+    schedule_name      = kwargs.get("schedule_name")
+
+    purge_code_logger.info(
+        f"[RecoveryCodes] Starting purge job | retention_days={retention_days}, bulk_delete={bulk_delete}, "
+        f"log_per_code={log_per_code}, delete_empty_batch={delete_empty_batch}, use_with_logger={use_with_logger}s, started_at={timezone.now()}",
     )
 
     total_batches = 0
     total_purged = 0
+    total_skipped = 0
     purged_batches_info = []
 
     batches = RecoveryCodesBatch.objects.select_related("user").all()
+    purge_code_logger.debug("[RecoveryCodes] Found %s batches to check", batches.count())
+
     for batch in batches:
         purged_count, is_empty = batch.purge_expired_codes(
             bulk_delete=bulk_delete,
@@ -77,11 +85,19 @@ def purge_all_expired_batches(*args, **kwargs):
             retention_days=retention_days,
             delete_empty_batch=delete_empty_batch,
         )
-        if purged_count >= 0:
+
+        if purged_count > 0:
             total_purged += purged_count
             total_batches += 1
-            purged_batches_info.append(
-                _generate_purged_batch_code_json_report(batch, purged_count, is_empty)
+            batch_report = _generate_purged_batch_code_json_report(batch, purged_count, is_empty)
+            purged_batches_info.append(batch_report)
+
+            purge_code_logger.info(f"[RecoveryCodes] Batch purged | user_id={batch.user.id}, batch_id={batch.id}, purged_count={purged_count}, is_empty={is_empty}")
+        else:
+            total_skipped += 1
+            purge_code_logger.debug(
+                "[RecoveryCodes] Batch skipped | user_id=%s, batch_id=%s, purged_count=%s",
+                batch.user.id, batch.id, purged_count
             )
 
     RecoveryCodePurgeHistory.objects.create(
@@ -90,9 +106,16 @@ def purge_all_expired_batches(*args, **kwargs):
         retention_days=retention_days,
     )
 
+    purge_code_logger.info(
+        "[RecoveryCodes] Purge complete | total_batches_purged=%s, total_codes_purged=%s, "
+        "total_batches_skipped=%s, finished_at=%s",
+        total_batches, total_purged, total_skipped, timezone.now()
+    )
+
     return {
         "reports": purged_batches_info,
-        "use_with_logger": bool(use_with_logger),  
+        "use_with_logger": bool(use_with_logger),
+        "schedule_name" : schedule_name,
     }
 
 
@@ -245,7 +268,7 @@ def _if_set_to_true_use_logger(use_logger: bool, email_sender_logger: EmailSende
         purge_email_logger.info(
             "Sending email with logger turned on. All actions will be logged."
         )
-        email_sender_logger.config_logger(logger, log_level=LoggerType.INFO)
+        email_sender_logger.config_logger(email_logger, log_level=LoggerType.INFO)
         email_sender_logger.start_logging_session()
     else:
         purge_email_logger.info(
@@ -257,37 +280,52 @@ def _if_set_to_true_use_logger(use_logger: bool, email_sender_logger: EmailSende
 def hook_email_purge_report(task):
     """
     Hook to send purge summary report by email.
+    Marks scheduler as SUCCESS only if everything runs correctly.
     """
-    email_sender_logger = EmailSenderLogger.create()
-
-    result = task.result or {}
-    reports = result.get("reports", [])
-    use_with_logger = result.get("use_with_logger")
+    result           = task.result or {}
+    reports          = result.get("reports", [])
+    use_with_logger  = result.get("use_with_logger")
+    schedule_name    = result.get("schedule_name")
 
     if use_with_logger is None:
         use_with_logger = settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER
 
-    _if_set_to_true_use_logger(use_with_logger, email_sender_logger)
+    email_sender_logger = EmailSenderLogger.create()
 
-    subject, html, text = _get_email_attribrutes(reports)
-    email_sender = EmailSender.create()
-    if not email_sender:
-        logger.error("EmailSender.create() returned None! Cannot send email.")
-        return
+    try:
+        _if_set_to_true_use_logger(use_with_logger, email_sender_logger)
 
-    (
-        email_sender_logger
-        .add_email_sender_instance(email_sender)    
-        .from_address(settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER)
-        .to(settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL)
-        .with_context({"report": reports, "username": settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL})
-        .with_subject(subject)
-        .with_html_template(html, "recovery_codes_deletion")
-        .with_text_template(text, "recovery_codes_deletion")
-        .send()
-    )
+        subject, html, text = _get_email_attribrutes(reports)
+        email_sender = EmailSender.create()
+        if not email_sender:
+            raise RuntimeError("EmailSender.create() returned None! Cannot send email.")
 
-    logger.info("Purge summary email sent successfully")
+        (
+            email_sender_logger
+            .add_email_sender_instance(email_sender)    
+            .from_address(settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER)
+            .to(settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL)
+            .with_context({"report": reports, "username": settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL})
+            .with_subject(subject)
+            .with_html_template(html, "recovery_codes_deletion")
+            .with_text_template(text, "recovery_codes_deletion")
+            .send()
+        )
+
+        email_logger.info("Purge summary email sent successfully")
+
+        RecoveryCodeCleanUpScheduler.objects.filter(
+            name=schedule_name
+        ).update(status=RecoveryCodeCleanUpScheduler.Status.SUCCESS)
+
+    except Exception as e:
+        email_logger.error(f"Failed to send purge summary email: {e}", exc_info=True)
+        RecoveryCodeCleanUpScheduler.objects.filter(
+            name=schedule_name
+        ).update(status=RecoveryCodeCleanUpScheduler.Status.FAILED)
+        raise
+
+        
 
 
 def _get_email_attribrutes(reports: list):

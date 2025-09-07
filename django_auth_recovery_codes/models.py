@@ -14,17 +14,24 @@ from django_email_sender.models import EmailBaseLog
 from django.conf import settings
 from django.core.cache import cache
 
-
+from django_auth_recovery_codes.loggers.loggers import purge_code_logger
 from django_auth_recovery_codes.base_models import AbstractCleanUpScheduler
 from django_auth_recovery_codes.utils.security.generator import generate_2fa_secure_recovery_code
 from django_auth_recovery_codes.utils.security.hash import is_already_hashed, make_lookup_hash
-from django_auth_recovery_codes.utils.utils import schedule_future_date, create_json_from_attrs, create_unique_string, default_cooldown_minutes
-from django_auth_recovery_codes.utils.cache.safe_cache import delete_cache_with_retry
+from django_auth_recovery_codes.utils.utils import (schedule_future_date, 
+                                                    create_json_from_attrs, 
+                                                    create_unique_string,
+                                                    default_cooldown_minutes,
+                                                    default_multiplier
+                                                    )
+from django_auth_recovery_codes.utils.cache.safe_cache import delete_cache_with_retry, get_safe_cache_ttl
 
 
 
 User   = get_user_model()
-logger = logging.getLogger("auth.recovery_codes")
+logger = logging.getLogger("auth_recovery_codes")
+
+CAN_GENERATE_CODE_CACHE_KEY =  "can_generate_code:{}"
 
 
 class RecoveryCodeAudit(models.Model):
@@ -134,8 +141,8 @@ class Status(models.TextChoices):
 class RecoveryCodeCleanUpScheduler(AbstractCleanUpScheduler):
     name               = models.CharField(max_length=180, default=create_unique_string("Purge Expired Recovery Codes"), unique=True)
     bulk_delete        = models.BooleanField(default=True)
-    log_per_code       = models.BooleanField(default=False)
     delete_empty_batch = models.BooleanField(default=True)
+    log_per_code       = models.BooleanField(default=False)
     next_run           = models.DateTimeField(blank=True, null=True)
     deleted_count      = models.PositiveIntegerField(default=0, editable=False)
   
@@ -166,7 +173,12 @@ class RecoveryCodesBatch(models.Model):
     deleted_at         = models.DateTimeField(null=True, blank=True)
     deleted_by         = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name="deleted_batches")
     last_generated     = models.DateTimeField(auto_now=True)
-    cooldown_minutes   = models.PositiveSmallIntegerField(default=default_cooldown_minutes)
+    cooldown_minutes   = models.PositiveSmallIntegerField(default=default_cooldown_minutes, 
+                                                          help_text="The number of minutes in seconds before a new request can be made. Default " \
+                                                          "valued used from the settings.DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN flag")
+    multiplier         = models.PositiveSmallIntegerField(default=default_multiplier, 
+                                                          help_text="The multiplier used to increase the wait time ." \
+                                                          "Default value used from the settings.DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER flag")
     requested_attempt  = models.PositiveSmallIntegerField(default=0)
 
      # Action tracking
@@ -230,12 +242,26 @@ class RecoveryCodesBatch(models.Model):
         """
         Add cached attempts to the batch and clear cache.
         """
-        
-        attempts = cache.get(cache_key, 0)
+        data = cache.get(cache_key, {})
+
+        purge_code_logger.debug(
+            "[RecoveryCodes] Flushing cache: batch_id=%s, key=%s, data=%s",
+            getattr(batch, "id", None), cache_key, data,
+        )
+
+        attempts = data.get("attempts", 0)
         if attempts > 0:
-            batch.requested_attempt += attempts
-            batch.save(update_fields=[batch.REQUEST_ATTEMPT_FIELD])
-            delete_cache_with_retry(cache_key)
+            batch.attempts = attempts
+            batch.save(update_fields=["attempts"])
+
+            purge_code_logger.info(f"[RecoveryCodes] Persisted attempts: batch_id={batch.id}, attempts={attempts}")
+        else:
+            purge_code_logger.debug("[RecoveryCodes] No attempts to flush: batch_id=%s, key=%s", getattr(batch, "id", None), cache_key,)
+
+        cache.delete(cache_key)
+
+        purge_code_logger.debug(
+            "[RecoveryCodes] Cleared cache after flush: batch_id=%s, key=%s", getattr(batch, "id", None), cache_key)
 
     @staticmethod
     def _update_recovery_cooldown(cache_key: str) -> int:
@@ -251,17 +277,32 @@ class RecoveryCodesBatch(models.Model):
         Returns:
             int: The new TTL (in seconds) for the cooldown.
         """
-        multiplier  = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER", 2)
-        cutoff      = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT", 3600)
+        multiplier = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER", 2)
+        cutoff = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT", 3600)
 
-        current_ttl = cache.ttl(cache_key) or 0
-        new_ttl     = min(int(current_ttl * multiplier), cutoff)
+        data = cache.get(cache_key, {})
 
-        cache.incr(cache_key)
-        cache.expire(cache_key, new_ttl)
+        purge_code_logger.debug(
+            "[RecoveryCodes] Pre-update state: key=%s, data=%s", 
+            cache_key, data
+        )
+
+        current_ttl = data.get("remaining_seconds", 0)
+        new_ttl = min(int(current_ttl * multiplier) or 1, cutoff)
+
+        attempts = data.get("attempts", 0) + 1
+        data.update({"attempts": attempts, "remaining_seconds": new_ttl})
+
+        cache.set(cache_key, data, timeout=new_ttl)
+
+        purge_code_logger.info(
+            "[RecoveryCodes] Cooldown updated: key=%s, attempts=%d, "
+            "prev_ttl=%d, new_ttl=%d, multiplier=%d, cutoff=%d",
+            cache_key, attempts, current_ttl, new_ttl, multiplier, cutoff,
+        )
 
         return new_ttl
-    
+        
     @staticmethod
     def _start_recovery_cooldown(current_batch: RecoveryCodesBatch, cache_key: str, remaining_seconds: int) -> tuple[bool, int]:
         """
@@ -287,7 +328,13 @@ class RecoveryCodesBatch(models.Model):
         current_batch._increment_request_attempt()
         current_batch.save(update_fields=[current_batch.REQUEST_ATTEMPT_FIELD])
 
-        cache.set(cache_key, FIRST_ATTEMPT, timeout=remaining_seconds)
+        data = {
+            "attempts": FIRST_ATTEMPT,
+            "remaining_seconds": remaining_seconds,
+        }
+
+        purge_code_logger.info(f"Starting recovery cooldown with attempt: {FIRST_ATTEMPT} and a timeout value of: {remaining_seconds} and the data: {data}")
+        cache.set(cache_key, data, timeout=remaining_seconds)
         return False, remaining_seconds
 
     @classmethod
@@ -335,13 +382,17 @@ class RecoveryCodesBatch(models.Model):
         >>>
 
         """
-        cache_key = f"can_generate_code:{user.id}"
-        attempts  = cache.get(cache_key, 0)
+        
+        cache_key = CAN_GENERATE_CODE_CACHE_KEY.format(user.id)
+        data      = cache.get(cache_key, {})
+        attempts  = data.get("attempts", 0)
 
         if attempts > 0:
+            purge_code_logger.debug(f"Recovery code attempts: {attempts}")
             return False, cls._update_recovery_cooldown(cache_key)
 
         current_batch = cls.get_by_user(user)
+
         if current_batch is None:
             raise ValueError("No recovery code batch for this user")
 
@@ -351,41 +402,7 @@ class RecoveryCodesBatch(models.Model):
 
         cls._flush_attempts_to_db(current_batch, cache_key)
         return True, 0
-         
-    def purge_expired_codes(self, bulk_delete=True, log_per_code=False, retention_days=1, delete_empty_batch=False):
-        """
-        Hard-delete recovery codes in this batch marked for deletion or invalidated,
-        optionally logging per code or in bulk. Deletes batch if empty.
-
-        Args:
-            bulk_delete (bool): Delete all codes in one query if True, else one by one.
-            log_per_code (bool): Log each code deletion individually if True.
-            retention_days (int): Number of days to keep soft-deleted codes.
-            delete_empty_batch (bool): Delete batch if it becomes empty.
-        Returns:
-            int: Number of codes deleted.
-        """
-       
-        expired_codes = self._get_expired_recovery_codes_qs(retention_days)
-
-        if not expired_codes.exists():
-            print(f"[{timezone.now()}] No codes to purge for batch {self.id}") # will change to logger afterwards for now keep
-            return 0, expired_codes.count() == 0
-
-        if log_per_code and not bulk_delete:
-           deleted_count = self._delete_expired_codes_by_scheduler_helper(expired_codes)
-        else:
-           deleted_count = self._bulk_delete_expired_codes_by_scheduler_helper(expired_codes)
-
-        # Delete the batch if no codes remain
-        is_empty = (expired_codes.count() - deleted_count ) == 0
     
-        if delete_empty_batch and is_empty:
-            print(f"[{timezone.now()}] Batch {self.id} is empty and will be deleted.") # will change to logger after for now keep
-            self.delete()
-
-        return deleted_count, is_empty
-
     def _get_expired_recovery_codes_qs(self, retention_days: int = None) -> QuerySet[RecoveryCode]:
         """
         Return a queryset of recovery codes eligible for automatic removal with two extra conditions.
@@ -411,7 +428,6 @@ class RecoveryCodesBatch(models.Model):
             raised if the number is a negative number since the method assumes that the 
             user wants all expired codes regrdless of age.
 
-
         Returns:
         QuerySet[RecoveryCode]: The filtered recovery codes queryset.
 
@@ -427,39 +443,92 @@ class RecoveryCodesBatch(models.Model):
         if retention_days > 0:
             qs = qs.filter(modified_at__lt=self.get_expiry_threshold(retention_days))
         return qs
-
+    
+    def _execute_code_deletion(self, expired_codes, log_per_code: bool, bulk_delete: bool) -> int:
+        """
+        Decide whether to delete per code or in bulk, then perform the deletion.
+        """
+        if log_per_code and not bulk_delete:
+            return self._delete_expired_codes_by_scheduler_helper(expired_codes)
+        return self._bulk_delete_expired_codes_by_scheduler_helper(expired_codes)
+    
     def _delete_expired_codes_by_scheduler_helper(self, expired_codes):
         """"""
         deleted_count = 0
-        for code in expired_codes:
-                RecoveryCodeAudit.log_action(
-                    user_issued_to=self.user,
-                    action=RecoveryCodeAudit.Action.BATCH_PURGED,
-                    deleted_by=self.user,
-                    batch=self,
-                    number_deleted=1,
-                    number_issued=self.number_issued,
-                    reason="Batch of expired or invalidated codes removed by scheduler",
-                )
-                code.delete()
-                deleted_count += 1
+        for deleted_count, code in enumerate(expired_codes, start=1):
+            RecoveryCodeAudit.log_action(
+                user_issued_to=code.user,
+                action=RecoveryCodeAudit.Action.BATCH_PURGED,
+                deleted_by=code.deleted_by,
+                batch=self,
+                number_deleted=code.number_removed,
+                number_issued=code.number_issued,
+                reason="Batch of expired or invalidated codes removed by scheduler",
+            )
+            code.delete()
         return deleted_count
 
     def _bulk_delete_expired_codes_by_scheduler_helper(self, expired_codes):
         """"""
         number_to_delete = expired_codes.count()
+        purge_code_logger.debug(f"Using bulk deleted mode. Batch {self.id} has {number_to_delete} to delete")
+      
+        
+        deleted_count = 0
         if number_to_delete > 0:
-                expired_codes.delete()
-                RecoveryCodeAudit.log_action(
+            deleted_count, _ = expired_codes.delete()
+            RecoveryCodeAudit.log_action(
                     user_issued_to=self.user,
                     action=RecoveryCodeAudit.Action.BATCH_PURGED,
-                    deleted_by=self.user,
+                    deleted_by=self.deleted_by,
                     batch=self,
-                    number_deleted=1,
+                    number_deleted=deleted_count,
                     number_issued=self.number_issued,
                     reason="Batch of expired or invalidated codes removed by scheduler",
                 )
-        return number_to_delete
+        else:
+            purge_code_logger.debug(f"There is nothing to delete in the batch. Batch has {number_to_delete} to delete")
+        return deleted_count
+
+    def purge_expired_codes(self, bulk_delete=True, log_per_code=False, retention_days=1, delete_empty_batch = True):
+        """
+        Hard-delete recovery codes in this batch marked for deletion or invalidated,
+        optionally logging per code or in bulk. Deletes batch if empty.
+
+        Args:
+            bulk_delete (bool): Delete all codes in one query if True, else one by one.
+            log_per_code (bool): Log each code deletion individually if True.
+            retention_days (int): Number of days to keep soft-deleted codes.
+        
+        Returns:
+            int: Number of codes deleted.
+        """
+       
+        expired_codes = self._get_expired_recovery_codes_qs(retention_days)
+      
+        if not expired_codes.exists():
+            purge_code_logger.info(f"No codes to purge for batch {self.id} at {timezone.now()}")
+            return 0, True
+
+        deleted_count            = self._execute_code_deletion(expired_codes, log_per_code, bulk_delete)
+        active_codes_remaining   = (self.number_issued - deleted_count)
+        is_empty                 = active_codes_remaining == 0
+
+        purge_code_logger.debug(
+                f"[Batch {self.id} Purge Summary]\n"
+                f"  Number deleted   : {deleted_count}\n"
+                f"  Number issued    : {self.number_issued}\n"
+                f"  Codes remaining  : {active_codes_remaining}\n"
+                f"  Is batch empty   : {is_empty}"
+        )
+
+        if delete_empty_batch and is_empty:
+            purge_code_logger.info(f"Batch {self.id} is now empty and will be deleted at {timezone.now()}")
+            self.delete()
+        else:
+            purge_code_logger.info(f"Batch {self.id} contains {active_codes_remaining} codes")
+
+        return deleted_count, is_empty
 
     @staticmethod
     def get_expiry_threshold(days=30):
@@ -739,6 +808,7 @@ class RecoveryCodesBatch(models.Model):
             batch_instance.mark_as_generated()
 
             cls._deactivate_all_batches_except_current(batch_instance)
+            cls._flush_attempts_to_db(batch, CAN_GENERATE_CODE_CACHE_KEY.format(user.id))
 
             for _ in range(batch_number):
                 raw_code = generate_2fa_secure_recovery_code()
@@ -793,6 +863,7 @@ class RecoveryCodesBatch(models.Model):
         with transaction.atomic():
 
             # Update all related recovery codes
+
           
             # Update the batch itself
             recovery_batch.status         = Status.PENDING_DELETE
