@@ -94,7 +94,7 @@ class RecoveryCodesBatchAdmin(admin.ModelAdmin):
                        "requested_attempt",
                       
                          "expiry_date", "viewed", "downloaded", "emailed", "generated",
-                          "cooldown_minutes",
+                          "cooldown_seconds",
                     
                        "multiplier",
                          ),

@@ -1107,14 +1107,14 @@ button {
     position: fixed;
     left: 10px;
     bottom: 0;
-    width: 30%;
+    width: 45%;
     background: #28a745;
     color: white;
     border: 1px solid black;
     border-radius: 4px;
     font-size: 0.9rem;
     font-weight: 400;
-    text-align: center;
+    text-align: left;
     transform: translateY(100%);
     border-left: 4px solid var(--red-primary);
     box-shadow: var(--box-shadow-primary);
@@ -1125,9 +1125,7 @@ button {
         rgb(38, 57, 77) 0 20px 30px -10px;
 }
 
-#messages {
-    width: 40%;
-}
+
 /* Content wrapper inside the message box */
 .message-container {
     padding: var(--sm-spacing);

@@ -8,9 +8,11 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib.auth import get_user_model
 from typing import TypedDict
 
+from django_auth_recovery_codes.utils.converter import SecondsToTime
+
 from .models import RecoveryCode, RecoveryCodesBatch, Status
 from .utils.cache.safe_cache import set_cache_with_retry, get_cache_with_retry, delete_cache_with_retry
-from .loggers.loggers import view_logger
+from .loggers.loggers import view_logger, purge_code_logger
 
 User = get_user_model()
 
@@ -18,7 +20,6 @@ User = get_user_model()
 RECOVERY_CODES_BATCH_HISTORY_KEY = 'recovery_codes_batch_history_{}'
 ITEM_PER_PAGE                   = 5  # This will be taking from teh settings for now constant
  
-
 
 
 class ResponseDict(TypedDict):
@@ -146,11 +147,12 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
     try:
         user                         = request.user
         raw_codes                    = []
-        can_generate_code            = None
-        wait_time                    = None
         can_generate_code, wait_time = _can_codes_be_generated_yet(user)
-   
-        if can_generate_code:
+
+        time_to_wait = SecondsToTime(wait_time).format_to_human_readable() or None
+        purge_code_logger.debug(f"[GENERATE NEW CODE] Can generate code = {can_generate_code}, wait_time = {time_to_wait}")
+
+        if can_generate_code and time_to_wait is None:
 
             raw_codes, batch_instance = _generate_code_batch(request, generate_with_expiry_date)
 
@@ -167,16 +169,17 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
             )
             view_logger.info(f"[RecoveryCodes] Generated new codes for user={user.id}, batch_id={batch_instance.id}")
 
-        else:
+        elif time_to_wait is not None:
+        
             resp.update(
                 {
-                    "MESSAGE": f"You have to wait {wait_time} seconds before you can request a new code",
+                    "MESSAGE": f"You have to wait {time_to_wait} seconds before you can request a new code",
                     "SUCCESS": True,
                     "CAN_GENERATE": False,
                 }
             )
             view_logger.info(f"[RecoveryCodes] User={user.id} must wait {wait_time}s before generating a new code")
-
+    
         # session state
         request.session["recovery_codes_state"] = {"codes": raw_codes}
         request.session["is_emailed"]           = False

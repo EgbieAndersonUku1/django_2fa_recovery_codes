@@ -16,16 +16,16 @@ from django.core.cache import cache
 
 from django_auth_recovery_codes.loggers.loggers import purge_code_logger
 from django_auth_recovery_codes.base_models import AbstractCleanUpScheduler
+from django_auth_recovery_codes.utils.converter import SecondsToTime
 from django_auth_recovery_codes.utils.security.generator import generate_2fa_secure_recovery_code
 from django_auth_recovery_codes.utils.security.hash import is_already_hashed, make_lookup_hash
 from django_auth_recovery_codes.utils.utils import (schedule_future_date, 
                                                     create_json_from_attrs, 
                                                     create_unique_string,
-                                                    default_cooldown_minutes,
-                                                    default_multiplier
+                                                   
                                                     )
-from django_auth_recovery_codes.utils.cache.safe_cache import delete_cache_with_retry, get_safe_cache_ttl
-
+from django_auth_recovery_codes.app_settings import default_cooldown_seconds, default_multiplier
+from django_auth_recovery_codes.utils.cache.safe_cache import delete_cache_with_retry
 
 
 User   = get_user_model()
@@ -173,8 +173,8 @@ class RecoveryCodesBatch(models.Model):
     deleted_at         = models.DateTimeField(null=True, blank=True)
     deleted_by         = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name="deleted_batches")
     last_generated     = models.DateTimeField(auto_now=True)
-    cooldown_minutes   = models.PositiveSmallIntegerField(default=default_cooldown_minutes, 
-                                                          help_text="The number of minutes in seconds before a new request can be made. Default " \
+    cooldown_seconds   = models.PositiveSmallIntegerField(default=default_cooldown_seconds, 
+                                                          help_text="The number of seconds before a new request can be made. Default " \
                                                           "valued used from the settings.DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN flag")
     multiplier         = models.PositiveSmallIntegerField(default=default_multiplier, 
                                                           help_text="The multiplier used to increase the wait time ." \
@@ -211,7 +211,7 @@ class RecoveryCodesBatch(models.Model):
     
     def _get_next_allowed_time_to_generate_code(self):
         """"""
-        return self.last_generated + timedelta(minutes=self.cooldown_minutes)
+        return self.last_generated + timedelta(seconds=self.cooldown_seconds)
 
     def _get_remaining_time_till_generate_code(self):
         """"""
@@ -234,7 +234,7 @@ class RecoveryCodesBatch(models.Model):
         """
         self.requested_attempt += 1
         if save:
-            self.update_fields=[self.REQUEST_ATTEMPT_FIELD]
+            self.save(update_fields=[self.REQUEST_ATTEMPT_FIELD, self.MODIFIED_AT_FIELD])
         return self
 
     @classmethod
@@ -258,7 +258,7 @@ class RecoveryCodesBatch(models.Model):
         else:
             purge_code_logger.debug("[RecoveryCodes] No attempts to flush: batch_id=%s, key=%s", getattr(batch, "id", None), cache_key,)
 
-        cache.delete(cache_key)
+        delete_cache_with_retry(cache_key)
 
         purge_code_logger.debug(
             "[RecoveryCodes] Cleared cache after flush: batch_id=%s, key=%s", getattr(batch, "id", None), cache_key)
@@ -282,13 +282,10 @@ class RecoveryCodesBatch(models.Model):
 
         data = cache.get(cache_key, {})
 
-        purge_code_logger.debug(
-            "[RecoveryCodes] Pre-update state: key=%s, data=%s", 
-            cache_key, data
-        )
+        purge_code_logger.debug(f"[RecoveryCodes] Pre-update state: key={cache_key}, data={data}")
 
         current_ttl = data.get("remaining_seconds", 0)
-        new_ttl = min(int(current_ttl * multiplier) or 1, cutoff)
+        new_ttl     = min(int(current_ttl * multiplier) or 1, cutoff)
 
         attempts = data.get("attempts", 0) + 1
         data.update({"attempts": attempts, "remaining_seconds": new_ttl})
@@ -296,9 +293,8 @@ class RecoveryCodesBatch(models.Model):
         cache.set(cache_key, data, timeout=new_ttl)
 
         purge_code_logger.info(
-            "[RecoveryCodes] Cooldown updated: key=%s, attempts=%d, "
-            "prev_ttl=%d, new_ttl=%d, multiplier=%d, cutoff=%d",
-            cache_key, attempts, current_ttl, new_ttl, multiplier, cutoff,
+            f"[RecoveryCodes] Cooldown updated: key={cache_key}, attempts={attempts}, "
+            f"prev_ttl={current_ttl}, new_ttl={new_ttl}, multiplier={multiplier}, cutoff={cutoff}",
         )
 
         return new_ttl
@@ -398,6 +394,7 @@ class RecoveryCodesBatch(models.Model):
 
         remaining = current_batch._get_remaining_time_till_generate_code()
         if remaining > 0:
+            purge_code_logger.debug(f"You still have a waiting time of {SecondsToTime(remaining).format_to_human_readable()}")
             return cls._start_recovery_cooldown(current_batch, cache_key, remaining)
 
         cls._flush_attempts_to_db(current_batch, cache_key)
@@ -734,19 +731,19 @@ class RecoveryCodesBatch(models.Model):
 
     def mark_as_viewed(self, save : bool = True):
         self.viewed = True
-        return self._update_field_helper(fields_list=[self.VIEWED_FLAG], save=save)
+        return self._update_field_helper(fields_list=[self.VIEWED_FLAG, self.MODIFIED_AT_FIELD], save=save)
 
     def mark_as_downloaded(self, save : bool = True):
         self.downloaded = True
-        return self._update_field_helper(fields_list=[self.DOWNLOADED_FLAG], save=save)
+        return self._update_field_helper(fields_list=[self.DOWNLOADED_FLAG, self.MODIFIED_AT_FIELD], save=save)
 
     def mark_as_emailed(self, save: bool = True):
         self.emailed = True
-        return self._update_field_helper(fields_list=[self.EMAILED_FLAG], save=save)
+        return self._update_field_helper(fields_list=[self.EMAILED_FLAG, self.MODIFIED_AT_FIELD], save=save)
     
     def mark_as_generated(self, save: bool = True):
         self.generated = True
-        self._update_field_helper(fields_list=[self.GENERATED_FLAG], save=save)
+        self._update_field_helper(fields_list=[self.GENERATED_FLAG, self.MODIFIED_AT_FIELD], save=save)
     
     def _update_field_helper(self, fields_list: list, save : bool = True):
 
@@ -828,9 +825,7 @@ class RecoveryCodesBatch(models.Model):
             if batch:
                 cls._if_async_supported_async_bulk_create_or_use_sync_bulk_crate(batch)
 
-
             return raw_codes, batch_instance
-    
     
     @classmethod
     def delete_recovery_batch(cls, user: "User"):
@@ -848,13 +843,13 @@ class RecoveryCodesBatch(models.Model):
         """
         
         try:
-          
-            recovery_batch = (
-                cls.objects
-                .select_related('user')  
-                .prefetch_related('recovery_codes')   
-                .get(user=user, status=Status.ACTIVE)
-            )
+           
+           recovery_batch = (
+               cls.objects
+               .select_related('user')  
+               .prefetch_related('recovery_codes')   
+               .get(user=user, status=Status.ACTIVE)
+           )
         except cls.DoesNotExist:
             return False
 
@@ -863,20 +858,20 @@ class RecoveryCodesBatch(models.Model):
         with transaction.atomic():
 
             # Update all related recovery codes
-
-          
             # Update the batch itself
             recovery_batch.status         = Status.PENDING_DELETE
             recovery_batch.deleted_at     = timezone.now()
             recovery_batch.deleted_by     = user
             recovery_batch.number_removed = recovery_batch.number_issued
+
             recovery_batch.recovery_codes.update(status=Status.PENDING_DELETE, 
                                                  is_deactivated=True,
                                                  mark_for_deletion=True,
                                                  )
             recovery_batch.save()
 
-          
+            delete_cache_with_retry(CAN_GENERATE_CODE_CACHE_KEY.format(user.id))
+        
             RecoveryCodeAudit.log_action(  user_issued_to=recovery_batch.user,
                                             action=RecoveryCodeAudit.Action.BATCH_PURGED,
                                             deleted_by=user,
@@ -885,6 +880,7 @@ class RecoveryCodesBatch(models.Model):
                                             number_issued=recovery_batch.number_issued,
                                             reason="The entire batch is being deleted by the user",
                                          )
+            
                                                 
         return recovery_batch
     
@@ -1017,13 +1013,12 @@ class RecoveryCode(models.Model):
         self.deleted_by      = self.user
         self.deleted_at      = timezone.now()
        
-
         RecoveryCodeAudit.log_action(user_issued_to=self.user,
                                     action=RecoveryCodeAudit.Action.BATCH_PURGED,
                                     deleted_by=self.user,
-                                    batch=self,
+                                    batch=self.batch,
                                     number_deleted=1,
-                                    number_issued=self.number_issued,
+                                    number_issued=self.batch.number_issued,
                                     reason="The code has been invalidated by the user",
                                      )
         if save:
@@ -1077,9 +1072,9 @@ class RecoveryCode(models.Model):
         RecoveryCodeAudit.log_action( user_issued_to=self.user,
                                     action=RecoveryCodeAudit.Action.BATCH_PURGED,
                                     deleted_by=self.user,
-                                    batch=self,
+                                    batch=self.batch,
                                     number_deleted=1,
-                                    number_issued=self.number_issued,
+                                    number_issued=self.batch.number_issued,
                                     reason="The code was deleted by the userr"
 
                                      )

@@ -11,11 +11,11 @@ class SecondsToTime:
     HOURS_IN_SECONDS = 3600
     SECONDS          = 60
 
-    def __init__(self, seconds):
+    def __init__(self, seconds: int):
         self._seconds = seconds
     
     @property
-    def seconds(self):
+    def seconds(self) -> int:
         """Display the time in seconds"""
         return self._seconds % self.SECONDS
     
@@ -53,12 +53,12 @@ class SecondsToTime:
         self._seconds = value
         
     @property    
-    def hour(self):
+    def hour(self) -> int:
         """Display the time in hours"""
         return self._seconds // self.HOURS_IN_SECONDS
     
     @property
-    def minutes(self):
+    def minutes(self) -> int:
         """Display the time in minutes"""
         return (self._seconds % self.HOURS_IN_SECONDS) // self.SECONDS
     
@@ -85,7 +85,7 @@ class SecondsToTime:
         """
         return (self.hour, self.minutes, self.seconds)
 
-    def format_to_human_readable(self):
+    def format_to_human_readable(self) -> str:
         """
         Convert the stored time into a human-readable string.
 
@@ -134,7 +134,7 @@ class SecondsToTime:
             return f"{hour_string}, {minute_string} and {second_string}"
         return "".join(formatted_time)
         
-    def _create_time_string(self, time_value: int, identifier: str):
+    def _create_time_string(self, time_value: int, identifier: str) -> str:
         """
         Return a human-readable string for a time component.
 
