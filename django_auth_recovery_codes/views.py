@@ -1,3 +1,4 @@
+import logging
 import json
 import threading
 
@@ -30,9 +31,11 @@ TTL = getattr(settings, 'DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL', MINUTES_IN_SECON
 TTL = TTL if isinstance(TTL, int) else MINUTES_IN_SECONDS
 
 SENDER_EMAIL =  settings.DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL
+
+
 # Create your views here.
 
-logger = getLogger()
+logger = logging.getLogger("app.views")
 
 
 
@@ -243,22 +246,22 @@ def mark_all_recovery_codes_as_pending_delete(request):
     
     recovery_batch  = RecoveryCodesBatch.delete_recovery_batch(request.user)
     status          = None
-    data   = { "SUCCESS": False, "MESSAGE": ""}
+    data            = { "SUCCESS": False, "MESSAGE": ""}
     
     # reset the cache values
     if recovery_batch:
 
-        recovery_batch.reset_cache_values()
-        recovery_batch.save()
         request.session["is_downloaded"] = False
         request.session["is_emailed"]    = False
         request.session["force_update"]  = True
+        
+    
 
         # removes the raw codes from the session to ensure that it can't be downloaded or emailed 
         # when the frontend buttons are clicked
-        request.session.get("recovery_codes_state", {}).pop("codes")   
-
-        set_cache(CACHE_KEY.format(request.user.id), recovery_batch.get_cache_values(), TTL)
+        request.session.get("recovery_codes_state", {}).pop("codes")  
+        set_cache(CACHE_KEY.format(request.user.id), recovery_batch.reset_cache_values(), TTL)
+      
 
         data.update({
             "SUCCESS": True,
@@ -390,7 +393,6 @@ def recovery_dashboard(request):
     
     recovery_batch_context = get_recovery_batches_context(request)
 
-  
     if user_data is None:
         # cache has expired, get data and re-add to cache
         recovery_batch = RecoveryCodesBatch.get_by_user(user)

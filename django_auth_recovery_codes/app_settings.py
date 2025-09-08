@@ -26,3 +26,13 @@ class AppConfigSettings:
 
 # Singleton-like instance (just like django.conf.settings)
 app_settings = AppConfigSettings()
+
+
+def default_cooldown_seconds():
+    base       = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN", 15)
+    multiplier = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER", 2)
+    return base * multiplier
+
+
+def default_multiplier():
+    return getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER", 1)

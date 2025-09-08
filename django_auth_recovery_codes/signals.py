@@ -2,7 +2,7 @@ import logging
 
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-from django_auth_recovery_codes.models import RecoveryCodeCleanUpScheduler, RecoveryCodeAudit, RecoveryCodeAuditScheduler
+from django_auth_recovery_codes.models import RecoveryCodeCleanUpScheduler, RecoveryCodeAudit, RecoveryCodeAuditScheduler, RecoveryCodesBatch, RecoveryCode
 from django_q.tasks import schedule, Schedule
 from datetime import timedelta
 from django.core.exceptions import ValidationError
@@ -11,7 +11,7 @@ from django_auth_recovery_codes.utils.utils import create_unique_string
 
 from django.conf import settings
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("app.singal_logger")
 
 
 @receiver(pre_save, sender=RecoveryCodeAuditScheduler)
@@ -47,6 +47,7 @@ def update_recovery_code_scheduler(sender, instance, **kwargs):
                     "log_per_code": instance.log_per_code,
                     "delete_empty_batch": instance.delete_empty_batch,
                     "use_with_logger": instance.use_with_logger,
+                    "schedule_name": schedule_name,
                 },
             },
         )
@@ -96,6 +97,4 @@ def validate_next_run_scheduler_value(sender, instance, **kwargs):
         if instance.use_with_logger is None:
             instance.use_with_logger = settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER
     
-
-
 

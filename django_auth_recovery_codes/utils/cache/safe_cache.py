@@ -220,3 +220,14 @@ def get_cache_with_retry(
         action_name="get"
     )
     return result if result is not None else default
+
+
+def get_safe_cache_ttl(key):
+
+    ttl = None
+    if hasattr(cache, "ttl"):  # check if backend supports it
+        try:
+            ttl = cache.ttl(key)
+        except NotImplementedError:
+            pass
+    return ttl

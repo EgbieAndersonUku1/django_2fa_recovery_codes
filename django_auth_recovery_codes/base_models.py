@@ -4,6 +4,11 @@ from datetime import timedelta
 from django.conf import settings
 
 
+def get_default_logger():
+    from django.conf import settings
+    return getattr(settings, "DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER", False)
+
+
 class AbstractCleanUpScheduler(models.Model):
     """
     Abstract base model for scheduled cleanup tasks.
@@ -51,7 +56,7 @@ class AbstractCleanUpScheduler(models.Model):
     deleted_count      = models.PositiveIntegerField(default=0)
     status             = models.CharField(max_length=1, choices=Status, default=Status.PENDING)
     error_message      = models.TextField(null=True, blank=True, editable=False)
-    use_with_logger    = models.BooleanField(default=lambda: settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER or False, help_text=(
+    use_with_logger    = models.BooleanField(default=get_default_logger, help_text=(
                                             "If True, the scheduler will use a logger to record the sending of emails. "
                                             "Default value comes from the setting "
                                             "'DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER'."
@@ -70,10 +75,11 @@ class AbstractCleanUpScheduler(models.Model):
         return cls.objects.filter(enable_scheduler=enabled)
     
     @classmethod
-    def get_by_scheduler_id(cls, scheduler_id: str):
+    def get_by_schedule_name(cls, schedule_name: str):
         """"""
+
         try:
-            return cls.objects.get(pk=scheduler_id)
+            return cls.objects.get(name=schedule_name)
         except cls.DoesNotExist:
             return None
 

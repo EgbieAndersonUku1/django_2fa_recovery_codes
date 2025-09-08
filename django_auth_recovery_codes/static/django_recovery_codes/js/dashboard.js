@@ -476,7 +476,8 @@ async function handleInvalidateButtonClick(e) {
         handleInvalidateCodeFetchAPI
     );
 
-    handleRecoveryCodeAlert(data, "Code successfully deactivated");
+    console.log(data)
+    handleRecoveryCodeAlert(data, "Code successfully deactivated", "invalidate");
 
     invalidateFormElement.reset();
 }
@@ -530,7 +531,7 @@ async function handleDeleteCodeeButtonClick(e) {
             handleRemoveRecoveryCodeApiRequest
         );
 
-        handleRecoveryCodeAlert(data, "Code successfully deleted");
+        handleRecoveryCodeAlert(data, "Code successfully deleted", "delete");
         deleteFormElement.reset()
 
     };
@@ -677,7 +678,7 @@ async function handlDeleteAllCodeButtonClick(e) {
         handleDeleteAllCodesApiRequest,
     )
 
-    if (resp.SUCCESS) {
+    if (resp && resp.SUCCESS) {
         statsBatchCodesRemovedBoard.textContent = resp.TOTAL_REMOVED;
         const codeActionButtons = document.getElementById("code-actions");
         const tableCodes = document.getElementById("table-code-view")
@@ -692,7 +693,12 @@ async function handlDeleteAllCodeButtonClick(e) {
                 icon: "success",
                 confirmButtonText: "OK"
             })
-
+            
+            const SUCCESS_ALERT_SELECTOR = ".alert-message";  // Dynamic selector only shows when the page is generated and refreshed
+            const dynamicAlertElement = document.querySelector(SUCCESS_ALERT_SELECTOR)
+            toggleElement(dynamicAlertElement);
+            toggleElement(alertMessage)
+          
         } else {
             warnError("handleDeleteAllCodeButtonClick", "The button container element wasn't found")
         }
@@ -959,8 +965,6 @@ async function handleRecoveryCodesAction({ e,
 
     if (daysToExpiry !== null && typeof daysToExpiry === "number") {
         body.daysToExpiry = daysToExpiry;
-
-
     }
 
     body.forceUpdate = true;
@@ -988,27 +992,52 @@ async function handleRecoveryCodesAction({ e,
     )
 
     if (resp.SUCCESS) {
+     
+        if (resp.CAN_GENERATE) {
+            statsTotalCodesIssuedBoard.textContent = resp.TOTAL_ISSUED;
+            toggleElement(generaterecoveryBatchSectionElement);
 
-        statsTotalCodesIssuedBoard.textContent = resp.TOTAL_ISSUED;
-        toggleElement(generaterecoveryBatchSectionElement);
+            const isPopulated = populateTableWithUserCodes(resp.CODES);
 
-        const isPopulated = populateTableWithUserCodes(resp.CODES);
+            if (isPopulated) {
+                sendPostFetchWithoutBody("/auth/recovery-codes/viewed/",
+                    "Failed to mark code as viewed "
+                );
 
-        if (isPopulated) {
-            sendPostFetchWithoutBody("/auth/recovery-codes/viewed/",
-                "Failed to mark code as viewed "
-            );
+                insertBatchCardIntoSection(resp.BATCH, resp.ITEM_PER_PAGE);
+            }
 
-            insertBatchCardIntoSection(resp.BATCH, resp.ITEM_PER_PAGE);
+        
+            return true;
         }
-        return true;
+        
+        messageContainerElement.classList.add("show");
+
+        showTemporaryMessage(messageContainerElement, resp.MESSAGE);
+        tableCoderSpinnerElement.style.display = "none";
+        toggleSpinner(tableCoderSpinnerElement, false);
+
+        setTimeout(() => {
+              codeGenerationComplete();
+         
+        }, 5000)
+      
+
 
     } else {
+        const DEFAULT_MESSAGE = "Something went wrong and we couldn't generate your recovery codes"
         messageContainerElement.classList.add("show");
-        messageContainerElement.textContent = "Something went wrong and we couldn't generate your recovery codes"
+        messageContainerElement.textContent = DEFAULT_MESSAGE;
         tableCoderSpinnerElement.style.display = "none";
+        toggleSpinner(tableCoderSpinnerElement, false);
+
+        setTimeout(() => {
+              codeGenerationComplete();
+            messageContainerElement.classList.remove("show");
+        }, 5000)
         return false;
     }
+
 }
 
 
@@ -1082,7 +1111,8 @@ async function handleButtonAlertClickHelper(e, buttonElementID, buttonSpinnerEle
 
     } finally {
         toggleSpinner(buttonSpinnerElement, false);
-        toggleButtonDisabled(buttonElement, false)
+        toggleButtonDisabled(buttonElement, false);
+      
     }
 
 
@@ -1254,7 +1284,7 @@ function insertBatchCardIntoSection(batch, batchPerPage = 5) {
   
     const historyCardElement = generateRecoveryCodesSummaryCard(batch);
     let secondRecoveryCardBatch;
-   
+
 
     dynamicBatchSpinnerElement.style.display = "inline-block";
     toggleSpinner(dynamicBatchSpinnerElement);
@@ -1263,9 +1293,9 @@ function insertBatchCardIntoSection(batch, batchPerPage = 5) {
 
 
           addChildWithPaginatorLimit(recoveryBatchSectionElement, historyCardElement, batchPerPage)
-           secondRecoveryCardBatch = getNthChildNested(recoveryBatchSectionElement, 2, TAG_NAME, CLASS_SELECTOR);
-            markCardAsDeleted(secondRecoveryCardBatch)
-            toggleSpinner(dynamicBatchSpinnerElement, false);
+          secondRecoveryCardBatch = getNthChildNested(recoveryBatchSectionElement, 2, TAG_NAME, CLASS_SELECTOR);
+          markCardAsDeleted(secondRecoveryCardBatch)
+          toggleSpinner(dynamicBatchSpinnerElement, false);
 
       
         toggleSpinner(dynamicBatchSpinnerElement, false);
@@ -1296,7 +1326,6 @@ function markCardAsDeleted(cardElement) {
 
 
 
-
 /**
  * Displays a standardised alert for recovery code operations (e.g., deactivate, delete).
  *
@@ -1317,15 +1346,13 @@ function markCardAsDeleted(cardElement) {
  * handleRecoveryCodeAlert(data, "Code successfully deactivated");
  * handleRecoveryCodeAlert(data, "Code successfully deleted");
  */
-function handleRecoveryCodeAlert(data, successCompareMessage) {
+function handleRecoveryCodeAlert(data, successCompareMessage, fieldName) {
     
-    console.log(data)
     if (data && Object.hasOwn(data, "SUCCESS")) {
 
         if (data.OPERATION_SUCCESS) {
             const icon = data.ALERT_TEXT === successCompareMessage ? "success" : "info";
-            console.log(data.ALERT_TEXT)
-
+          
             AlertUtils.showAlert({
                 title: data.ALERT_TEXT,
                 text: data.MESSAGE ,
@@ -1333,14 +1360,14 @@ function handleRecoveryCodeAlert(data, successCompareMessage) {
                 confirmButtonText: "Ok"
             });
 
-            
+    
             // Only increment the frontend number when the operation is truly successful.
             // Reason: The backend returns true for non-error states like `deleted`, 
             // `already deleted`, or `already invalidated`. 
             // The  `successCompareMessage` ensures that the frontend only visually 
             // increments the number when the intended action (e.g., deletion or invalidation) has actually occurred.
             if (icon === "success") {
-                updateCurrentRecoveryCodeBatchCard();
+                updateCurrentRecoveryCodeBatchCard(fieldName);
             }
           
             return;
@@ -1369,14 +1396,29 @@ function handleRecoveryCodeAlert(data, successCompareMessage) {
 
 
 
-function updateCurrentRecoveryCodeBatchCard() {
-  
+
+
+
+function updateCurrentRecoveryCodeBatchCard(fieldToUpdate) {
     const currentCardBatch = getNthChildNested(recoveryBatchSectionElement, 1, TAG_NAME, CLASS_SELECTOR);
-    incrementRecoveryCardField(currentCardBatch);
+
+  
+    switch(fieldToUpdate) {
+        case "invalidate":
+            incrementRecoveryCardField(currentCardBatch, "number_invalidated");
+            break;
+         case "delete":
+            incrementRecoveryCardField(currentCardBatch, "number_removed");
+            break;
+        
+    }
+   
 }
 
 
-function incrementRecoveryCardField(cardBatchElement) {
+
+
+function incrementRecoveryCardField(cardBatchElement, fieldSelector) {
     if (!checkIfHTMLElement(cardBatchElement)) {
         warnError(
             "incrementRecoveryCardField",
@@ -1386,14 +1428,11 @@ function incrementRecoveryCardField(cardBatchElement) {
     }
 
     const PElements = cardBatchElement.querySelectorAll('.card-head .info-box .value p');
-    const keys      = ["number_invalidated", "number_removed"];
     
-
     for (const pElement of PElements) {
         // Only increment fields with the correct class
-        const t = keys.some(key => pElement.classList.contains(key))
 
-        if (keys.some(key => pElement.classList.contains(key))) {
+        if (pElement.classList.contains(fieldSelector)) {
             const currentValue = parseInt(pElement.textContent || "0", 10);
             pElement.textContent = currentValue + 1;
         
