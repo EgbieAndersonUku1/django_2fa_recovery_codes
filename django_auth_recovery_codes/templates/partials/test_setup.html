@@ -1,0 +1,30 @@
+<h1 class="margin-top-lg medium-title"> Verify that your code has been set up correctly</h1>
+<hr class="dividor">
+
+<section id="verify-setup" class="margin-top-xlg" aria-label="Verify recovery codes">
+    <div class="box-display bg-subtle-gray-with-padding" role="region" aria-labelledby="setup-verification-title">
+    
+        <p>This is a one-time step to confirm that your code has been configured correctly by the backend.</p>
+
+        <p class="padding-top-md">
+            <strong>Optional:</strong> This is a one-time test to confirm that your code has been configured correctly by the backend. 
+            It is not required, but recommended before relying on your codes.
+        </p>
+        
+        <p class="padding-top-md padding-bottom-md bold">How it works:</p>
+        <ul id="setup-verification-list" class="padding-left-md">
+            <li>Enter any code you wish to test.</li>
+            <li>The app will check with the backend to confirm whether the set-up is correct.</li>
+            <li>This test does not use up one of your codes.</li>
+            <li>If successful, you will see a confirmation message and this section will no longer be needed.</li>
+            <li>If the set-up fails, delete the code batch, generate a new one, and try again.</li>
+        </ul>
+    </div>
+
+    <div class="form-container margin-top-xlg" id="verify-form-container"
+        aria-labelledby="verify-form-label">
+        {% include "partials/partial_forms/test_setup.html" %}
+    </div>
+</section>
+
+
