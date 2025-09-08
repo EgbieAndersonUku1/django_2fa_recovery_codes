@@ -77,12 +77,12 @@ def _generate_recovery_codes_with_expiry_date_helper(
         )
 
     try:
-        data = json.loads(request.body.decode("utf-8"))
-        days_to_expire = int(data.get("daysToExpiry", 0))
-        raw_codes, batch_instance = RecoveryCodesBatch.create_recovery_batch(
-            user=user,
-            days_to_expire=days_to_expire
-        )
+        data                      = json.loads(request.body.decode("utf-8"))
+        days_to_expire            = int(data.get("daysToExpiry", 0))
+        raw_codes, batch_instance = RecoveryCodesBatch.create_recovery_batch(user=user, days_to_expire=days_to_expire)
+        
+    except IntegrityError as e:
+        raise ValueError(f"[RecoveryCodes] IntegrityError for user={request.user.id}: {e}")
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON in request body: {str(e)}")
     except TypeError as e:

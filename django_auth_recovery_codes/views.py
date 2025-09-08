@@ -3,6 +3,7 @@ import json
 import threading
 
 from logging import getLogger
+from django.db import IntegrityError
 from django_q.tasks import async_task
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -13,7 +14,7 @@ from django.http import HttpResponse
 from django.conf import settings
 from typing import Tuple
 
-from .models import RecoveryCodesBatch, RecoveryCode, Status
+from .models import RecoveryCodesBatch, RecoveryCode, Status, RecoveryCodeSetup
 from .views_helper import  generate_recovery_code_fetch_helper, recovery_code_operation_helper, get_recovery_batches_context
 from .utils.cache.safe_cache import (get_cache_or_set, set_cache, 
                                      get_cache_with_retry, 
@@ -418,3 +419,26 @@ def recovery_dashboard(request):
     return render(request, "django_auth_recovery_codes/dashboard.html", context)
 
 
+
+@csrf_protect
+@login_required
+def verify_test_code_setup(request):
+    """"""
+    response_data = {'SUCCESS': False,  "MESSAGE": "", "ERROR": ''}
+    try:
+        data              = json.loads(request.body.decode("utf-8"))
+        plaintext_code    = data.get("code")
+        
+        if not plaintext_code:
+            response_data.update({"MESSAGE": 'No code found', 
+                                  'ERROR': 'The json failed to process the code because nothing was returned'})
+        
+        
+    except IntegrityError as e:
+        response_data["ERROR"]   = str(e)
+        response_data["SUCCESS"] = 400
+    except Exception as e:
+        response_data["ERROR"]   = str(e)
+        response_data["SUCCESS"] = 400
+    
+    return JsonResponse(response_data, status=201 if response_data["SUCCESS"] else 400)

@@ -34,6 +34,25 @@ logger = logging.getLogger("auth_recovery_codes")
 CAN_GENERATE_CODE_CACHE_KEY =  "can_generate_code:{}"
 
 
+
+class RecoveryCodeSetup(models.Model):
+    user        = models.OneToOneField(User, on_delete=models.CASCADE, related_name='code_setup')
+    verified_at = models.DateTimeField(auto_now_add=True)
+    success     = models.BooleanField(default=False)
+
+    def mark_verified(self, success=True):
+        self.success = success
+        self.save()
+    
+    def is_setup(self):
+        return self.success
+    
+    @classmethod
+    def get_by_user(cls, user: User):
+        """"""
+        return cls.objects.get_or_create(user)
+
+
 class RecoveryCodeAudit(models.Model):
     class Action(models.TextChoices):
         DELETED                   = "deleted", "Deleted"
@@ -797,7 +816,7 @@ class RecoveryCodesBatch(models.Model):
          # since it makes no sense for one to be created and not the other.
          # if one fails none is created and the changes are rolled back
         with transaction.atomic(): 
-        
+            
             batch_instance = cls(user=user, number_issued=batch_number)
             if days_to_expire:
                 batch_instance.expiry_date = schedule_future_date(days=days_to_expire)
@@ -827,6 +846,63 @@ class RecoveryCodesBatch(models.Model):
 
             return raw_codes, batch_instance
     
+     @classmethod
+    def verify_setup(cls, user: User, plaintext_code: str) -> dict:
+        """
+        One-time verification of a user's recovery code setup.
+
+        Args:
+            user: User instance
+            plaintext_code: str, the recovery code to test
+
+        Returns:
+            dict: Status of verification, including success and other flags.
+        """
+        if not isinstance(user, User):
+            raise TypeError(f"Expected a user instance but got object with type {type(user).__name__}")
+        
+        if not isinstance(plaintext_code, str):
+            raise TypeError(f"Expected the plaintext code to be a string but got object with type {type(plaintext_code).__name__}")
+
+        response_data = {
+            "success": False,
+            "CREATED": False,
+            "BACKEND_CONFIGURATION": False,
+            "SETUP_COMPLETE": False,
+            "IS_VALID": False
+        }
+
+        recovery_code_setup = RecoveryCodeSetup.get_by_user(user)
+
+        if recovery_code_setup.is_setup():
+            response_data.update({
+                "success": True,
+                "CREATED": True,
+                "BACKEND_CONFIGURATION": True,
+                "SETUP_COMPLETE": True,
+                "IS_VALID": True
+            })
+            return response_data
+
+        recovery_code = RecoveryCode.get_by_code(plaintext_code)
+        if not recovery_code:
+            return response_data
+
+        if recovery_code.verify_recovery_code(plaintext_code):
+            recovery_code_setup.mark_verified()
+            response_data.update({
+                "success": True,
+                "CREATED": True,
+                "BACKEND_CONFIGURATION": True,
+                "SETUP_COMPLETE": True,
+                "IS_VALID": True
+            })
+            return response_data
+
+        # Code exists but failed verification
+        response_data["CREATED"] = True
+        return response_data
+
     @classmethod
     def delete_recovery_batch(cls, user: "User"):
         """
