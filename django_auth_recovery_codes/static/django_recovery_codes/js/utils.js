@@ -562,3 +562,19 @@ export function addChildWithPaginatorLimit(parentElement, elementToAdd, pageLimi
 
 
 
+
+
+export function toggleElement(element, hide = true) {
+
+    if (!element || element === undefined || element === null) {
+        console.log("there is no elemnent")
+        return;
+    }
+
+    if (hide) {
+        element.classList.add("d-none");
+        return
+    }
+
+    element.classList.remove("d-none");
+}

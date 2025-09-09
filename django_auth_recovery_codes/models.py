@@ -26,6 +26,12 @@ from django_auth_recovery_codes.utils.utils import (schedule_future_date,
                                                     )
 from django_auth_recovery_codes.app_settings import default_cooldown_seconds, default_multiplier
 from django_auth_recovery_codes.utils.cache.safe_cache import delete_cache_with_retry
+from django_auth_recovery_codes.enums import (CreatedStatus, 
+                                              BackendConfigStatus, 
+                                              SetupCompleteStatus, 
+                                              ValidityStatus,
+                                              TestSetupStatus,
+                                              )
 
 
 User   = get_user_model()
@@ -50,8 +56,8 @@ class RecoveryCodeSetup(models.Model):
     @classmethod
     def get_by_user(cls, user: User):
         """"""
-        return cls.objects.get_or_create(user)
-
+        instance, _ = cls.objects.get_or_create(user=user)
+        return instance
 
 class RecoveryCodeAudit(models.Model):
     class Action(models.TextChoices):
@@ -846,7 +852,7 @@ class RecoveryCodesBatch(models.Model):
 
             return raw_codes, batch_instance
     
-     @classmethod
+    @classmethod
     def verify_setup(cls, user: User, plaintext_code: str) -> dict:
         """
         One-time verification of a user's recovery code setup.
@@ -865,43 +871,45 @@ class RecoveryCodesBatch(models.Model):
             raise TypeError(f"Expected the plaintext code to be a string but got object with type {type(plaintext_code).__name__}")
 
         response_data = {
-            "success": False,
-            "CREATED": False,
-            "BACKEND_CONFIGURATION": False,
-            "SETUP_COMPLETE": False,
-            "IS_VALID": False
+            "SUCCESS": False,
+            "CREATED": CreatedStatus.NOT_CREATED.value,
+            "BACKEND_CONFIGURATION": BackendConfigStatus.NOT_CONFIGURED.value,
+            "SETUP_COMPLETE": SetupCompleteStatus.NOT_COMPLETE.value,
+            "IS_VALID": ValidityStatus.INVALID.value,
         }
 
         recovery_code_setup = RecoveryCodeSetup.get_by_user(user)
 
         if recovery_code_setup.is_setup():
             response_data.update({
-                "success": True,
-                "CREATED": True,
-                "BACKEND_CONFIGURATION": True,
-                "SETUP_COMPLETE": True,
-                "IS_VALID": True
+                "SUCCESS": True,
+                "CREATED": CreatedStatus.ALREADY_CREATED.value,
+                "BACKEND_CONFIGURATION": BackendConfigStatus.CONFIGURED.value,
+                "SETUP_COMPLETE": SetupCompleteStatus.ALREADY_COMPLETE.value,
+                "IS_VALID": ValidityStatus.VALID.value
             })
             return response_data
 
-        recovery_code = RecoveryCode.get_by_code(plaintext_code)
+        recovery_code = RecoveryCode.get_by_code(plaintext_code, user) # returns only the object if plaintext code is valid
+
+        logger.debug("[VERIFY_SETUP]", f"The recovery code returned {recovery_code}")
+
         if not recovery_code:
             return response_data
-
-        if recovery_code.verify_recovery_code(plaintext_code):
-            recovery_code_setup.mark_verified()
+        
+        recovery_code_setup.mark_verified()
+  
+        if recovery_code.batch.id is not None:
             response_data.update({
-                "success": True,
-                "CREATED": True,
-                "BACKEND_CONFIGURATION": True,
-                "SETUP_COMPLETE": True,
-                "IS_VALID": True
-            })
-            return response_data
-
-        # Code exists but failed verification
-        response_data["CREATED"] = True
+                    "SUCCESS": True,
+                    "CREATED": TestSetupStatus.CREATED,
+                    "BACKEND_CONFIGURATION": TestSetupStatus.BACKEND_CONFIGURATION_SUCCESS,
+                    "SETUP_COMPLETE": TestSetupStatus.SETUP_COMPLETE,
+                    "IS_VALID": TestSetupStatus.VALIDATION_COMPLETE,
+                })
+   
         return response_data
+
 
     @classmethod
     def delete_recovery_batch(cls, user: "User"):
@@ -1156,7 +1164,7 @@ class RecoveryCode(models.Model):
                                      )
         return self
 
-    def verify_recovery_code(self, plaintext_code: str) -> bool:
+    def _verify_recovery_code(self, plaintext_code: str) -> bool:
         """
         Verify a recovery code against its stored Django-hashed value.
 
@@ -1188,7 +1196,7 @@ class RecoveryCode(models.Model):
         - Even if the candidate was retrieved using lookup_hash, skipping check_password
         would weaken security. Both steps are necessary.
         """
-        return check_password(plaintext_code, self.hash_code)
+        return check_password(plaintext_code.strip(), self.hash_code)
 
     @classmethod
     def get_by_code(cls, plaintext_code: str, user: User) -> RecoveryCode | None:
@@ -1243,7 +1251,7 @@ class RecoveryCode(models.Model):
         except cls.DoesNotExist:
             return None
         
-        is_valid = candidate.verify_recovery_code(plaintext_code)
+        is_valid = candidate._verify_recovery_code(plaintext_code)
         return candidate if is_valid else None
 
     def hash_raw_code(self, code: str):

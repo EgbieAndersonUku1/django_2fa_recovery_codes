@@ -51,8 +51,6 @@ def recovery_codes_regenerate(request):
    
 
 
-def recovery_codes_verify(request, code):
-    pass
 
 
 @require_http_methods(['POST'])
@@ -423,22 +421,37 @@ def recovery_dashboard(request):
 @csrf_protect
 @login_required
 def verify_test_code_setup(request):
-    """"""
-    response_data = {'SUCCESS': False,  "MESSAGE": "", "ERROR": ''}
+    """
+    Verify a test recovery code setup for the logged-in user.
+    """
+    response_data = {"SUCCESS": False, "MESSAGE": "", "ERROR": ""}
+
     try:
-        data              = json.loads(request.body.decode("utf-8"))
-        plaintext_code    = data.get("code")
-        
+        data           = json.loads(request.body.decode("utf-8"))
+        plaintext_code = data.get("code")
+
         if not plaintext_code:
-            response_data.update({"MESSAGE": 'No code found', 
-                                  'ERROR': 'The json failed to process the code because nothing was returned'})
-        
-        
+            response_data.update({
+                "MESSAGE": "No code provided.",
+                "ERROR": "The JSON body did not include a 'code' field."
+            })
+            return JsonResponse(response_data, status=400)
+
+        result = RecoveryCodesBatch.verify_setup(request.user, plaintext_code)
+        response_data.update(result)
+
+        return JsonResponse(response_data, status=200 if response_data["SUCCESS"] else 400)
+
     except IntegrityError as e:
-        response_data["ERROR"]   = str(e)
-        response_data["SUCCESS"] = 400
+        response_data.update({
+            "ERROR": str(e),
+            "MESSAGE": "Database integrity error occurred."
+        })
+        return JsonResponse(response_data, status=400)
+
     except Exception as e:
-        response_data["ERROR"]   = str(e)
-        response_data["SUCCESS"] = 400
-    
-    return JsonResponse(response_data, status=201 if response_data["SUCCESS"] else 400)
+        response_data.update({
+            "ERROR": str(e),
+            "MESSAGE": "An unexpected error occurred."
+        })
+        return JsonResponse(response_data, status=500)
