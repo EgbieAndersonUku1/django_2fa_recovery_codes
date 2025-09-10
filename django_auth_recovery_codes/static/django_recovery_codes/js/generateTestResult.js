@@ -1,6 +1,6 @@
 import { toggleSpinner } from "./utils.js";
 
-const resultContainer = document.getElementById("test-result");
+const resultContainer = document.getElementById("dynamic-verify-form-container");
 
 
 const MILLI_SECONDS = 1000;
@@ -12,7 +12,8 @@ export async function displayResults(results) {
     divTestResultContainer.id        = "test-result"
     divTestResultContainer.className = "padding-top-md";
 
-
+    divTestResultContainer.classList.add("margin-top-lg");
+    
     const titleElement = createTitle();
     resultContainer.appendChild(titleElement);
 
@@ -52,7 +53,7 @@ function createResultDiv(message, className = null) {
     pElement.textContent = message;
 
     if (className !== null) {
-        pElement.className   = className;
+        pElement.className = className;
     }
 
     toggleSpinner(spanElement)
@@ -75,13 +76,4 @@ function createResultDiv(message, className = null) {
     return divContainer
 
 }
-
-
-const s =  { "SUCCESS": true,
-                    "CREATED": "TestSetupStatus.CREATED",
-                    "BACKEND_CONFIGURATION": "TestSetupStatus.BACKEND_CONFIGURATION_SUCCESS",
-                    "SETUP_COMPLETE": "TestSetupStatus.SETUP_COMPLETE",
-                    "IS_VALID": "TestSetupStatus.VALIDATION_COMPLETE"
-}
-
 

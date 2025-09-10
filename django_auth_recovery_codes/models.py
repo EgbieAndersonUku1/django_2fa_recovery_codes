@@ -31,6 +31,7 @@ from django_auth_recovery_codes.enums import (CreatedStatus,
                                               SetupCompleteStatus, 
                                               ValidityStatus,
                                               TestSetupStatus,
+                                              UsageStatus,
                                               )
 
 
@@ -75,6 +76,26 @@ class RecoveryCodeSetup(models.Model):
         """
         instance = cls.objects.create(user=user)
         return instance
+    
+    @classmethod
+    def has_first_time_setup_occurred(cls, user: User):
+        """
+        Check if the user has completed the first-time setup.
+
+        Args:
+            user (User): The user instance to check.
+
+        Returns:
+            bool: True if the user has at least one RecoveryCode with success=True, False otherwise.
+
+        Example:
+            >>> RecoveryCode.has_first_time_setup_occurred(user)
+            True
+        """
+        if not isinstance(user, User):
+            raise TypeError(f"Expected a User instance, got {type(user).__name__}")
+        return cls.objects.filter(user=user, success=True).exists()
+
 
 
 class RecoveryCodeAudit(models.Model):
@@ -898,6 +919,7 @@ class RecoveryCodesBatch(models.Model):
             "BACKEND_CONFIGURATION": BackendConfigStatus.NOT_CONFIGURED.value,
             "SETUP_COMPLETE": SetupCompleteStatus.NOT_COMPLETE.value,
             "IS_VALID": ValidityStatus.INVALID.value,
+            "USAGE": UsageStatus.FAILURE.value,
         }
 
         recovery_code_setup = RecoveryCodeSetup.get_by_user(user)
@@ -908,7 +930,8 @@ class RecoveryCodesBatch(models.Model):
                 "CREATED": CreatedStatus.ALREADY_CREATED.value,
                 "BACKEND_CONFIGURATION": BackendConfigStatus.CONFIGURED.value,
                 "SETUP_COMPLETE": SetupCompleteStatus.ALREADY_COMPLETE.value,
-                "IS_VALID": ValidityStatus.VALID.value
+                "IS_VALID": ValidityStatus.VALID.value,
+                "USAGE": UsageStatus.SUCCESS.value,
             })
             return response_data
 
@@ -926,6 +949,7 @@ class RecoveryCodesBatch(models.Model):
                     "BACKEND_CONFIGURATION": TestSetupStatus.BACKEND_CONFIGURATION_SUCCESS.value,
                     "SETUP_COMPLETE": TestSetupStatus.SETUP_COMPLETE.value,
                     "IS_VALID": TestSetupStatus.VALIDATION_COMPLETE.value,
+                    "USAGE": UsageStatus.SUCCESS.value,
                 })
 
             recovery_code_setup.mark_as_verified()

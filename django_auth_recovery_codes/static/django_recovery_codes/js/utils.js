@@ -253,7 +253,8 @@ export function getCsrfToken() {
     const csrfToken = document.getElementById("csrf_token");
 
     if (csrfToken === null) {
-        return;
+        throw new Error("The CSRF token return null, CSRF Token is needed for security of the application")
+      
     }
 
     return csrfToken.content
@@ -578,3 +579,25 @@ export function toggleElement(element, hide = true) {
 
     element.classList.remove("d-none");
 }
+
+
+
+/**
+ * A no-operation (doNothing) function.
+ * 
+ * This function does nothing and returns undefined.
+ * It can be used as a placeholder callback or a safe default
+ * to explicitly indicate that no action should be taken.
+ *
+ * @example
+ * try {
+ *   toggleElement(testSetupFormElement);
+ * } catch (error) {
+ *   noop(); // ignore errors
+ * }
+ *
+ * @example
+ * button.addEventListener("click", noop); // no action on click
+ */
+export const doNothing = () => {};
+

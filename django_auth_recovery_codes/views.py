@@ -384,42 +384,6 @@ def generate_recovery_code_without_expiry(request):
 
 @csrf_protect
 @login_required
-def recovery_dashboard(request):
-    user               = request.user
-    cache_key          = CACHE_KEY.format(user.id)
-    user_data          =  get_cache_with_retry(cache_key)
-    context            = {}
-    
-    recovery_batch_context = get_recovery_batches_context(request)
-
-    if user_data is None:
-        # cache has expired, get data and re-add to cache
-        recovery_batch = RecoveryCodesBatch.get_by_user(user)
-        if recovery_batch:
-            user_data = recovery_batch.get_cache_values()
-        set_cache_with_retry(cache_key, user_data)
-    
- 
-    data = user_data
-    if data:
-        context.update({
-                "is_generated": data.get("generated"),
-                "is_email": data.get("emailed"),
-                "is_viewed": data.get("viewed"),
-                "is_downloaded": data.get("downloaded")
-            })
-    
-    if not isinstance(recovery_batch_context, dict):
-        raise TypeError(f"Expected a context dictionary but got object with type {type(recovery_batch_context).__name__}")
-
-    context.update(recovery_batch_context)
-    
-    return render(request, "django_auth_recovery_codes/dashboard.html", context)
-
-
-
-@csrf_protect
-@login_required
 def verify_test_code_setup(request):
     """
     Verify a test recovery code setup for the logged-in user.
@@ -441,6 +405,14 @@ def verify_test_code_setup(request):
 
         response_data.update(result)
 
+        # update the cache with the setup
+        cache_key  = CACHE_KEY.format(request.user.id)
+        user_data  = get_cache_with_retry(cache_key, {})
+
+        user_data["user_has_done_setup"]  = response_data.get("SUCCESS", False)
+        set_cache_with_retry(cache_key, user_data)
+    
+
         return JsonResponse(response_data, status=200 if response_data["SUCCESS"] else 400)
 
     except IntegrityError as e:
@@ -456,3 +428,45 @@ def verify_test_code_setup(request):
             "MESSAGE": "An unexpected error occurred."
         })
         return JsonResponse(response_data, status=500)
+
+
+
+@csrf_protect
+@login_required
+def recovery_dashboard(request):
+    
+    user                   = request.user
+    cache_key              = CACHE_KEY.format(user.id)
+    user_data              =  get_cache_with_retry(cache_key)
+    context                = {}
+    recovery_batch_context = get_recovery_batches_context(request)
+    
+    if user_data is None:
+
+        # cache has expired, get data and re-add to cache
+        recovery_batch = RecoveryCodesBatch.get_by_user(user)
+
+        if recovery_batch:
+            user_data                        = recovery_batch.get_cache_values()
+            user_data["user_has_done_setup"] = RecoveryCodeSetup.has_first_time_setup_occurred(user)
+       
+        set_cache_with_retry(cache_key, user_data)
+    
+    if user_data:
+        
+        context.update({
+                "is_generated": user_data.get("generated"),
+                "is_email": user_data.get("emailed"),
+                "is_viewed": user_data.get("viewed"),
+                "is_downloaded": user_data.get("downloaded"),
+                "user_has_done_setup": user_data.get("user_has_done_setup"),
+            })
+    
+    if not isinstance(recovery_batch_context, dict):
+        raise TypeError(f"Expected a context dictionary but got object with type {type(recovery_batch_context).__name__}")
+
+    context.update(recovery_batch_context)
+    
+    return render(request, "django_auth_recovery_codes/dashboard.html", context)
+
+

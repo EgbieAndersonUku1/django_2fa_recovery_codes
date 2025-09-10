@@ -10,6 +10,7 @@ import {
     showEnqueuedMessages,
     downloadFromResponse,
     toggleElement,
+    doNothing,
 
 } from "./utils.js";
 
@@ -73,7 +74,8 @@ const deleteFormElement = document.getElementById("delete-form");
 const deleteInputFieldElement = document.getElementById("delete-code-input");
 
 // test setup form
-const testSetupFormElement        = document.getElementById("verify-setup-form");
+const testSetupFormContainerElement  = document.getElementById("dynamic-verify-form-container")
+const testSetupFormElement           = document.getElementById("verify-setup-form");
 const testSetupInputFieldElement  = document.getElementById("verify-code-input");
 
 // event handlers
@@ -161,7 +163,10 @@ let alertMessage;
 
 
 // configuration
-const config = { CODE_IS_BEING_GENERATED: false, generateCodeActionButtons: false };
+const config = { CODE_IS_BEING_GENERATED: false, 
+                generateCodeActionButtons: false,
+                verificationTestInProgress: false,
+            };
 
 
 window.addEventListener("resize", handleResetDashboardState);
@@ -177,9 +182,19 @@ function codeGenerationComplete() {
 }
 
 
+function verificationTestInProgress() {
+    config.verificationTestInProgress = true;
+}
 
+
+function verificationTestComplete() {
+    config.verificationTestInProgress = false;
+}
+
+
+// Prevents the page from being refreshed or closed why a given action is being performed
 window.addEventListener("beforeunload", function (event) {
-    if (config.CODE_IS_BEING_GENERATED) {
+    if (config.CODE_IS_BEING_GENERATED || config.verificationTestInProgress) {
         event.preventDefault();
         event.returnValue = "";
         return "";
@@ -237,6 +252,7 @@ function handleEventDelegation(e) {
             handleIncludeExpiryDateCheckMark(e);
             break;
         case VERIFY_SETUP_BUTTON:
+            verificationTestInProgress()
             handleTestCodeVerificationSetupClick(e);
             break;
         case REGENERATE_BUTTON_ID:
@@ -411,8 +427,9 @@ async function handleTestCodeVerificationSetupClick(e) {
                 
             } catch (error) {
                 showTemporaryMessage(messageContainerElement, "Something went wrong, refresh page, delete and regenerate codes and try again");
-            }                                              
-          
+            }  finally {
+                verificationTestComplete();
+          }
         }
        
     
@@ -794,7 +811,15 @@ async function handlDeleteAllCodeButtonClick(e) {
             const SUCCESS_ALERT_SELECTOR = ".alert-message";  // Dynamic selector only shows when the page is generated and refreshed
             const dynamicAlertElement = document.querySelector(SUCCESS_ALERT_SELECTOR)
             toggleElement(dynamicAlertElement);
-            toggleElement(alertMessage)
+            toggleElement(alertMessage);
+
+            toggleElement(testSetupFormContainerElement);
+
+            try {
+                toggleElement(testSetupFormElement)
+            } catch (error) {
+                doNothing()
+            }
           
         } else {
             warnError("handleDeleteAllCodeButtonClick", "The button container element wasn't found")
@@ -1122,6 +1147,10 @@ async function handleRecoveryCodesAction({ e,
                 );
 
                 updateBatchHistorySection(recoveryBatchSectionElement, resp.BATCH, resp.ITEM_PER_PAGE);
+              
+
+                // show the optional verification form
+                toggleElement(testSetupFormContainerElement, false);
             }
 
         
@@ -1368,7 +1397,6 @@ function handleRecoveryCodeAlert(data, successCompareMessage, fieldName) {
 
 
 }
-
 
 
 

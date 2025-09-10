@@ -629,6 +629,15 @@ input:focus {
 
 
 /* ------------------------------------------ */
+/*              TEST VERIFACTION SECTION       */
+/* ------------------------------------------ */
+
+.result-div {
+    color: green;
+    font-weight: 300;
+}
+
+/* ------------------------------------------ */
 /*                  UTILITIES                  */
 /* ------------------------------------------ */
 /* Utility classes for common layout and styling:

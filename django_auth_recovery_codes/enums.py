@@ -23,6 +23,11 @@ class ValidityStatus(Enum):
     VALID   = "The provided data is valid."
 
 
+class UsageStatus(Enum):
+    SUCCESS = "You can now begin using your 2FA recovery codes, please remember to keep them safe"
+    FAILURE = "The test failed, please delete your current codes, regenerate new ones, and try again"
+
+
 class TestSetupStatus(Enum):
     SUCCESS                          = True
     CREATED                          = "Test successful: recovery codes have been created successfully."

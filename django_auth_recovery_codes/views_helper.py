@@ -456,6 +456,13 @@ def get_recovery_batches_context(request):
     """
     Returns a context dict with recovery batches, paginated.
     Automatically refreshes cache if the session flag indicates update.
+
+    Note:
+
+    The data is always pulled from the cache and never from database. If
+    an update is made (e.g the batch updated) the new data is added to
+    the database and then to the cache before the updated data in the 
+    cache is used.
     """
     user               = request.user
     recovery_cache_key = RECOVERY_CODES_BATCH_HISTORY_KEY.format(user.id)
