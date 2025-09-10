@@ -22,7 +22,7 @@ import fetchData from "./fetch.js";
 import { HTMLTableBuilder } from "./generateTable.js";
 import { generateCodeActionAButtons, buttonStates, updateButtonFromConfig } from "./generateCodeActionButtons.js";
 import { notify_user } from "./notify.js";
-import { displayResults } from "./generateTestResult.js";
+import { displayResults, clearTestResultContainer } from "./generateTestResult.js";
 
 
 // Elements
@@ -77,6 +77,7 @@ const deleteInputFieldElement = document.getElementById("delete-code-input");
 const testSetupFormContainerElement  = document.getElementById("dynamic-verify-form-container")
 const testSetupFormElement           = document.getElementById("verify-setup-form");
 const testSetupInputFieldElement  = document.getElementById("verify-code-input");
+const dynamicTestFormSetupElement = document.getElementById("dynamic-form-setup")
 
 // event handlers
 
@@ -212,6 +213,10 @@ function loadTestVerificationElements() {
         testVerifySpinnerElement =  document.getElementById(TEST_SETUP_LOADER);
     }
 
+    
+
+   
+
 }
 
 
@@ -236,6 +241,7 @@ function handleEventDelegation(e) {
             codeIsBeingGenerated();
             handleGenerateCodeWithExpiryClick(e);
             loadTestVerificationElements();
+        
             config.generateCodeActionButtons = true;
 
             break;
@@ -252,7 +258,7 @@ function handleEventDelegation(e) {
             handleIncludeExpiryDateCheckMark(e);
             break;
         case VERIFY_SETUP_BUTTON:
-            verificationTestInProgress()
+            verificationTestInProgress();
             handleTestCodeVerificationSetupClick(e);
             break;
         case REGENERATE_BUTTON_ID:
@@ -413,23 +419,48 @@ async function handleTestCodeVerificationSetupClick(e) {
         
         };
 
-        // // console.log(data)
         const data = await handleButtonAlertClickHelper(e,
                                                         VERIFY_SETUP_BUTTON,
                                                         testVerifySpinnerElement,
                                                         alertAttributes,
                                                         handleTestSetupFetchAPI,
                                                 );
+     
+     
         if (data) {
+
              try {
-                displayResults(data);
-                toggleElement(testSetupFormElement);
+                
+                clearTestResultContainer();
+                const isComplete = await displayResults(data);
+                
+                if (!data.FAILURE) {
+
+                    toggleElement(dynamicTestFormSetupElement);
+
+                    try {
+                        // Removes the form after a successful test.
+                        //
+                        // The form is hidden via Jinja until the page refreshes, so it may not exist
+                        // in the DOM yet. Attempting to remove it while hidden would raise an error.
+                        toggleElement(testSetupFormElement);
+                    } catch (error) {
+                        doNothing(); 
+                    }
+
+                }
+                testFormSectionElement.reset();
+
+               if (isComplete) {
+                 verificationTestComplete();
+               }
+             
+            
                 
             } catch (error) {
-                showTemporaryMessage(messageContainerElement, "Something went wrong, refresh page, delete and regenerate codes and try again");
-            }  finally {
-                verificationTestComplete();
-          }
+                doNothing();
+              
+            }  
         }
        
     
@@ -1148,9 +1179,14 @@ async function handleRecoveryCodesAction({ e,
 
                 updateBatchHistorySection(recoveryBatchSectionElement, resp.BATCH, resp.ITEM_PER_PAGE);
               
-
+                console.log(resp)
                 // show the optional verification form
-                toggleElement(testSetupFormContainerElement, false);
+                // toggleElement(testSetupFormContainerElement, false);
+                if (!resp.HAS_COMPLETED_SETUP) {
+                    toggleElement(dynamicTestFormSetupElement, false);
+                    loadTestVerificationElements();
+                } 
+              
             }
 
         
@@ -1171,7 +1207,7 @@ async function handleRecoveryCodesAction({ e,
 
 
     } else {
-        const DEFAULT_MESSAGE = "Oops, something went wrong and we couldn't process your request"
+        const DEFAULT_MESSAGE = "Hang on we are trying to process your request.."
     
         showTemporaryMessage(messageContainerElement, DEFAULT_MESSAGE)
         tableCoderSpinnerElement.style.display = "none";

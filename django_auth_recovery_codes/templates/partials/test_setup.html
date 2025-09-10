@@ -28,10 +28,13 @@
     </div>
     {% endif %}
 
-    <!-- Dynamic result area (hidden initially) -->
-    <div class="form-container margin-top-xlg dynamic-form-setup d-none" id="dynamic-verify-form-container" aria-labelledby="verify-form-label">
+  
+    <div class="form-container margin-top-xlg d-none"  id="dynamic-form-setup" aria-labelledby="verify-form-label">
         {% include "partials/partial_forms/test_setup_form.html" %}
     </div> 
+    <div class="results" id="dynamic-verify-form-container">
+          <!-- Dynamic result area (hidden initially) -->
+    </div>
 
     <hr class="dividor margin-top-lg margin-bottom-lg">
 </section>

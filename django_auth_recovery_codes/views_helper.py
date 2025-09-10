@@ -26,13 +26,14 @@ from typing import TypedDict
 
 from django_auth_recovery_codes.utils.converter import SecondsToTime
 
-from .models import RecoveryCode, RecoveryCodesBatch, Status
+from .models import RecoveryCode, RecoveryCodeSetup, RecoveryCodesBatch, Status
 from .utils.cache.safe_cache import set_cache_with_retry, get_cache_with_retry, delete_cache_with_retry
 from .loggers.loggers import view_logger, purge_code_logger
 
 User = get_user_model()
 
 
+CACHE_KEY                        = 'recovery_codes_generated_{}'
 RECOVERY_CODES_BATCH_HISTORY_KEY = 'recovery_codes_batch_history_{}'
 ITEM_PER_PAGE                   = 5  # This will be taking from teh settings for now constant
  
@@ -151,6 +152,17 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
             f"Expected the cache parameter to be a string but got object with type {type(cache_key).__name__} "
         )
 
+    cache_data       = get_cache_with_retry(CACHE_KEY.format(request.user.id), default={})    
+    HAS_SET_UP_FLAG  = 'user_has_done_setup'
+
+    view_logger.debug(f"Retrieving the cache in order to check if the user has already run test setup. Cache data: {cache_data}")
+
+    if HAS_SET_UP_FLAG not in cache_data:
+
+        view_logger.debug(f"Flag not found in cache, setting '{HAS_SET_UP_FLAG}' to the cache")
+        cache_data[HAS_SET_UP_FLAG] = RecoveryCodeSetup.has_first_time_setup_occurred(request.user) or False
+        set_cache_with_retry(CACHE_KEY, cache_data)
+
     resp = {
             "TOTAL_ISSUED": 0,
             "SUCCESS": False,
@@ -158,13 +170,14 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
             "codes": [],
             "MESSAGE": "",
             "CAN_GENERATE": False,
+            "HAS_COMPLETED_SETUP": cache_data.get(HAS_SET_UP_FLAG),
             }
 
     try:
         user                         = request.user
         raw_codes                    = []
         can_generate_code, wait_time = _can_codes_be_generated_yet(user)
-
+   
         time_to_wait = SecondsToTime(wait_time).format_to_human_readable() or None
         purge_code_logger.debug(f"[GENERATE NEW CODE] Can generate code = {can_generate_code}, wait_time = {time_to_wait}")
 
@@ -207,6 +220,7 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
             "downloaded": False,
             "emailed": False,
             "viewed": False,
+            "user_has_done_setup": cache_data.get(HAS_SET_UP_FLAG, False)
         }
         set_cache_with_retry(cache_key.format(user.id), value=values_to_save_in_cache)
         view_logger.debug(f"[RecoveryCodes] Updated cache for user={user.id}, key={cache_key}")

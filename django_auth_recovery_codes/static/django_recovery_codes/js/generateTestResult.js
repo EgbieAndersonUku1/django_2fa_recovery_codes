@@ -5,6 +5,9 @@ const resultContainer = document.getElementById("dynamic-verify-form-container")
 
 const MILLI_SECONDS = 1000;
 
+export function clearTestResultContainer() {
+    resultContainer.innerHTML = "";
+}
 
 export async function displayResults(results) {
     const divTestResultContainer     = document.createElement("div");
@@ -19,13 +22,31 @@ export async function displayResults(results) {
 
     const keys = Object.keys(results).filter(key => key !== "SUCCESS");
 
+    console.log(results)
     keys.forEach((key, index) => {
 
         setTimeout(() => {
             const message = results[key];
-            const divResult = createResultDiv(message);
-            resultContainer.appendChild(divResult);
+
+            if (key !== "FAILURE") {
+                if (message) {
+
+             
+                const divResult = createResultDiv(message);
+
+                divResult.classList.remove("text-red", "text-green")
+              
+                results.FAILURE ? divResult.classList.add("text-red") : divResult.classList.add("text-green")
+              
+            
+                resultContainer.appendChild(divResult);
+                }
+            }
+            
+          
         }, index * MILLI_SECONDS); 
+
+     return true 
     });
 }
 
@@ -50,7 +71,11 @@ function createResultDiv(message, className = null) {
     spanElement.classList.add("loader", "bg-green", "test-loader");
     divResult.classList.add("result-title");
 
-    pElement.textContent = message;
+    const icon     = document.createElement("i");
+    icon.className = "fa-brands fa-hashnode";
+
+    pElement.appendChild(icon);
+    pElement.appendChild(document.createTextNode(` ${message}`));
 
     if (className !== null) {
         pElement.className = className;

@@ -1,14 +1,18 @@
 import logging
 
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import post_save, pre_save, post_delete
 from django.dispatch import receiver
-from django_auth_recovery_codes.models import RecoveryCodeCleanUpScheduler, RecoveryCodeAudit, RecoveryCodeAuditScheduler, RecoveryCodesBatch, RecoveryCode
+from django_auth_recovery_codes.models import (RecoveryCodeCleanUpScheduler, 
+                                               RecoveryCodeAudit, 
+                                               RecoveryCodeSetup,
+                                               RecoveryCodeAuditScheduler,
+                                                 RecoveryCodesBatch, RecoveryCode)
 from django_q.tasks import schedule, Schedule
 from datetime import timedelta
 from django.core.exceptions import ValidationError
 from django_auth_recovery_codes.tasks import unschedule_task, clear_queued_tasks
 from django_auth_recovery_codes.utils.utils import create_unique_string
-
+from django_auth_recovery_codes.utils.cache.safe_cache import get_cache_with_retry, set_cache_with_retry
 from django.conf import settings
 
 logger = logging.getLogger("app.singal_logger")
@@ -98,3 +102,18 @@ def validate_next_run_scheduler_value(sender, instance, **kwargs):
             instance.use_with_logger = settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER
     
 
+@receiver(post_delete, sender=RecoveryCodeSetup)
+def handle_post_delete_recovery_setup(sender, instance, **kwargs):
+    """
+    Reset the recovery setup flag in the cache when a RecoveryCodeSetup is deleted.
+
+    Prevents cache/frontend desynchronisation if the model is removed in the admin
+    or shell.
+    """
+    if instance:
+        SETUP_FLAG = 'user_has_done_setup'
+        CACHE_KEY  = f'recovery_codes_generated_{instance.user.id}'
+        cache_data = get_cache_with_retry(CACHE_KEY)  
+        if cache_data:
+            cache_data[SETUP_FLAG] = False
+            set_cache_with_retry(CACHE_KEY, cache_data)
