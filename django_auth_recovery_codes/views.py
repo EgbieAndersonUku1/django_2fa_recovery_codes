@@ -407,6 +407,7 @@ def verify_test_code_setup(request):
             raise TypeError(f"Expected a dictionary but got object with type ({type(result).__name__})")
         
         response_data.update(result)
+        
         if not result.get("FAILURE"):
             cache_key  = CACHE_KEY.format(request.user.id)
             cache_data = get_cache_with_retry(cache_key)
@@ -474,7 +475,6 @@ def recovery_dashboard(request):
         raise TypeError(f"Expected a context dictionary but got object with type {type(recovery_batch_context).__name__}")
 
     context.update(recovery_batch_context);
-    print(context)
     
     return render(request, "django_auth_recovery_codes/dashboard.html", context)
 
