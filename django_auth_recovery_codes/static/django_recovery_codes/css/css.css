@@ -399,6 +399,12 @@ Example: This will create a two-column grid with automatic spacing.
 }
 
 
+.two-column-grid--5-95 {
+    display: grid;
+    grid-template-columns: 5% 95%;
+}
+
+
 
 /* ------------------------------------------ */
 /*                 FLEX ELEMENTS              */

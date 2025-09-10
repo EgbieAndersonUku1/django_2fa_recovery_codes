@@ -21,7 +21,7 @@ import fetchData from "./fetch.js";
 import { HTMLTableBuilder } from "./generateTable.js";
 import { generateCodeActionAButtons, buttonStates, updateButtonFromConfig } from "./generateCodeActionButtons.js";
 import { notify_user } from "./notify.js";
-
+import { displayResults } from "./generateTestResult.js";
 
 
 // Elements
@@ -48,6 +48,7 @@ const downloadCodeButtonElementSpinner = document.getElementById("download-code-
 const invalidateSpinnerElement = document.getElementById("invalidate-code-loader");
 const tableCoderSpinnerElement = document.getElementById("table-loader");
 const dynamicBatchSpinnerElement = document.getElementById("dynamic-batch-loader");
+const testFormSectionElement     = document.getElementById("verify-setup");
 
 let testVerifySpinnerElement;
 
@@ -402,10 +403,18 @@ async function handleTestCodeVerificationSetupClick(e) {
                                                         testVerifySpinnerElement,
                                                         alertAttributes,
                                                         handleTestSetupFetchAPI,
-                                                        );
-
-        console.log(data);
-
+                                                );
+        if (data) {
+             try {
+                displayResults(data);
+                toggleElement(testSetupFormElement);
+                
+            } catch (error) {
+                showTemporaryMessage(messageContainerElement, "Something went wrong, refresh page, delete and regenerate codes and try again");
+            }                                              
+          
+        }
+       
     
 }
 
@@ -1349,7 +1358,6 @@ function handleRecoveryCodeAlert(data, successCompareMessage, fieldName) {
             return;
         }
     }
-
 
     AlertUtils.showAlert({
         title: "The code is invalid",

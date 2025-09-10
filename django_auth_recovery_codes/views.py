@@ -438,6 +438,7 @@ def verify_test_code_setup(request):
             return JsonResponse(response_data, status=400)
 
         result = RecoveryCodesBatch.verify_setup(request.user, plaintext_code)
+
         response_data.update(result)
 
         return JsonResponse(response_data, status=200 if response_data["SUCCESS"] else 400)

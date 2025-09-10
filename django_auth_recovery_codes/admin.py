@@ -10,8 +10,14 @@ from .models import (RecoveryCode,
                      RecoveryCodePurgeHistory,
                      RecoveryCodeAuditScheduler,
                      RecoveryCodeEmailLog,
+                     RecoveryCodeSetup,
                      )
 
+
+class RecoveryCodeSetupAdmin(admin.ModelAdmin):
+    list_display    = ["id", "user", "verified_at", "success"]
+    readonly_fields = ["id", "user", "verified_at", "success"]
+    search_fields   = ["id", "user", "success"]
 
 
 class RecoveryCodeEmailLogAdmin(admin.ModelAdmin):
@@ -147,3 +153,4 @@ admin.site.register(RecoveryCodeCleanUpScheduler, RecoveryCodeCleanupSchedulerAd
 admin.site.register(RecoveryCodePurgeHistory, RecoveryCodePurgeHistoryAdmin)
 admin.site.register(RecoveryCodeAuditScheduler, RecoveryCodeAuditSchedulerAdmin)
 admin.site.register(RecoveryCodeEmailLog, RecoveryCodeEmailLogAdmin)
+admin.site.register(RecoveryCodeSetup, RecoveryCodeSetupAdmin)

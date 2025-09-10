@@ -40,24 +40,42 @@ logger = logging.getLogger("auth_recovery_codes")
 CAN_GENERATE_CODE_CACHE_KEY =  "can_generate_code:{}"
 
 
-
 class RecoveryCodeSetup(models.Model):
     user        = models.OneToOneField(User, on_delete=models.CASCADE, related_name='code_setup')
     verified_at = models.DateTimeField(auto_now_add=True)
+    created_at  = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
     success     = models.BooleanField(default=False)
 
-    def mark_verified(self, success=True):
-        self.success = success
+    def mark_as_verified(self):
+        """Marks the setup as verified (success=True)."""
+        self.success = True
         self.save()
-    
+
     def is_setup(self):
+        """Returns True if the setup is verified."""
         return self.success
-    
+
     @classmethod
     def get_by_user(cls, user: User):
-        """"""
-        instance, _ = cls.objects.get_or_create(user=user)
+        """
+        Fetches the setup for a user without creating it.
+        Returns None if no setup exists.
+        """
+        try:
+            return cls.objects.get(user=user)
+        except cls.DoesNotExist:
+            return None
+
+    @classmethod
+    def create_for_user(cls, user: User):
+        """
+        Explicitly creates a setup for a user.
+        Returns the new instance.
+        """
+        instance = cls.objects.create(user=user)
         return instance
+
 
 class RecoveryCodeAudit(models.Model):
     class Action(models.TextChoices):
@@ -811,6 +829,10 @@ class RecoveryCodesBatch(models.Model):
         if days_to_expire and days_to_expire < 0:
             raise ValueError("daysToExpiry must be a positive integer")
 
+        recordCodeSetup = RecoveryCodeSetup.get_by_user(user)
+        if recordCodeSetup is None:
+            RecoveryCodeSetup.create_for_user(user)
+
         raw_codes = []
         batch     = []
        
@@ -880,7 +902,7 @@ class RecoveryCodesBatch(models.Model):
 
         recovery_code_setup = RecoveryCodeSetup.get_by_user(user)
 
-        if recovery_code_setup.is_setup():
+        if recovery_code_setup is not None and recovery_code_setup.is_setup():
             response_data.update({
                 "SUCCESS": True,
                 "CREATED": CreatedStatus.ALREADY_CREATED.value,
@@ -897,19 +919,18 @@ class RecoveryCodesBatch(models.Model):
         if not recovery_code:
             return response_data
         
-        recovery_code_setup.mark_verified()
-  
-        if recovery_code.batch.id is not None:
+        if recovery_code.batch.id:
             response_data.update({
                     "SUCCESS": True,
-                    "CREATED": TestSetupStatus.CREATED,
-                    "BACKEND_CONFIGURATION": TestSetupStatus.BACKEND_CONFIGURATION_SUCCESS,
-                    "SETUP_COMPLETE": TestSetupStatus.SETUP_COMPLETE,
-                    "IS_VALID": TestSetupStatus.VALIDATION_COMPLETE,
+                    "CREATED": TestSetupStatus.CREATED.value,
+                    "BACKEND_CONFIGURATION": TestSetupStatus.BACKEND_CONFIGURATION_SUCCESS.value,
+                    "SETUP_COMPLETE": TestSetupStatus.SETUP_COMPLETE.value,
+                    "IS_VALID": TestSetupStatus.VALIDATION_COMPLETE.value,
                 })
+
+            recovery_code_setup.mark_as_verified()
    
         return response_data
-
 
     @classmethod
     def delete_recovery_batch(cls, user: "User"):

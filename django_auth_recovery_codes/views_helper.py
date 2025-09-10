@@ -1,3 +1,19 @@
+# """
+# view_helpers.py
+
+# This file contains helper functions specific to the views.
+
+# Purpose:
+# - Keep views.py clean and uncluttered.
+# - Provide functionality that is specific to the view logic.
+
+# Notes:
+# - Not a general-purpose utilities module.
+# - Functions here are intended to work only with the views.
+# - Can be expanded in the future with more view-specific helpers.
+# """
+
+
 import logging
 import json
 from django.http import JsonResponse
