@@ -850,8 +850,8 @@ class RecoveryCodesBatch(models.Model):
         if days_to_expire and days_to_expire < 0:
             raise ValueError("daysToExpiry must be a positive integer")
 
-        recordCodeSetup = RecoveryCodeSetup.get_by_user(user)
-        if recordCodeSetup is None:
+        recovery_code_setup = RecoveryCodeSetup.get_by_user(user)
+        if recovery_code_setup is None:
             RecoveryCodeSetup.create_for_user(user)
 
         raw_codes = []
@@ -914,12 +914,13 @@ class RecoveryCodesBatch(models.Model):
             raise TypeError(f"Expected the plaintext code to be a string but got object with type {type(plaintext_code).__name__}")
 
         response_data = {
-            "SUCCESS": False,
+            "SUCCESS": True,
             "CREATED": CreatedStatus.NOT_CREATED.value,
             "BACKEND_CONFIGURATION": BackendConfigStatus.NOT_CONFIGURED.value,
             "SETUP_COMPLETE": SetupCompleteStatus.NOT_COMPLETE.value,
             "IS_VALID": ValidityStatus.INVALID.value,
             "USAGE": UsageStatus.FAILURE.value,
+            "FAILURE": True,
         }
 
         recovery_code_setup = RecoveryCodeSetup.get_by_user(user)
@@ -932,14 +933,19 @@ class RecoveryCodesBatch(models.Model):
                 "SETUP_COMPLETE": SetupCompleteStatus.ALREADY_COMPLETE.value,
                 "IS_VALID": ValidityStatus.VALID.value,
                 "USAGE": UsageStatus.SUCCESS.value,
+                "FAILURE": False,
             })
             return response_data
 
         recovery_code = RecoveryCode.get_by_code(plaintext_code, user) # returns only the object if plaintext code is valid
 
-        logger.debug("[VERIFY_SETUP]", f"The recovery code returned {recovery_code}")
+        logger.debug(f"The recovery code returned {recovery_code == None}")
+
+        logger.debug("[VERIFY_SETUP] The recovery code returned %s", recovery_code)
+
 
         if not recovery_code:
+            response_data.update({"SUCCESS": True})
             return response_data
         
         if recovery_code.batch.id:
@@ -950,7 +956,13 @@ class RecoveryCodesBatch(models.Model):
                     "SETUP_COMPLETE": TestSetupStatus.SETUP_COMPLETE.value,
                     "IS_VALID": TestSetupStatus.VALIDATION_COMPLETE.value,
                     "USAGE": UsageStatus.SUCCESS.value,
+                    "FAILURE": False,
                 })
+
+            # should be created when the batch is first created, however, if for
+            # some reason, it wasn't createdin the batch, recreate it.
+            if recovery_code_setup is None:
+                recovery_code_setup = RecoveryCodeSetup.create_for_user(user)
 
             recovery_code_setup.mark_as_verified()
    

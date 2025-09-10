@@ -2,7 +2,6 @@ import logging
 import json
 import threading
 
-from logging import getLogger
 from django.db import IntegrityError
 from django_q.tasks import async_task
 from django.http import JsonResponse
@@ -20,6 +19,8 @@ from .utils.cache.safe_cache import (get_cache_or_set, set_cache,
                                      get_cache_with_retry, 
                                      set_cache_with_retry, 
                                      )
+
+from .loggers.loggers import view_logger
 from .tasks import send_recovery_codes_email
 from .utils.exporters.file_converters import to_csv, to_pdf, to_text
 
@@ -402,17 +403,18 @@ def verify_test_code_setup(request):
             return JsonResponse(response_data, status=400)
 
         result = RecoveryCodesBatch.verify_setup(request.user, plaintext_code)
-
+        if not isinstance(result, dict):
+            raise TypeError(f"Expected a dictionary but got object with type ({type(result).__name__})")
+        
         response_data.update(result)
+        
+        if not result.get("FAILURE"):
+            cache_key  = CACHE_KEY.format(request.user.id)
+            cache_data = get_cache_with_retry(cache_key)
 
-        # update the cache with the setup
-        cache_key  = CACHE_KEY.format(request.user.id)
-        user_data  = get_cache_with_retry(cache_key, {})
-
-        user_data["user_has_done_setup"]  = response_data.get("SUCCESS", False)
-        set_cache_with_retry(cache_key, user_data)
-    
-
+            if cache_data:
+                cache_data['user_has_done_setup'] = True
+                set_cache_with_retry(cache_key, cache_data)
         return JsonResponse(response_data, status=200 if response_data["SUCCESS"] else 400)
 
     except IntegrityError as e:
@@ -441,7 +443,10 @@ def recovery_dashboard(request):
     context                = {}
     recovery_batch_context = get_recovery_batches_context(request)
     
+
     if user_data is None:
+
+        view_logger.debug("The cache has expired. Pulling data from db and rewriting to the cache")
 
         # cache has expired, get data and re-add to cache
         recovery_batch = RecoveryCodesBatch.get_by_user(user)
@@ -451,6 +456,10 @@ def recovery_dashboard(request):
             user_data["user_has_done_setup"] = RecoveryCodeSetup.has_first_time_setup_occurred(user)
        
         set_cache_with_retry(cache_key, user_data)
+
+    else:
+        view_logger.debug("Getting the data from the cache instead of the database")
+        
     
     if user_data:
         
@@ -465,7 +474,7 @@ def recovery_dashboard(request):
     if not isinstance(recovery_batch_context, dict):
         raise TypeError(f"Expected a context dictionary but got object with type {type(recovery_batch_context).__name__}")
 
-    context.update(recovery_batch_context)
+    context.update(recovery_batch_context);
     
     return render(request, "django_auth_recovery_codes/dashboard.html", context)
 
