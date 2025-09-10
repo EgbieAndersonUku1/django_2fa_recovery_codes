@@ -1,3 +1,19 @@
+# """
+# view_helpers.py
+
+# This file contains helper functions specific to the views.
+
+# Purpose:
+# - Keep views.py clean and uncluttered.
+# - Provide functionality that is specific to the view logic.
+
+# Notes:
+# - Not a general-purpose utilities module.
+# - Functions here are intended to work only with the views.
+# - Can be expanded in the future with more view-specific helpers.
+# """
+
+
 import logging
 import json
 from django.http import JsonResponse
@@ -77,12 +93,12 @@ def _generate_recovery_codes_with_expiry_date_helper(
         )
 
     try:
-        data = json.loads(request.body.decode("utf-8"))
-        days_to_expire = int(data.get("daysToExpiry", 0))
-        raw_codes, batch_instance = RecoveryCodesBatch.create_recovery_batch(
-            user=user,
-            days_to_expire=days_to_expire
-        )
+        data                      = json.loads(request.body.decode("utf-8"))
+        days_to_expire            = int(data.get("daysToExpiry", 0))
+        raw_codes, batch_instance = RecoveryCodesBatch.create_recovery_batch(user=user, days_to_expire=days_to_expire)
+        
+    except IntegrityError as e:
+        raise ValueError(f"[RecoveryCodes] IntegrityError for user={request.user.id}: {e}")
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid JSON in request body: {str(e)}")
     except TypeError as e:
@@ -440,6 +456,13 @@ def get_recovery_batches_context(request):
     """
     Returns a context dict with recovery batches, paginated.
     Automatically refreshes cache if the session flag indicates update.
+
+    Note:
+
+    The data is always pulled from the cache and never from database. If
+    an update is made (e.g the batch updated) the new data is added to
+    the database and then to the cache before the updated data in the 
+    cache is used.
     """
     user               = request.user
     recovery_cache_key = RECOVERY_CODES_BATCH_HISTORY_KEY.format(user.id)

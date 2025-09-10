@@ -52,7 +52,7 @@ const batchKeysMapping = {
  *                        for each field in the batch.
  *
  * @example
- * const batch = { id: 1, issued: 10, used: 2 };
+ *` const batch = { id: 1, issued: 10, used: 2 };
  * const card = generateRecoveryCodesSummaryCard(batch);
  * document.body.appendChild(card);
  */

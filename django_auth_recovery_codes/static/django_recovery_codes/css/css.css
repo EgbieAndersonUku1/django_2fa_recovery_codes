@@ -399,6 +399,12 @@ Example: This will create a two-column grid with automatic spacing.
 }
 
 
+.two-column-grid--5-95 {
+    display: grid;
+    grid-template-columns: 5% 95%;
+}
+
+
 
 /* ------------------------------------------ */
 /*                 FLEX ELEMENTS              */
@@ -621,6 +627,15 @@ input:focus {
 }
 
 
+
+/* ------------------------------------------ */
+/*              TEST VERIFACTION SECTION       */
+/* ------------------------------------------ */
+
+.result-div {
+    color: green;
+    font-weight: 300;
+}
 
 /* ------------------------------------------ */
 /*                  UTILITIES                  */

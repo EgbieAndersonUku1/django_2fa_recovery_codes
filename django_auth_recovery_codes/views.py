@@ -3,6 +3,7 @@ import json
 import threading
 
 from logging import getLogger
+from django.db import IntegrityError
 from django_q.tasks import async_task
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -13,7 +14,7 @@ from django.http import HttpResponse
 from django.conf import settings
 from typing import Tuple
 
-from .models import RecoveryCodesBatch, RecoveryCode, Status
+from .models import RecoveryCodesBatch, RecoveryCode, Status, RecoveryCodeSetup
 from .views_helper import  generate_recovery_code_fetch_helper, recovery_code_operation_helper, get_recovery_batches_context
 from .utils.cache.safe_cache import (get_cache_or_set, set_cache, 
                                      get_cache_with_retry, 
@@ -50,8 +51,6 @@ def recovery_codes_regenerate(request):
    
 
 
-def recovery_codes_verify(request, code):
-    pass
 
 
 @require_http_methods(['POST'])
@@ -385,29 +384,82 @@ def generate_recovery_code_without_expiry(request):
 
 @csrf_protect
 @login_required
-def recovery_dashboard(request):
-    user               = request.user
-    cache_key          = CACHE_KEY.format(user.id)
-    user_data          =  get_cache_with_retry(cache_key)
-    context            = {}
-    
-    recovery_batch_context = get_recovery_batches_context(request)
+def verify_test_code_setup(request):
+    """
+    Verify a test recovery code setup for the logged-in user.
+    """
+    response_data = {"SUCCESS": False, "MESSAGE": "", "ERROR": ""}
 
-    if user_data is None:
-        # cache has expired, get data and re-add to cache
-        recovery_batch = RecoveryCodesBatch.get_by_user(user)
-        if recovery_batch:
-            user_data = recovery_batch.get_cache_values()
+    try:
+        data           = json.loads(request.body.decode("utf-8"))
+        plaintext_code = data.get("code")
+
+        if not plaintext_code:
+            response_data.update({
+                "MESSAGE": "No code provided.",
+                "ERROR": "The JSON body did not include a 'code' field."
+            })
+            return JsonResponse(response_data, status=400)
+
+        result = RecoveryCodesBatch.verify_setup(request.user, plaintext_code)
+
+        response_data.update(result)
+
+        # update the cache with the setup
+        cache_key  = CACHE_KEY.format(request.user.id)
+        user_data  = get_cache_with_retry(cache_key, {})
+
+        user_data["user_has_done_setup"]  = response_data.get("SUCCESS", False)
         set_cache_with_retry(cache_key, user_data)
     
- 
-    data = user_data
-    if data:
+
+        return JsonResponse(response_data, status=200 if response_data["SUCCESS"] else 400)
+
+    except IntegrityError as e:
+        response_data.update({
+            "ERROR": str(e),
+            "MESSAGE": "Database integrity error occurred."
+        })
+        return JsonResponse(response_data, status=400)
+
+    except Exception as e:
+        response_data.update({
+            "ERROR": str(e),
+            "MESSAGE": "An unexpected error occurred."
+        })
+        return JsonResponse(response_data, status=500)
+
+
+
+@csrf_protect
+@login_required
+def recovery_dashboard(request):
+    
+    user                   = request.user
+    cache_key              = CACHE_KEY.format(user.id)
+    user_data              =  get_cache_with_retry(cache_key)
+    context                = {}
+    recovery_batch_context = get_recovery_batches_context(request)
+    
+    if user_data is None:
+
+        # cache has expired, get data and re-add to cache
+        recovery_batch = RecoveryCodesBatch.get_by_user(user)
+
+        if recovery_batch:
+            user_data                        = recovery_batch.get_cache_values()
+            user_data["user_has_done_setup"] = RecoveryCodeSetup.has_first_time_setup_occurred(user)
+       
+        set_cache_with_retry(cache_key, user_data)
+    
+    if user_data:
+        
         context.update({
-                "is_generated": data.get("generated"),
-                "is_email": data.get("emailed"),
-                "is_viewed": data.get("viewed"),
-                "is_downloaded": data.get("downloaded")
+                "is_generated": user_data.get("generated"),
+                "is_email": user_data.get("emailed"),
+                "is_viewed": user_data.get("viewed"),
+                "is_downloaded": user_data.get("downloaded"),
+                "user_has_done_setup": user_data.get("user_has_done_setup"),
             })
     
     if not isinstance(recovery_batch_context, dict):

@@ -9,12 +9,12 @@ import {
     showTemporaryMessage,
     showEnqueuedMessages,
     downloadFromResponse,
-    getNthChildNested,
-    addChildWithPaginatorLimit,
-
+    toggleElement,
+    doNothing,
 
 } from "./utils.js";
 
+import { handleButtonAlertClickHelper, updateCurrentRecoveryCodeBatchCard, updateBatchHistorySection } from "./dashboardHelpers.js";
 import { parseFormData } from "./form.js";
 import { AlertUtils } from "./alerts.js";
 import { logError, warnError } from "./logger.js";
@@ -22,8 +22,7 @@ import fetchData from "./fetch.js";
 import { HTMLTableBuilder } from "./generateTable.js";
 import { generateCodeActionAButtons, buttonStates, updateButtonFromConfig } from "./generateCodeActionButtons.js";
 import { notify_user } from "./notify.js";
-import { generateRecoveryCodesSummaryCard } from "./generateBatchHistoryCard.js";
-
+import { displayResults } from "./generateTestResult.js";
 
 
 // Elements
@@ -50,6 +49,9 @@ const downloadCodeButtonElementSpinner = document.getElementById("download-code-
 const invalidateSpinnerElement = document.getElementById("invalidate-code-loader");
 const tableCoderSpinnerElement = document.getElementById("table-loader");
 const dynamicBatchSpinnerElement = document.getElementById("dynamic-batch-loader");
+const testFormSectionElement     = document.getElementById("verify-setup");
+
+let testVerifySpinnerElement;
 
 // button elements
 const generateButtonElement = document.getElementById("generate-code-button-wrapper");
@@ -69,17 +71,24 @@ const invalidateInputFieldElement = document.getElementById('invalidate-code-inp
 
 // delete code form
 const deleteFormElement = document.getElementById("delete-form");
-const deleteInputFieldElement = document.getElementById("delete-code-input")
+const deleteInputFieldElement = document.getElementById("delete-code-input");
 
+// test setup form
+const testSetupFormContainerElement  = document.getElementById("dynamic-verify-form-container")
+const testSetupFormElement           = document.getElementById("verify-setup-form");
+const testSetupInputFieldElement  = document.getElementById("verify-code-input");
 
 // event handlers
-recovryDashboardElement.addEventListener("click", handleEventDelegation);
 
 
-
+// input
 invalidateInputFieldElement.addEventListener("input", handleInputFieldHelper);
 deleteInputFieldElement.addEventListener("input", handleInputFieldHelper);
+testSetupInputFieldElement.addEventListener("input", handleInputFieldHelper);
+
+// clicking
 invalidateFormElement.addEventListener("click", handleInvalidateButtonClick)
+recovryDashboardElement.addEventListener("click", handleEventDelegation);
 
 
 // invalidate code form elements
@@ -87,10 +96,18 @@ invalidateFormElement.addEventListener("submit", handleInvalidationFormSubmissio
 invalidateFormElement.addEventListener("input", handleInvalidationFormSubmission);
 invalidateFormElement.addEventListener("blur", handleInvalidationFormSubmission);
 
+
 // delete code form elements 
 deleteFormElement.addEventListener("submit", handleDeleteFormSubmission);
 deleteFormElement.addEventListener("input", handleDeleteFormSubmission);
 deleteFormElement.addEventListener("blur", handleDeleteFormSubmission);
+
+
+// test setup
+testSetupFormElement.addEventListener("submit", handleTestSetupFormSubmission);
+testSetupFormElement.addEventListener("input", handleTestSetupFormSubmission);
+testSetupFormElement.addEventListener("blur", handleTestSetupFormSubmission);
+
 
 
 // messages elements
@@ -111,6 +128,7 @@ const statsBatchCodesRemovedBoard = document.getElementById("stat__total-batch-c
 const statsCodesDeactivatedBoard = document.getElementById("stat__total-codes-deactivated");
 const statsTotalCodesRemovedBoard = document.getElementById("stat__total-codes-removed")
 
+let dynamicSetupButton;
 
 // constants
 const MILLI_SECONDS_BEFORE_DISPLAY = 1000;
@@ -128,6 +146,8 @@ const CLOSE_NAV_BAR_ICON = "close-nav-icon";
 const enqueueMessages = [];
 const TAG_NAME       = "div";
 const CLASS_SELECTOR = "card-head";
+const VERIFY_SETUP_BUTTON = "verify-code-btn";
+const TEST_SETUP_LOADER    = "verify-setup-code-loader";
 
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -143,7 +163,10 @@ let alertMessage;
 
 
 // configuration
-const config = { CODE_IS_BEING_GENERATED: false, generateCodeActionButtons: false };
+const config = { CODE_IS_BEING_GENERATED: false, 
+                generateCodeActionButtons: false,
+                verificationTestInProgress: false,
+            };
 
 
 window.addEventListener("resize", handleResetDashboardState);
@@ -159,15 +182,37 @@ function codeGenerationComplete() {
 }
 
 
+function verificationTestInProgress() {
+    config.verificationTestInProgress = true;
+}
 
+
+function verificationTestComplete() {
+    config.verificationTestInProgress = false;
+}
+
+
+// Prevents the page from being refreshed or closed why a given action is being performed
 window.addEventListener("beforeunload", function (event) {
-    if (config.CODE_IS_BEING_GENERATED) {
+    if (config.CODE_IS_BEING_GENERATED || config.verificationTestInProgress) {
         event.preventDefault();
         event.returnValue = "";
         return "";
     }
 });
 
+
+function loadTestVerificationElements() { 
+       
+    if (!dynamicSetupButton) {
+        dynamicSetupButton = document.getElementById(VERIFY_SETUP_BUTTON)
+    }
+
+    if (!testVerifySpinnerElement) {
+        testVerifySpinnerElement =  document.getElementById(TEST_SETUP_LOADER);
+    }
+
+}
 
 
 function handleEventDelegation(e) {
@@ -190,6 +235,7 @@ function handleEventDelegation(e) {
         case GENERATE_CODE_WITH_EXPIRY_BUTTON:
             codeIsBeingGenerated();
             handleGenerateCodeWithExpiryClick(e);
+            loadTestVerificationElements();
             config.generateCodeActionButtons = true;
 
             break;
@@ -197,12 +243,17 @@ function handleEventDelegation(e) {
             codeIsBeingGenerated();
             handleGenerateCodeWithNoExpiryClick(e);
             config.generateCodeActionButtons = true;
+            loadTestVerificationElements();
             break;
         case EMAIL_BUTTON_ID:
             handleEmailCodeeButtonClick(e);
             break;
         case "exclude_expiry":
             handleIncludeExpiryDateCheckMark(e);
+            break;
+        case VERIFY_SETUP_BUTTON:
+            verificationTestInProgress()
+            handleTestCodeVerificationSetupClick(e);
             break;
         case REGENERATE_BUTTON_ID:
 
@@ -218,6 +269,7 @@ function handleEventDelegation(e) {
             toggleElement(alertMessage);
             handleRegenerateCodeButtonClick(e);
             config.REGENERATE_CODE_REQUEST = true;
+            break;
 
         case DELETE_CURRENT_CODE_BUTTON_ID:
             handleDeleteCodeeButtonClick(e);
@@ -321,6 +373,68 @@ async function handleGenerateCodeWithExpiryClick(e) {
     }
 
 }
+
+
+async function handleTestCodeVerificationSetupClick(e) {
+
+    const formData = await handleTestSetupFormSubmission(e)
+
+    if (!formData) return;
+    
+    const code = formData.verifyCode;
+
+    const alertAttributes = {
+        title: "Verify setup",
+        text: `⚠️ Important: This application will now verify if your setup was correctly configured with the backend. 
+                    This is a one time verification and will not be verified again on the next batch
+                        Are you sure you want to continue?`,
+        icon: "info",
+        cancelMessage: "No worries! No action was taken",
+        messageToDisplayOnSuccess: `
+                    Great! Your codes are being verified, we let you know once it is ready.
+                    You can continue using the app while we validate them.
+                    We’ll notify you once they’re ready.
+                    Please, don't close the page.
+                `,
+        confirmButtonText: "Yes, validate setup",
+        denyButtonText: "No, don't validate setup"
+        };
+
+        const handleTestSetupFetchAPI = async () => {
+            const data = await fetchData({
+                url: "/auth/recovery-codes/verify-setup/",
+                csrfToken: getCsrfToken(),
+                method: "POST",
+                body: { code: code },
+                throwOnError: false,
+            });
+
+            return data;
+        
+        };
+
+        // // console.log(data)
+        const data = await handleButtonAlertClickHelper(e,
+                                                        VERIFY_SETUP_BUTTON,
+                                                        testVerifySpinnerElement,
+                                                        alertAttributes,
+                                                        handleTestSetupFetchAPI,
+                                                );
+        if (data) {
+             try {
+                displayResults(data);
+                toggleElement(testSetupFormElement);
+                
+            } catch (error) {
+                showTemporaryMessage(messageContainerElement, "Something went wrong, refresh page, delete and regenerate codes and try again");
+            }  finally {
+                verificationTestComplete();
+          }
+        }
+       
+    
+}
+
 
 
 
@@ -697,7 +811,15 @@ async function handlDeleteAllCodeButtonClick(e) {
             const SUCCESS_ALERT_SELECTOR = ".alert-message";  // Dynamic selector only shows when the page is generated and refreshed
             const dynamicAlertElement = document.querySelector(SUCCESS_ALERT_SELECTOR)
             toggleElement(dynamicAlertElement);
-            toggleElement(alertMessage)
+            toggleElement(alertMessage);
+
+            toggleElement(testSetupFormContainerElement);
+
+            try {
+                toggleElement(testSetupFormElement)
+            } catch (error) {
+                doNothing()
+            }
           
         } else {
             warnError("handleDeleteAllCodeButtonClick", "The button container element wasn't found")
@@ -823,6 +945,23 @@ function handleDeleteFormSubmission(e) {
 
 
 
+/**
+ * Handles the submission event for the "delete" form.
+ *
+ * The function allows the user to submit a request to delete a single recovery
+ * codes via a fetch API request when the form is submitted.
+ * 
+ *
+ *
+ * @param {Event} e - The submit event triggered by the form.
+ * @returns {void}
+ */
+function handleTestSetupFormSubmission(e) {
+    return handleFormSubmissionHelper(e, testSetupFormElement, ["verify_code"]);
+
+}
+
+
 
 
 /**
@@ -863,6 +1002,9 @@ function handleFormSubmissionHelper(e, formElement, requiredFields) {
     const formData = new FormData(formElement);
     return parseFormData(formData, requiredFields);
 }
+
+
+
 
 
 
@@ -991,7 +1133,7 @@ async function handleRecoveryCodesAction({ e,
         handleGenerateCodeFetchApi
     )
 
-    if (resp.SUCCESS) {
+    if (resp && resp.SUCCESS) {
      
         if (resp.CAN_GENERATE) {
             statsTotalCodesIssuedBoard.textContent = resp.TOTAL_ISSUED;
@@ -1004,7 +1146,11 @@ async function handleRecoveryCodesAction({ e,
                     "Failed to mark code as viewed "
                 );
 
-                insertBatchCardIntoSection(resp.BATCH, resp.ITEM_PER_PAGE);
+                updateBatchHistorySection(recoveryBatchSectionElement, resp.BATCH, resp.ITEM_PER_PAGE);
+              
+
+                // show the optional verification form
+                toggleElement(testSetupFormContainerElement, false);
             }
 
         
@@ -1025,9 +1171,9 @@ async function handleRecoveryCodesAction({ e,
 
 
     } else {
-        const DEFAULT_MESSAGE = "Something went wrong and we couldn't generate your recovery codes"
-        messageContainerElement.classList.add("show");
-        messageContainerElement.textContent = DEFAULT_MESSAGE;
+        const DEFAULT_MESSAGE = "Oops, something went wrong and we couldn't process your request"
+    
+        showTemporaryMessage(messageContainerElement, DEFAULT_MESSAGE)
         tableCoderSpinnerElement.style.display = "none";
         toggleSpinner(tableCoderSpinnerElement, false);
 
@@ -1037,84 +1183,6 @@ async function handleRecoveryCodesAction({ e,
         }, 5000)
         return false;
     }
-
-}
-
-
-/**
- * Handles a button click event by showing a confirmation alert with spinner and button state toggling.
- * If the alert is confirmed, optionally executes a callback function.
- *
- * @param {Event} e - The click event containing the button element.
- * @param {string} buttonElementID - The ID of the button to listen for; the function proceeds only if the clicked button matches this ID.
- * @param {HTMLElement} buttonSpinnerElement - The spinner element associated with the button, shown while waiting for user response.
- * @param {Object} alertAttributes - Attributes object for the alert dialog.
- * @param {string} alertAttributes.title - The alert title.
- * @param {string} alertAttributes.text - The alert message body.
- * @param {string} alertAttributes.icon - The icon to display in the alert.
- * @param {string} alertAttributes.cancelMessage - Message shown when the alert is cancelled.
- * @param {string} alertAttributes.messageToDisplayOnSuccess - Message to show on successful confirmation.
- * @param {string} alertAttributes.confirmButtonText - Text for the confirm button.
- * @param {string} alertAttributes.denyButtonText - Text for the deny/cancel button.
- * @param {Function} [func=null] - Optional callback function to execute if the alert is confirmed.
- *
- * @returns {Promise<boolean|undefined>} Resolves to the confirmation response (true if confirmed, false if denied).
- *                                      Returns undefined if the clicked button's ID does not match `buttonElementID`.
- */
-async function handleButtonAlertClickHelper(e, buttonElementID, buttonSpinnerElement, alertAttributes = {}, func = null) {
-
-    if (!(typeof alertAttributes === "object")) {
-        logError("handleButtonAlertClickHelper", `The parameter alertAttributes is not an object. Expected an object but got type: ${typeof alertAttributes}`)
-    }
-
-    if (!(typeof buttonElementID === "string")) {
-        logError("handleButtonAlertClickHelper", `The parameter buttonElementID is not an string. Expected a string but got type: ${typeof buttonElement}`)
-    }
-
-    if (func && !(typeof func === "function")) {
-        logError("handleButtonAlertClickHelper", `The parameter func is not a function. Expected a function but got type: ${typeof func}`)
-    }
-
-    const buttonElement = e.target.closest("button");
-
-    if (!buttonElement || buttonElement.tagName !== 'BUTTON' || buttonElement.id !== buttonElementID) {
-        return;
-    }
-
-    toggleSpinner(buttonSpinnerElement);
-    toggleButtonDisabled(buttonElement);
-
-    await new Promise(requestAnimationFrame);
-
-    try {
-        let resp;
-        if (alertAttributes !== null && Object.keys(alertAttributes).length > 0) {
-            resp = await AlertUtils.showConfirmationAlert({
-                title: alertAttributes.title,
-                text: alertAttributes.text,
-                icon: alertAttributes.icon,
-                cancelMessage: alertAttributes.cancelMessage,
-                messageToDisplayOnSuccess: alertAttributes.messageToDisplayOnSuccess,
-                confirmButtonText: alertAttributes.confirmButtonText,
-                denyButtonText: alertAttributes.denyButtonText
-            });
-        } else {
-            resp = true;
-        }
-        if (resp) {
-            if (func) {
-                return func()
-            }
-        }
-
-        return resp;
-
-    } finally {
-        toggleSpinner(buttonSpinnerElement, false);
-        toggleButtonDisabled(buttonElement, false);
-      
-    }
-
 
 }
 
@@ -1165,22 +1233,6 @@ function toggleSideBarIcon(navIconElement) {
     }, 500);
 }
 
-
-
-function toggleElement(element, hide = true) {
-
-    if (!element || element === undefined || element === null) {
-        console.log("there is no elemnent")
-        return;
-    }
-
-    if (hide) {
-        element.classList.add("d-none");
-        return
-    }
-
-    element.classList.remove("d-none");
-}
 
 
 function populateTableWithUserCodes(codes) {
@@ -1279,53 +1331,6 @@ function pickRightDivAndPopulateTable(tableCodesElement) {
 }
 
 
-function insertBatchCardIntoSection(batch, batchPerPage = 5) {
-
-  
-    const historyCardElement = generateRecoveryCodesSummaryCard(batch);
-    let secondRecoveryCardBatch;
-
-
-    dynamicBatchSpinnerElement.style.display = "inline-block";
-    toggleSpinner(dynamicBatchSpinnerElement);
-
-    setTimeout(() => {
-
-
-          addChildWithPaginatorLimit(recoveryBatchSectionElement, historyCardElement, batchPerPage)
-          secondRecoveryCardBatch = getNthChildNested(recoveryBatchSectionElement, 2, TAG_NAME, CLASS_SELECTOR);
-          markCardAsDeleted(secondRecoveryCardBatch)
-          toggleSpinner(dynamicBatchSpinnerElement, false);
-
-      
-        toggleSpinner(dynamicBatchSpinnerElement, false);
-
-    }, (MILLI_SECONDS_BEFORE_DISPLAY + MILLI_SECONDS))
-
-}
-
-
-function markCardAsDeleted(cardElement) {
-
-    if (cardElement === null) return;
-
-    const statusElements = cardElement.querySelectorAll('.card-head .info-box .value p');
-    if (!statusElements.length) return;
-
-
-    for (const pElement of statusElements) {
-        if (pElement.classList.contains('status')) {
-            pElement.textContent = "Deleted";
-            pElement.classList.remove("text-green");
-            pElement.classList.add("text-red", "bold");
-            break;
-        }
-    }
-}
-
-
-
-
 /**
  * Displays a standardised alert for recovery code operations (e.g., deactivate, delete).
  *
@@ -1367,7 +1372,7 @@ function handleRecoveryCodeAlert(data, successCompareMessage, fieldName) {
             // The  `successCompareMessage` ensures that the frontend only visually 
             // increments the number when the intended action (e.g., deletion or invalidation) has actually occurred.
             if (icon === "success") {
-                updateCurrentRecoveryCodeBatchCard(fieldName);
+                updateCurrentRecoveryCodeBatchCard(recoveryBatchSectionElement, fieldName);
             }
           
             return;
@@ -1383,7 +1388,6 @@ function handleRecoveryCodeAlert(data, successCompareMessage, fieldName) {
         }
     }
 
-
     AlertUtils.showAlert({
         title: "The code is invalid",
         text: "The code entered is an invalid code",
@@ -1397,53 +1401,4 @@ function handleRecoveryCodeAlert(data, successCompareMessage, fieldName) {
 
 
 
-
-
-function updateCurrentRecoveryCodeBatchCard(fieldToUpdate) {
-    const currentCardBatch = getNthChildNested(recoveryBatchSectionElement, 1, TAG_NAME, CLASS_SELECTOR);
-
-  
-    switch(fieldToUpdate) {
-        case "invalidate":
-            incrementRecoveryCardField(currentCardBatch, "number_invalidated");
-            break;
-         case "delete":
-            incrementRecoveryCardField(currentCardBatch, "number_removed");
-            break;
-        
-    }
-   
-}
-
-
-
-
-function incrementRecoveryCardField(cardBatchElement, fieldSelector) {
-    if (!checkIfHTMLElement(cardBatchElement)) {
-        warnError(
-            "incrementRecoveryCardField",
-            `Expected a field p Element. Got object with type ${typeof cardBatchElement}`
-        );
-        return; // Exit if not a valid element
-    }
-
-    const PElements = cardBatchElement.querySelectorAll('.card-head .info-box .value p');
-    
-    for (const pElement of PElements) {
-        // Only increment fields with the correct class
-
-        if (pElement.classList.contains(fieldSelector)) {
-            const currentValue = parseInt(pElement.textContent || "0", 10);
-            pElement.textContent = currentValue + 1;
-        
-            pElement.classList.add("text-green", "bold", "highlight");
-            
-            setTimeout(() => {
-                pElement.classList.remove("highlight");
-            }, MILLI_SECONDS);
-
-            break;
-        }
-    }
-}
 

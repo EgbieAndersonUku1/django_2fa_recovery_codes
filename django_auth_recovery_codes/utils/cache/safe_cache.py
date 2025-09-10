@@ -225,7 +225,7 @@ def get_cache_with_retry(
 def get_safe_cache_ttl(key):
 
     ttl = None
-    if hasattr(cache, "ttl"):  # check if backend supports it
+    if hasattr(cache, "ttl"):  # check if backend supports it since not all cache support ttl
         try:
             ttl = cache.ttl(key)
         except NotImplementedError:
