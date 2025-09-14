@@ -1,4 +1,4 @@
-import { showEnqueuedMessages } from "./utils.js";
+import { showEnqueuedMessages } from "./messages/message.js";
 
 
 const notificationContainer = document.getElementById("notification");

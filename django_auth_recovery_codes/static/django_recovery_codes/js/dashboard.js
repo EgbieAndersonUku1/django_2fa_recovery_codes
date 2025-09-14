@@ -5,16 +5,25 @@ import {
     applyDashToInput,
     sanitizeText,
     toggleButtonDisabled,
-    getCsrfToken,
-    showTemporaryMessage,
-    showEnqueuedMessages,
-    downloadFromResponse,
     toggleElement,
     doNothing,
 
 } from "./utils.js";
 
-import { handleButtonAlertClickHelper, updateCurrentRecoveryCodeBatchCard, updateBatchHistorySection } from "./dashboardHelpers.js";
+import { getCsrfToken } from "./security/csrf.js";
+import { showTemporaryMessage } from "./messages/message.js";
+import EnqueuedMessages from "./messages/enqueueMessages.js";
+
+import { downloadFromResponse } from "./helpers/handleDownload.js";
+import { handleDeleteCodeeButtonClick, handleDeleteFormSubmission } from "./helpers/handleCodeDelete.js";
+import messageContainerElement from "./helpers/appMessages.js";
+
+
+import { handleButtonAlertClickHelper } from "./helpers/handleButtonAlertClicker.js";
+import { updateCurrentRecoveryCodeBatchCard } from "./batchCardsHistory/updateBatchHistorySection.js";
+import { updateBatchHistorySection } from "./batchCardsHistory/updateBatchHistorySection.js";
+import { handleGenerateCodeWithNoExpiryClick } from "./helpers/handleCodeGeneration.js";
+
 import { parseFormData } from "./form.js";
 import { AlertUtils } from "./alerts.js";
 import { logError, warnError } from "./logger.js";
@@ -23,6 +32,7 @@ import { HTMLTableBuilder } from "./generateTable.js";
 import { generateCodeActionAButtons, buttonStates, updateButtonFromConfig } from "./generateCodeActionButtons.js";
 import { notify_user } from "./notify.js";
 import { displayResults, clearTestResultContainer } from "./generateTestResult.js";
+import { handleGenerateCodeWithExpiryClick } from "./helpers/handleCodeGeneration.js";
 
 
 // Elements
@@ -42,7 +52,7 @@ const generateCodeWithExirySpinnerElement = document.getElementById("generate-co
 const generateCodeWithNoExpirySpinnerElement = document.getElementById("generate-code-without-expiry-loader");
 const excludeSpinnerLoaderElement = document.getElementById("exclude-expiry-loader");
 const regenerateButtonSpinnerElement = document.getElementById("re-generate-code-loader")
-const emailButtonSpinnerElement = document.getElementById("email-code-loader");
+
 const deleteCodeButtonSpinnerElement = document.getElementById("delete-current-code-loader");
 const deleteAllCodeButtonSpinnerElement = document.getElementById("delete-all-code-loader");
 const downloadCodeButtonElementSpinner = document.getElementById("download-code-loader");
@@ -112,7 +122,7 @@ testSetupFormElement.addEventListener("blur", handleTestSetupFormSubmission);
 
 
 // messages elements
-const messageContainerElement = document.getElementById("messages");
+
 const messagePTag = document.getElementById("message-p-tag");
 
 
@@ -133,26 +143,25 @@ let dynamicSetupButton;
 
 // constants
 const MILLI_SECONDS_BEFORE_DISPLAY = 1000;
-const MILLI_SECONDS = 6000
 const REGENERATE_BUTTON_ID = "regenerate-code-btn";
+const DOWNLOAD_CODE_BTN_ID = "download-code-btn";
+const GENERATE_CODE_WITH_EXPIRY_BUTTON_ID = "form-generate-code-btn";
+const GENERATE_CODE_WITH_NO_EXPIRY = "generate-code-with-no-expiry-btn";
+const CLOSE_NAV_BAR_ICON = "close-nav-icon";
+
+const VERIFY_SETUP_BUTTON = "verify-code-btn";
+const TEST_SETUP_LOADER    = "verify-setup-code-loader";
 const EMAIL_BUTTON_ID = "email-code-btn";
 const DELETE_CURRENT_CODE_BUTTON_ID = "delete-current-code-btn";
 const DELETE_ALL_CODES_BUTTON_ID = "delete-all-code-btn"
-const DOWNLOAD_CODE_BTN_ID = "download-code-btn";
-const INVALIDATE_CODE_BTN = "invalidate-code-btn";
-const GENERATE_CODE_WITH_EXPIRY_BUTTON = "form-generate-code-btn";
-const GENERATE_CODE_WITH_NO_EXPIRY = "generate-code-with-no-expiry-btn";
 const OPEN_NAV_BAR_HAMBURGERR_ICON = "open-hamburger-nav-icon";
-const CLOSE_NAV_BAR_ICON = "close-nav-icon";
-const enqueueMessages = [];
-const TAG_NAME       = "div";
-const CLASS_SELECTOR = "card-head";
-const VERIFY_SETUP_BUTTON = "verify-code-btn";
-const TEST_SETUP_LOADER    = "verify-setup-code-loader";
 
+
+
+const enqueuedMessages = new EnqueuedMessages();
 
 document.addEventListener("DOMContentLoaded", () => {
-    notify_user(enqueueMessages);
+    notify_user(enqueuedMessages.getEnqueuedMessages());
 
 });
 
@@ -237,17 +246,16 @@ function handleEventDelegation(e) {
 
 
     switch (elementID) {
-        case GENERATE_CODE_WITH_EXPIRY_BUTTON:
+        case GENERATE_CODE_WITH_EXPIRY_BUTTON_ID:
             codeIsBeingGenerated();
-            handleGenerateCodeWithExpiryClick(e);
+            handleGenerateCodeWithExpiryClick(e, GENERATE_CODE_WITH_EXPIRY_BUTTON_ID);
             loadTestVerificationElements();
-        
             config.generateCodeActionButtons = true;
 
             break;
         case GENERATE_CODE_WITH_NO_EXPIRY:
             codeIsBeingGenerated();
-            handleGenerateCodeWithNoExpiryClick(e);
+            handleGenerateCodeWithNoExpiryClick(e, GENERATE_CODE_WITH_NO_EXPIRY);
             config.generateCodeActionButtons = true;
             loadTestVerificationElements();
             break;
@@ -278,7 +286,7 @@ function handleEventDelegation(e) {
             break;
 
         case DELETE_CURRENT_CODE_BUTTON_ID:
-            handleDeleteCodeeButtonClick(e);
+            handleDeleteCodeeButtonClick(e, DELETE_CURRENT_CODE_BUTTON_ID)
             break;
         case DELETE_ALL_CODES_BUTTON_ID:
             handlDeleteAllCodeButtonClick(e);
@@ -325,56 +333,6 @@ function handleResetDashboardState() {
         recovryDashboardElement.style.marginTop = "0";
         navigationIconContainerElement.style.height = 0
         hamburgerOpenIcon.style.display = "none"
-
-    }
-
-}
-
-
-
-/**
- * Handles the click event for the "Generate Code" button.
- * 
- * Intended to generate recovery codes on the backend via the Fetch API.
- * 
- * @param {Event} e - The click event triggered by the button.
- */
-async function handleGenerateCodeWithExpiryClick(e) {
-
-    const formData = await handleGenerateCodeWithExpiryFormSubmission(e);
-
-    if (formData) {
-        const daysToExpiry = parseInt(formData.daysToExpiry);
-
-        const alertAttributes = {
-            title: "Generate Code",
-            text: `
-                ⚠️ Important: This will generate 10 new recovery codes and remove any unused ones.
-                They will be valid for only ${daysToExpiry} ${daysToExpiry === 1 ? 'day' : 'days'}.
-                Are you sure you want to continue?
-                    `,
-            icon: "info",
-            cancelMessage: "No worries! No action was taken",
-            messageToDisplayOnSuccess: `
-                Great! Your codes are being generated in the background and will be displayed in View Generated Codes section once ready.
-                You can continue using the app while we prepare them.
-                We’ll notify you once they’re ready.
-                Please, don't close the page.
-            `,
-            confirmButtonText: "Yes, generate codes",
-            denyButtonText: "No, don't generate codes"
-        };
-
-
-        handleRecoveryCodesAction({
-            e: e,
-            generateCodeBtn: GENERATE_CODE_WITH_EXPIRY_BUTTON,
-            generateCodeBtnSpinnerElement: generateCodeWithExirySpinnerElement,
-            alertAttributes: alertAttributes,
-            url: "/auth/recovery-codes/generate-with-expiry/",
-            daysToExpiry: daysToExpiry,
-
-        })
 
     }
 
@@ -468,43 +426,6 @@ async function handleTestCodeVerificationSetupClick(e) {
 
 
 
-
-/**
- * Handles the click event for the "Generate Code" button.
- * 
- * Intended to generate recovery codes on the backend via the Fetch API.
- * 
- * @param {Event} e - The click event triggered by the button.
- */
-async function handleGenerateCodeWithNoExpiryClick(e) {
-
-    const alertAttributes = {
-        title: "Generate Code",
-        text: `⚠️ Important: This will generate 10 new recovery codes. 
-                    They will be valid for an indefinite period unless deleted or invalidated. 
-                    Are you sure you want to continue?`,
-        icon: "info",
-        cancelMessage: "No worries! No action was taken",
-        messageToDisplayOnSuccess: `
-                Great! Your codes are being generated in the background and will be displayed in View Generated Codes section once ready.
-                You can continue using the app while we prepare them.
-                We’ll notify you once they’re ready.
-                Please, don't close the page.
-            `,
-        confirmButtonText: "Yes, generate codes",
-        denyButtonText: "No, don't generate codes"
-    };
-
-    handleRecoveryCodesAction({
-        e: e,
-        generateCodeBtn: GENERATE_CODE_WITH_NO_EXPIRY,
-        generateCodeBtnSpinnerElement: generateCodeWithNoExpirySpinnerElement,
-        alertAttributes: alertAttributes,
-        url: "/auth/recovery-codes/generate-without-expiry/",
-
-    })
-
-}
 
 
 
@@ -630,61 +551,6 @@ async function handleInvalidateButtonClick(e) {
 
 
 
-/**
- * Handles the click event for the "Invalidate code" button.
- * 
- * When clicked triggers a fetch API that allows the user to 
- * delete a single recovery code
- * 
- * @param {Event} e - The click event triggered by the button.
- */
-async function handleDeleteCodeeButtonClick(e) {
-
-    const formData = await handleDeleteFormSubmission(e);
-    if (!formData) return;
-
-    const code = formData.deleteCode;
-
-    if (formData) {
-        const alertAttributes = {
-            title: "Delete code",
-            text: `Doing this will delete the code "${code}". This action cannot be reversed. Are you sure you want to go ahead?`,
-            icon: "warning",
-            cancelMessage: "No worries! Your code is safe.",
-            messageToDisplayOnSuccess: "Awesome! Your code is being processed, please wait...",
-            confirmButtonText: "Yes, delete code",
-            denyButtonText: "No, don't delete code"
-        }
-
-        const handleRemoveRecoveryCodeApiRequest = async () => {
-
-            const data = await fetchData({
-                url: "/auth/recovery-codes/delete-codes/",
-                csrfToken: getCsrfToken(),
-                method: "POST",
-                body: { code: code },
-                throwOnError: false,
-            });
-
-            return data
-        };
-
-        const data = await handleButtonAlertClickHelper(e,
-            DELETE_CURRENT_CODE_BUTTON_ID,
-            deleteCodeButtonSpinnerElement,
-            alertAttributes,
-            handleRemoveRecoveryCodeApiRequest
-        );
-
-        handleRecoveryCodeAlert(data, "Code successfully deleted", "delete");
-        deleteFormElement.reset()
-
-    };
-
-
-}
-
-
 
 /**
  * Handles the click event for the "regenerate code" button.
@@ -750,8 +616,6 @@ async function handleEmailCodeeButtonClick(e) {
     }
 
 
-
-
     const handleEmailFetchApiSend = async () => {
         const url = "/auth/recovery-codes/email/";
 
@@ -766,13 +630,13 @@ async function handleEmailCodeeButtonClick(e) {
         updateButtonFromConfig(btn, buttonStates.emailed, "You have already emailed yourself this code");
         toggleButtonDisabled(btn);
 
-        enqueueMessages.push(resp.MESSAGE);
-        showEnqueuedMessages(enqueueMessages, messageContainerElement)
-
+        enqueuedMessages.addMessage(resp.MESSAGE);
+        enqueuedMessages.showEnqueuedMessages(messageContainerElement);
+       
 
     } else {
-        enqueueMessages.push(resp.MESSAGE)
-        showEnqueuedMessages(enqueueMessages, messageContainerElement)
+        enqueuedMessages.addMessage(resp.MESSAGE);
+        enqueuedMessages.showEnqueuedMessages(messageContainerElement);
 
     }
 
@@ -923,20 +787,6 @@ function handleIncludeExpiryDateCheckMark(e) {
 
 
 
-/**
- * Handles the submission event for the "Generate code" form.
- *
- * The function allows the user to generate a set of recovery
- * codes via a fetch API request when the form is submitted.
- *
- *
- * @param {Event} e - The submit event triggered by the form.
- * @returns {void}
- */
-function handleGenerateCodeWithExpiryFormSubmission(e) {
-    return handleFormSubmissionHelper(e, generateCodeWithExpiryFormElement, ["days-to-expiry"]);
-
-}
 
 
 
@@ -958,23 +808,6 @@ function handleInvalidationFormSubmission(e) {
 
 
 
-/**
- * Handles the submission event for the "delete" form.
- *
- * The function allows the user to submit a request to delete a single recovery
- * codes via a fetch API request when the form is submitted.
- * 
- *
- *
- * @param {Event} e - The submit event triggered by the form.
- * @returns {void}
- */
-function handleDeleteFormSubmission(e) {
-    return handleFormSubmissionHelper(e, deleteFormElement, ["delete_code"]);
-
-}
-
-
 
 /**
  * Handles the submission event for the "delete" form.
@@ -990,48 +823,6 @@ function handleDeleteFormSubmission(e) {
 function handleTestSetupFormSubmission(e) {
     return handleFormSubmissionHelper(e, testSetupFormElement, ["verify_code"]);
 
-}
-
-
-
-
-/**
- * Helper function that handles generic form submissions by validating the form
- * and extracting its data in a structured format.
- *
- *
- * This function is designed for reuse across multiple form submission scenarios
- * to centralise validation and data parsing logic.
- *
- * @param {Event} e - The submit event triggered by the form.
- * @param {HTMLFormElement} formElement - The form element being submitted.
- * @param {string[]} requiredFields - An array of field names that must be present in the form data.
- * @returns {Object|undefined} An object containing parsed form data if validation succeeds;
- *                              otherwise, undefined if validation fails.
- */
-function handleFormSubmissionHelper(e, formElement, requiredFields) {
-
-    if (!e || !e.target) {
-        return;
-    }
-
-    checkIfHTMLElement(formElement, "Form Element");
-
-    if (!Array.isArray(requiredFields)) {
-        logError("handleFormSubmissionHelper", `The form required list must be an array. Expected an array but got type ${type(requiredFields)}`);
-        return;
-    }
-
-    e.preventDefault();
-
-
-    if (!formElement.checkValidity()) {
-        formElement.reportValidity();
-        return
-    }
-
-    const formData = new FormData(formElement);
-    return parseFormData(formData, requiredFields);
 }
 
 
