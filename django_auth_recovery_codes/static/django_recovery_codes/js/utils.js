@@ -1,6 +1,8 @@
 
 import { logError, warnError } from "./logger.js";
 import { specialChars } from "./specialChars.js";
+import { showTemporaryMessage } from "./messages/message.js";
+
 
 /**
  * Shows the spinner for a specified duration and then hides it.
@@ -249,16 +251,7 @@ export function toggleButtonDisabled(buttonElement, disable = true) {
 
 
 
-export function getCsrfToken() {
-    const csrfToken = document.getElementById("csrf_token");
 
-    if (csrfToken === null) {
-        throw new Error("The CSRF token return null, CSRF Token is needed for security of the application")
-      
-    }
-
-    return csrfToken.content
-}
 
 
 
@@ -273,136 +266,10 @@ export function toTitle(text) {
 }
 
 
-function sleep(ms) {
+export function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-
-/**
- * Displays a queue of messages inside a container, showing each message
- * one after the other with a staggered delay for smooth animations.
- *
- * This function is asynchronous and non-blocking, meaning the rest of the
- * page remains responsive while the messages are displayed.
- *
- * @async
- * @function showEnqueuedMessages
- * @param {string[]} enqueueMessages - An array of message strings to display sequentially.
- * @param {HTMLElement} container - The container element where messages will appear.
- * @param {number} [duration=6000] - Time in milliseconds before a message is hidden.
- * @param {number} [stagger=500] - Delay in milliseconds before showing the next message, 
- *                                 allowing animations to overlap smoothly.
- * 
- * @example
- * const messages = ["First message", "Second message", "Third message"];
- * showEnqueuedMessages(messages, document.querySelector("#message-box"));
- *
- * // Messages will appear one by one in #message-box,
- * // each visible for ~6s, staggered 500ms apart.
- */
-export async function showEnqueuedMessages(enqueueMessages, container, duration = 6000, stagger = 3000) {
-    if (enqueueMessages.length === 0) {
-        warnError("showEnqueuedMessages", "The enqueueMessages is empty")
-        return;
-    }
-
-    if (!checkIfHTMLElement(container)) {
-        warnError("showEnqueuedMessages", "The container is not a HTML container")
-        return false;
-    }
-
-  
-    while (enqueueMessages.length > 0) {
-       
-        const message = enqueueMessages.shift();
-     
-        showTemporaryMessage(container, message,  duration);
-        await sleep(stagger); // small stagger for animation
-           
-      
-    }
-}
-
-
-/**
- * Shows a temporary message inside a container element and hides it after a specified duration.
- *
- * @param {HTMLElement} container - The container element that holds the message (e.g., a div).
- * @param {string} message - The text content to display inside the container.
- * @param {number} [duration=MILLI_SECONDS] - Optional. The time in milliseconds before the message is hidden. Defaults to MILLI_SECONDS.
- *
- * @example
- * showTemporaryMessage(messageContainerElement, "Operation successful!", 3000);
- */
-export function showTemporaryMessage(container, message, duration = 6000) {
-    container.classList.add("show");
-    container.querySelector("p").textContent = message;
-
-
-    setTimeout(() => {
-        container.classList.remove("show");
-       
-    }, duration);
-
-     return true;
-}
-
-
-/**
- * Download a file from a Fetch Response object, with content-type validation.
- *
- * Also checks the `X-Success` header to determine if the server operation succeeded.
- * Throws an error if the response is HTML, preventing accidental download of error pages.
- *
- * @param {Response} resp - The Fetch Response object from the server.
- *
- * @returns {Promise<{success: boolean, filename: string}>} Resolves with an object containing:
- *   - success: boolean indicating whether the server reported success via `X-Success` header.
- *   - filename: the name of the downloaded file.
- *
- * @throws {Error} If the response Content-Type is HTML, indicating a potential error page.
- *
- * @example
- * const resp = await fetchData({ url: "/download-code/", returnRawResponse: true });
- * const { success, filename } = await downloadFromResponse(resp);
- * console.log("Download success:", success, "Filename:", filename);
- */
-export async function downloadFromResponse(resp) {
-
-
-    const contentType = resp.headers.get("Content-Type") || "";
-
-    // Prevent downloading HTML pages which would likely result in error pages
-    if (contentType.includes("text/html")) {
-        const text = await resp.text();
-        throw new Error(`Unexpected HTML response detected:\n${text}`);
-    }
-
-    // Extract filename from headers
-    const disposition = resp.headers.get("Content-Disposition");
-    let filename      = "downloaded_file";
-
-    if (disposition && disposition.includes("filename=")) {
-        filename = disposition.split("filename=")[1].replace(/['"]/g, "");
-    }
-
-  
-    const success = resp.headers.get("X-Success") === "true";
-
-    // Convert response to Blob which would enable it to be downloaded
-    const blob = await resp.blob();
-    
-    // Trigger download which shows up in the icon on the browser when item is downloading
-    const url  = window.URL.createObjectURL(blob);
-    const aElement    = document.createElement("a");
-    aElement.href     = url;
-    aElement.download = filename;
-    aElement.click();
-    aElement.remove();
-    window.URL.revokeObjectURL(url);
-
-    return { success, filename };
-}
 
 
 export function prependChild(parent, newChild) {
@@ -601,3 +468,12 @@ export function toggleElement(element, hide = true) {
  */
 export const doNothing = () => {};
 
+
+
+export function clearElement(element) {
+    if (!checkIfHTMLElement(element, element.tagName)) {
+        return;
+    }
+
+    element.innerHTML = "";
+}

@@ -1,3 +1,5 @@
+import { getCsrfToken } from "./security/csrf.js";
+
 /**
  * Asynchronously sends an HTTP request to the specified URL and returns the parsed JSON response.
  * 
@@ -153,6 +155,35 @@ export default async function fetchData({ url,
         console.error("Fetch error:", error.message);
         throw new Error(`${error}`);
       
+    }
+}
+
+
+
+
+
+
+/**
+ * Sends a POST request using fetch without a request body.
+ *
+ * This is useful for endpoints where the act of sending the request 
+ * itself is the trigger (e.g., logging out, sending recovery codes, 
+ * invalidating tokens), and no payload is required.
+ *
+ * @param {string} url - The target URL for the request.
+ * @param {string} [msg=""] - Optional message prefix to display in console warnings on error.
+ * @returns {Promise<void>} Resolves when the request completes, logs a warning on error.
+ */
+export async function sendPostFetchWithoutBody(url, msg = "", forceUpdate = true) {
+    try {
+        return await fetchData({
+            url: url,
+            csrfToken: getCsrfToken(),
+            method: "POST",
+            body: { forceUpdate: forceUpdate }  // fetchData will handle stringifying and headers
+        });
+    } catch (error) {
+        console.warn(msg, error);
     }
 }
 
