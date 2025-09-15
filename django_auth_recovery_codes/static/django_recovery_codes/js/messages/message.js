@@ -1,5 +1,6 @@
 
 import { sleep } from "../utils.js";
+import { checkIfHTMLElement } from "../utils.js";
 
 
 /**

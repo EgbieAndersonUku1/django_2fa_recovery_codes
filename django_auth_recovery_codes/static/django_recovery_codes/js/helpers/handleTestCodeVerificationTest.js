@@ -1,7 +1,10 @@
+import { handleButtonAlertClickHelper } from "./handleButtonAlertClicker.js";
+import { handleFormSubmissionHelper } from "./formUtils.js";
 
-async function handleTestCodeVerificationSetupClick(e) {
 
-    const formData = await handleTestSetupFormSubmission(e)
+export async function handleTestCodeVerificationSetupClick(e, testSetupFormElement) {
+
+    const formData = await handleTestSetupFormSubmission(e, testSetupFormElement)
 
     if (!formData) return;
     
@@ -83,4 +86,22 @@ async function handleTestCodeVerificationSetupClick(e) {
        
     
 }
+
+
+/**
+ * Handles the submission event for the "delete" form.
+ *
+ * The function allows the user to submit a request to delete a single recovery
+ * codes via a fetch API request when the form is submitted.
+ * 
+ *
+ *
+ * @param {Event} e - The submit event triggered by the form.
+ * @returns {void}
+ */
+function handleTestSetupFormSubmission(e, testSetupFormElement) {
+    return handleFormSubmissionHelper(e, testSetupFormElement, ["verify_code"]);
+
+}
+
 

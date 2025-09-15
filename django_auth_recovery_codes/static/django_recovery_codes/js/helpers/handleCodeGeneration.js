@@ -4,6 +4,7 @@ import { showTemporaryMessage } from "../messages/message.js";
 import { getCsrfToken } from "../security/csrf.js";
 import { sendPostFetchWithoutBody } from "../fetch.js";
 import { handleFormSubmissionHelper } from "./formUtils.js";
+import { loadTestVerificationElements } from "../codesSetupVerifcation/handleTestSetup.js";
 
 
 import { handleButtonAlertClickHelper } from "./handleButtonAlertClicker.js";
@@ -40,11 +41,6 @@ const dynamicTestFormSetupElement = document.getElementById("dynamic-form-setup"
 
 // Stats display board
 const statsTotalCodesIssuedBoard = document.getElementById("stat__total_codes_issued")
-
-
-// constants
-const MILLI_SECONDS_BEFORE_DISPLAY = 500;
-let alertMessage;
 
 
 
@@ -150,7 +146,7 @@ export async function handleGenerateCodeWithNoExpiryClick(e, generateCodeButtonI
  * 
  * @param {Event} e - The click event triggered by the button.
  */
-export async function handleRegenerateCodeButtonClick(e) {
+export async function handleRegenerateCodeButtonClick(e, regenerateButtonID, alertMessage) {
 
     const alertAttributes = {
         title: "Ready to get new codes?",
@@ -171,7 +167,7 @@ export async function handleRegenerateCodeButtonClick(e) {
 
     handleRecoveryCodesAction({
         e: e,
-        generateCodeBtn: REGENERATE_BUTTON_ID,
+        generateCodeBtn: regenerateButtonID,
         generateCodeBtnSpinnerElement: generateCodeWithNoExpirySpinnerElement,
         alertAttributes: alertAttributes,
         url: "/auth/recovery-codes/regenerate/",
@@ -201,12 +197,11 @@ export async function handleRegenerateCodeButtonClick(e) {
  * @param {Event} e - The event triggered by clicking the checkbox.
  * @returns {void}
  */
-export function handleIncludeExpiryDateCheckMark(e) {
+export function handleIncludeExpiryDateCheckMark(e, milliseconds = 1000 ) {
 
-    showSpinnerFor(excludeSpinnerLoaderElement, MILLI_SECONDS_BEFORE_DISPLAY);
+    showSpinnerFor(excludeSpinnerLoaderElement, milliseconds);
 
     const excludeInputFieldCheckElement = e.target;
-
 
     if (excludeInputFieldCheckElement.checked) {
         daysToExpiryGroupWrapperElement.classList.add("d-none");
@@ -374,10 +369,11 @@ async function handleRecoveryCodesAction({ e,
     )
 
     if (resp && resp.SUCCESS) {
-        return resp.CAN_GENERATE ? handleCanGenerateCodeSuccessUI(resp) : handleCannotGenerateCodeUI(resp);
+        resp.CAN_GENERATE ? handleCanGenerateCodeSuccessUI(resp) : handleCannotGenerateCodeUI(resp);
+    } else {
+        handleCannotGenerateCodeError()
     }
-
-    return handleCannotGenerateCodeError()
+    appStateManager.setCodeGeneration(false);
 
 }
 

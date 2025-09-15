@@ -1,13 +1,15 @@
-import { toggleSpinner } from "./utils.js";
+import { toggleSpinner } from "../utils.js";
 
 const resultContainer = document.getElementById("dynamic-verify-form-container");
 
 
 const MILLI_SECONDS = 1000;
 
+
 export function clearTestResultContainer() {
     resultContainer.innerHTML = "";
 }
+
 
 export async function displayResults(results) {
     const divTestResultContainer     = document.createElement("div");
@@ -22,24 +24,21 @@ export async function displayResults(results) {
 
     const keys = Object.keys(results).filter(key => key !== "SUCCESS");
 
-    console.log(results)
     keys.forEach((key, index) => {
 
         setTimeout(() => {
             const message = results[key];
 
             if (key !== "FAILURE") {
+
                 if (message) {
-
-             
-                const divResult = createResultDiv(message);
-
-                divResult.classList.remove("text-red", "text-green")
-              
-                results.FAILURE ? divResult.classList.add("text-red") : divResult.classList.add("text-green")
-              
             
-                resultContainer.appendChild(divResult);
+                    const divResult = createResultDiv(message);
+                    divResult.classList.remove("text-red", "text-green")
+                
+                    results.FAILURE ? divResult.classList.add("text-red") : divResult.classList.add("text-green")
+            
+                    resultContainer.appendChild(divResult);
                 }
             }
             
@@ -94,11 +93,11 @@ function createResultDiv(message, className = null) {
 
      setTimeout(() => {
         divResult.appendChild(pElement);
-        toggleSpinner(spanElement, false)
+        toggleSpinner(spanElement, false);
     }, MILLI_SECONDS * 3)
    
   
-    return divContainer
+    return divContainer;
 
 }
 

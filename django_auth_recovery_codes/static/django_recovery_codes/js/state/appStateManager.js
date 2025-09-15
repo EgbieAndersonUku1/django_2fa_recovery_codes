@@ -29,6 +29,26 @@ export const appStateManager = {
     
     shouldGenerateCodeActionButtons() {
         return config.generateCodeActionButtons
+    },
+
+    setGenerateActionButtons(generate) {
+        config.generateCodeActionButtons = generate;
+    },
+
+    setTequestCodeRegeneration(codeRequested) {
+        config.REGENERATE_CODE_REQUEST = codeRequested;
+      
+    },
+
+    setLengthPerDashInputField(length = 6) {
+        if (!Number.isInteger(length)) {
+            console.error(`The length per dash on the inputfield must be an int. Expected an int got ${length}`);
+        }
+        config.LENGTH_PER_DASH = length;
+    },
+
+    getLengthPerDashInputField() {
+        return config.LENGTH_PER_DASH;
     }
 };
 

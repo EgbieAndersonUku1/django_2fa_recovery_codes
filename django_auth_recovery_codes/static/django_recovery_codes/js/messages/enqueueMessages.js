@@ -1,7 +1,7 @@
 import { showTemporaryMessage } from "./message.js";
 import { sleep } from "../utils.js";
 import { warnError } from "../logger.js";
-
+import { checkIfHTMLElement } from "../utils.js";
 
 
 export default class EnqueuedMessages {
@@ -15,7 +15,7 @@ export default class EnqueuedMessages {
     }
 
     getEnqueuedMessages() {
-        this._enqueuedMessages;
+        return this._enqueuedMessages;
     }
 
     

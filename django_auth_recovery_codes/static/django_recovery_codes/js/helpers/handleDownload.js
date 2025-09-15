@@ -1,6 +1,95 @@
-import { showTemporaryMessage } from "../messages/message.js";
+
+
+import { showTemporaryMessage }                from "../messages/message.js";
 import { toggleSpinner, toggleButtonDisabled } from "../utils.js";
-import { updateButtonFromConfig } from "../generateCodeActionButtons.js";
+import { updateButtonFromConfig }              from "../generateCodeActionButtons.js";
+import messageContainerElement                 from "./appMessages.js";
+import { messagePTag }                         from "./appMessages.js";
+import { handleButtonAlertClickHelper }        from "./handleButtonAlertClicker.js";
+import fetchData                               from "../fetch.js";
+import { getCsrfToken }                        from "../security/csrf.js";
+import { buttonStates }                        from "../generateCodeActionButtons.js";
+import { logError, warnError }                 from "../logger.js";
+
+
+
+const downloadCodeButtonElementSpinner = document.getElementById("download-code-loader");
+
+
+function extractDispositionFromHeaders(headers) {
+
+    if (typeof headers !== "object") {
+        warnError("headers not found because headers is not a dictionary")
+        return {disposition: null, filename: null}
+    }
+    return headers.get("Content-Disposition");
+
+}
+
+
+function getFilenameFromDisposition(disposition) {
+    let filename = "downloaded_file";
+   
+    if (disposition && disposition.includes("filename=")) {
+        filename = disposition.split("filename=")[1].replace(/['"]/g, "");
+    }
+
+    return filename;
+}
+
+async function triggerDownload(fetchResponse) {
+
+    const disposition = extractDispositionFromHeaders(fetchResponse.headers);
+
+    if (!disposition) {
+        logError("extractDispositionFromHeaders", "Expected a disposition object but got null");
+        return;
+    }
+
+    const filename = getFilenameFromDisposition(disposition);
+
+    try {
+        const blob        = await fetchResponse.blob();
+        const url         = window.URL.createObjectURL(blob);
+        const aElement    = document.createElement("a");
+        aElement.href     = url;
+        aElement.download = filename;
+        aElement.click();
+        aElement.remove();
+        window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+        throw new Error(error.message)
+    }
+
+    const success  = fetchResponse.headers.get("X-Success") === "true";
+    return { success, filename };
+   
+}
+
+
+
+
+function handleDownloadSuccessMessageUI(e) {
+
+    toggleSpinner(downloadCodeButtonElementSpinner, false)
+    showTemporaryMessage(messageContainerElement, "Your recovery codes have successfully been downloaded");
+
+    const btn = e.target.closest("button");
+    toggleButtonDisabled(btn, false);
+    updateButtonFromConfig(btn, buttonStates.downloaded, "You have already downloaded this code");
+    toggleButtonDisabled(btn)
+
+}
+
+function handleDownloadFailureMessageUI() {
+    
+    warnError("handleDownloadButtonClick", "The button container element wasn't found");
+    toggleSpinner(downloadCodeButtonElementSpinner, false)
+    showTemporaryMessage(messageContainerElement, "Failed to download your recovery codes")
+
+}
+
 
 
 /**
@@ -24,7 +113,6 @@ import { updateButtonFromConfig } from "../generateCodeActionButtons.js";
  */
 export async function downloadFromResponse(resp) {
 
-
     const contentType = resp.headers.get("Content-Type") || "";
 
     // Prevent downloading HTML pages which would likely result in error pages
@@ -33,31 +121,14 @@ export async function downloadFromResponse(resp) {
         throw new Error(`Unexpected HTML response detected:\n${text}`);
     }
 
-    // Extract filename from headers
-    const disposition = resp.headers.get("Content-Disposition");
-    let filename      = "downloaded_file";
 
-    if (disposition && disposition.includes("filename=")) {
-        filename = disposition.split("filename=")[1].replace(/['"]/g, "");
-    }
-
-  
-    const success = resp.headers.get("X-Success") === "true";
-
-    // Convert response to Blob which would enable it to be downloaded
-    const blob = await resp.blob();
-    
-    // Trigger download which shows up in the icon on the browser when item is downloading
-    const url  = window.URL.createObjectURL(blob);
-    const aElement    = document.createElement("a");
-    aElement.href     = url;
-    aElement.download = filename;
-    aElement.click();
-    aElement.remove();
-    window.URL.revokeObjectURL(url);
-
-    return { success, filename };
+    return  triggerDownload(resp);
 }
+
+
+
+
+
 
 
 /**
@@ -71,11 +142,10 @@ export async function downloadFromResponse(resp) {
 export async function handleDownloadButtonClick(e, downloadButtonID) {
 
     const buttonElement = e.target;
-   
-    toggleSpinner(downloadCodeButtonElementSpinner);
-    messageContainerElement.classList.add("show");
+    toggleButtonDisabled(buttonElement);
 
-    toggleButtonDisabled(buttonElement)
+    toggleSpinner(downloadCodeButtonElementSpinner);
+    messageContainerElement.classList.add("show");  
 
     messagePTag.textContent = "Preparing your download... just a moment!";
 
@@ -93,31 +163,19 @@ export async function handleDownloadButtonClick(e, downloadButtonID) {
 
     }
     const resp = await handleButtonAlertClickHelper(e,
-        downloadButtonID,
-        {},
-        downloadCodeButtonElementSpinner,
-        handleDownloadCodesApiRequest,
-    )
+                                                    downloadButtonID,
+                                                    {},
+                                                    downloadCodeButtonElementSpinner,
+                                                    handleDownloadCodesApiRequest,
+                                                     )
 
     const respData = await downloadFromResponse(resp)
 
     if (respData && respData.success) {
-
-        toggleButtonDisabled(buttonElement, false);
-        toggleSpinner(downloadCodeButtonElementSpinner, false)
-        showTemporaryMessage(messageContainerElement, "Your recovery codes have successfully been downloaded");
-
-        const btn = e.target.closest("button");
-        updateButtonFromConfig(btn, buttonStates.downloaded, "You have already downloaded this code");
-        toggleButtonDisabled(btn)
-
-
-    } else {
-        warnError("handleDownloadButtonClick", "The button container element wasn't found");
-
-        toggleSpinner(downloadCodeButtonElementSpinner, false)
-        showTemporaryMessage(messageContainerElement, "Failed to download your recovery codes")
-
-    }
+       handleDownloadSuccessMessageUI(e);
+       return;
+    } 
+    
+    handleDownloadFailureMessageUI();
 
 }

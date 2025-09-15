@@ -1,5 +1,12 @@
-const emailButtonSpinnerElement = document.getElementById("email-code-loader");
+import messageContainerElement                  from "./appMessages.js";
+import EnqueuedMessages                         from "../messages/enqueueMessages.js";
+import { handleButtonAlertClickHelper }         from "./handleButtonAlertClicker.js";
+import { sendPostFetchWithoutBody }             from "../fetch.js";
+import { updateButtonFromConfig, buttonStates } from "../generateCodeActionButtons.js";
+import { toggleButtonDisabled }                 from "../utils.js";
 
+const emailButtonSpinnerElement = document.getElementById("email-code-loader");
+const enqueuedMessages          = new EnqueuedMessages();
 
 
 /**
@@ -24,8 +31,8 @@ export async function handleEmailCodeeButtonClick(e, emailButtonID) {
     }
 
     const handleEmailFetchApiSend = async () => {
-                const url = "/auth/recovery-codes/email/";
-                return await sendPostFetchWithoutBody(url, "The email wasn't sent")
+            const url = "/auth/recovery-codes/email/";
+            return await sendPostFetchWithoutBody(url, "The email wasn't sent")
     }
 
     const resp = await handleButtonAlertClickHelper(e,
@@ -35,20 +42,24 @@ export async function handleEmailCodeeButtonClick(e, emailButtonID) {
                                                     handleEmailFetchApiSend
                                                     );
 
-    if (resp.SUCCESS) {
+    resp.SUCCESS ? handleEmailSuccessMessageUI(e, resp) : handleEmailFailureMessageUI(resp);
+    return true;
 
-        const btn = e.target.closest("button");
-        updateButtonFromConfig(btn, buttonStates.emailed, "You have already emailed yourself this code");
-        toggleButtonDisabled(btn);
-
-        enqueueMessages.push(resp.MESSAGE);
-        showEnqueuedMessages(enqueueMessages, messageContainerElement)
+}
 
 
-    } else {
-        enqueueMessages.push(resp.MESSAGE)
-        showEnqueuedMessages(enqueueMessages, messageContainerElement)
+function handleEmailSuccessMessageUI(e, resp) {
 
-    }
+    const btn = e.target.closest("button");
+    updateButtonFromConfig(btn, buttonStates.emailed, "You have already emailed yourself this code");
+    toggleButtonDisabled(btn);
 
+    enqueuedMessages.addMessage(resp.MESSAGE);
+    enqueuedMessages.showEnqueuedMessages(messageContainerElement);
+}
+
+
+function handleEmailFailureMessageUI(resp) {
+    enqueuedMessages.addMessage(resp.MESSAGE);
+    enqueuedMessages.showEnqueuedMessages(messageContainerElement);
 }
