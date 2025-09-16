@@ -4,6 +4,9 @@ import { handleButtonAlertClickHelper }         from "./handleButtonAlertClicker
 import { sendPostFetchWithoutBody }             from "../fetch.js";
 import { updateButtonFromConfig, buttonStates } from "../generateCodeActionButtons.js";
 import { toggleButtonDisabled }                 from "../utils.js";
+import { toggleProcessMessage }                 from "./handleButtonAlertClicker.js";
+import { showTemporaryMessage }                 from "../messages/message.js";
+
 
 const emailButtonSpinnerElement = document.getElementById("email-code-loader");
 const enqueuedMessages          = new EnqueuedMessages();
@@ -42,7 +45,14 @@ export async function handleEmailCodeeButtonClick(e, emailButtonID) {
                                                     handleEmailFetchApiSend
                                                     );
 
-    resp.SUCCESS ? handleEmailSuccessMessageUI(e, resp) : handleEmailFailureMessageUI(resp);
+    if (resp === undefined) {
+        showTemporaryMessage("Something went wrong and the email wasn't sent");
+        toggleProcessMessage(false);
+        return;
+    }
+   
+    resp && resp.SUCCESS ? handleEmailSuccessMessageUI(e, resp) : handleEmailFailureMessageUI(resp);
+   
     return true;
 
 }
@@ -56,10 +66,19 @@ function handleEmailSuccessMessageUI(e, resp) {
 
     enqueuedMessages.addMessage(resp.MESSAGE);
     enqueuedMessages.showEnqueuedMessages(messageContainerElement);
+
+    setTimeout(() => {
+        toggleProcessMessage(false)
+    }, 2000)
+   
 }
 
 
 function handleEmailFailureMessageUI(resp) {
-    enqueuedMessages.addMessage(resp.MESSAGE);
-    enqueuedMessages.showEnqueuedMessages(messageContainerElement);
+    if (resp) {
+        enqueuedMessages.addMessage(resp.MESSAGE);
+        enqueuedMessages.showEnqueuedMessages(messageContainerElement);
+    }
+ 
+    toggleProcessMessage(false)
 }

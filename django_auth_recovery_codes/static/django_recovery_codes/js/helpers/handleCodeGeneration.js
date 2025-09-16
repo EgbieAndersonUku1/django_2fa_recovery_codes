@@ -5,7 +5,7 @@ import { getCsrfToken } from "../security/csrf.js";
 import { sendPostFetchWithoutBody } from "../fetch.js";
 import { handleFormSubmissionHelper } from "./formUtils.js";
 import { loadTestVerificationElements } from "../codesSetupVerifcation/handleTestSetup.js";
-
+import { toggleProcessMessage } from "./handleButtonAlertClicker.js";
 
 import { handleButtonAlertClickHelper } from "./handleButtonAlertClicker.js";
 import { updateBatchHistorySection } from "../batchCardsHistory/updateBatchHistorySection.js";
@@ -15,6 +15,9 @@ import messageContainerElement from "./appMessages.js";
 
 import { AlertUtils } from "../alerts.js";
 import fetchData from "../fetch.js";
+
+
+
 
 
 // Elements
@@ -253,6 +256,7 @@ function handleCanGenerateCodeSuccessUI(resp) {
         // show the optional verification form
         // toggleElement(testSetupFormContainerElement, false);
         if (!resp.HAS_COMPLETED_SETUP) {
+            console.log("I am here.....................")
             toggleElement(dynamicTestFormSetupElement, false);
             loadTestVerificationElements();
         }
@@ -360,6 +364,8 @@ async function handleRecoveryCodesAction({ e,
 
     tableCoderSpinnerElement.style.display = "inline-block"
     toggleSpinner(tableCoderSpinnerElement);
+    
+  
 
     const resp = await handleButtonAlertClickHelper(e,
         generateCodeBtn,
@@ -368,10 +374,23 @@ async function handleRecoveryCodesAction({ e,
         handleGenerateCodeFetchApi
     )
 
+    console.log(resp);
     if (resp && resp.SUCCESS) {
-        resp.CAN_GENERATE ? handleCanGenerateCodeSuccessUI(resp) : handleCannotGenerateCodeUI(resp);
+    
+        if (resp.CAN_GENERATE) {
+
+            handleCanGenerateCodeSuccessUI(resp);
+            toggleProcessMessage(false);
+        
+        } else {
+            handleCannotGenerateCodeUI(resp);
+            toggleProcessMessage(false);
+        
+        }
+       
     } else {
-        handleCannotGenerateCodeError()
+        handleCannotGenerateCodeError();
+        toggleProcessMessage(false);
     }
     appStateManager.setCodeGeneration(false);
 

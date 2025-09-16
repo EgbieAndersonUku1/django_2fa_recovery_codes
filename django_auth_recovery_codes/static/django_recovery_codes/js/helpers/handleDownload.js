@@ -10,6 +10,7 @@ import fetchData                               from "../fetch.js";
 import { getCsrfToken }                        from "../security/csrf.js";
 import { buttonStates }                        from "../generateCodeActionButtons.js";
 import { logError, warnError }                 from "../logger.js";
+import { toggleProcessMessage }                from "./handleButtonAlertClicker.js";
 
 
 
@@ -127,10 +128,6 @@ export async function downloadFromResponse(resp) {
 
 
 
-
-
-
-
 /**
  * Handles the click event for the "Download code" button.
  * 
@@ -143,6 +140,7 @@ export async function handleDownloadButtonClick(e, downloadButtonID) {
 
     const buttonElement = e.target;
     toggleButtonDisabled(buttonElement);
+    const MILLI_SECONDS = 2000;
 
     toggleSpinner(downloadCodeButtonElementSpinner);
     messageContainerElement.classList.add("show");  
@@ -169,13 +167,18 @@ export async function handleDownloadButtonClick(e, downloadButtonID) {
                                                     handleDownloadCodesApiRequest,
                                                      )
 
+   
     const respData = await downloadFromResponse(resp)
 
-    if (respData && respData.success) {
-       handleDownloadSuccessMessageUI(e);
-       return;
-    } 
-    
-    handleDownloadFailureMessageUI();
+    setTimeout(() => {
+         toggleProcessMessage(false)
+        if (respData && respData.success) {
+            handleDownloadSuccessMessageUI(e);
+            return;
+        } 
+        
+        handleDownloadFailureMessageUI();
+          
+    }, MILLI_SECONDS)
 
 }

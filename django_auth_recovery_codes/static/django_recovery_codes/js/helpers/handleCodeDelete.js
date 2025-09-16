@@ -7,6 +7,8 @@ import { checkIfHTMLElement } from "../utils.js";
 import { toggleElement } from "../utils.js";
 import { AlertUtils } from "../alerts.js";
 import { doNothing } from "../utils.js";
+import { toggleProcessMessage } from "./handleButtonAlertClicker.js";
+
 
 export const deleteInputFieldElement    = document.getElementById("delete-code-input");
 const testSetupFormContainerElement     = document.getElementById("dynamic-verify-form-container");
@@ -186,7 +188,7 @@ export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID,
     if (resp && resp.SUCCESS) {
 
         const {codeActionButtons, tableCodes} = getDynamicCodeUIElements();
-        
+         toggleProcessMessage(false);
         if (!(checkIfHTMLElement(codeActionButtons) && checkIfHTMLElement(tableCodes))) {
             warnError("handleDeleteAllCodeButtonClick", "The button container element wasn't found");
             return;
@@ -200,9 +202,12 @@ export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID,
         try {
             toggleElement(testSetupFormElement)
         } catch (error) {
-            doNothing()
+            doNothing();
+            toggleProcessMessage(false);
             }
 
-        }    
+        }  else {
+             toggleProcessMessage(false);
+        }
 
 }

@@ -35,7 +35,7 @@ export const appStateManager = {
         config.generateCodeActionButtons = generate;
     },
 
-    setTequestCodeRegeneration(codeRequested) {
+    setRequestCodeRegeneration(codeRequested) {
         config.REGENERATE_CODE_REQUEST = codeRequested;
       
     },

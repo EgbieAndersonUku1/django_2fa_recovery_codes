@@ -454,13 +454,16 @@ def recovery_dashboard(request):
         if recovery_batch:
             user_data                        = recovery_batch.get_cache_values()
             user_data["user_has_done_setup"] = RecoveryCodeSetup.has_first_time_setup_occurred(user)
-       
+            view_logger.debug("Data retrieved are: is_generated=%s, is_email=%s, is_viewed=%s, is_downloaded=%s, user_has_done_setup=%s",
+                               user_data.get("generated"), user_data.get("emailed"), user_data.get("viewed"),
+                               user_data.get("downloaded"), user_data.get("user_has_done_setup")
+                    )
+
         set_cache_with_retry(cache_key, user_data)
 
     else:
         view_logger.debug("Getting the data from the cache instead of the database")
-        
-    
+     
     if user_data:
         
         context.update({
@@ -471,6 +474,7 @@ def recovery_dashboard(request):
                 "user_has_done_setup": user_data.get("user_has_done_setup"),
             })
     
+ 
     if not isinstance(recovery_batch_context, dict):
         raise TypeError(f"Expected a context dictionary but got object with type {type(recovery_batch_context).__name__}")
 
