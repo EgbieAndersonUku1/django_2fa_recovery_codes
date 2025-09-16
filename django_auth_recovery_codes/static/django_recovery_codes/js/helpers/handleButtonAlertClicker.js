@@ -2,7 +2,7 @@ import { toggleSpinner, toggleButtonDisabled } from "../utils.js";
 import { logError } from "../logger.js";
 import { AlertUtils } from "../alerts.js";
 
-
+const processingMessage = document.getElementById("process-message");
 
 /**
  * Handles a button click event by showing a confirmation alert with spinner and button state toggling.
@@ -27,15 +27,18 @@ import { AlertUtils } from "../alerts.js";
 export async function handleButtonAlertClickHelper(e, buttonElementID, buttonSpinnerElement, alertAttributes = {}, func = null) {
 
     if (!(typeof alertAttributes === "object")) {
-        logError("handleButtonAlertClickHelper", `The parameter alertAttributes is not an object. Expected an object but got type: ${typeof alertAttributes}`)
+        logError("handleButtonAlertClickHelper", `The parameter alertAttributes is not an object. Expected an object but got type: ${typeof alertAttributes}`);
+        return;
     }
 
     if (!(typeof buttonElementID === "string")) {
-        logError("handleButtonAlertClickHelper", `The parameter buttonElementID is not an string. Expected a string but got type: ${typeof buttonElement}`)
+        logError("handleButtonAlertClickHelper", `The parameter buttonElementID is not an string. Expected a string but got type: ${typeof buttonElement}`);
+        return;
     }
 
     if (func && !(typeof func === "function")) {
-        logError("handleButtonAlertClickHelper", `The parameter func is not a function. Expected a function but got type: ${typeof func}`)
+        logError("handleButtonAlertClickHelper", `The parameter func is not a function. Expected a function but got type: ${typeof func}`);
+        return;
     }
 
     const buttonElement = e.target.closest("button");
@@ -50,8 +53,10 @@ export async function handleButtonAlertClickHelper(e, buttonElementID, buttonSpi
     await new Promise(requestAnimationFrame);
 
     try {
-        let resp;
+        let resp = true;
+
         if (alertAttributes !== null && Object.keys(alertAttributes).length > 0) {
+
             resp = await AlertUtils.showConfirmationAlert({
                 title: alertAttributes.title,
                 text: alertAttributes.text,
@@ -61,10 +66,11 @@ export async function handleButtonAlertClickHelper(e, buttonElementID, buttonSpi
                 confirmButtonText: alertAttributes.confirmButtonText,
                 denyButtonText: alertAttributes.denyButtonText
             });
-        } else {
-            resp = true;
-        }
+
+        } 
         if (resp) {
+            
+            toggleProcessMessage(true);
             if (func) {
                 return func()
             }
@@ -82,3 +88,6 @@ export async function handleButtonAlertClickHelper(e, buttonElementID, buttonSpi
 }
 
 
+export function toggleProcessMessage(show=true) {
+    show ? processingMessage.classList.add("show") : processingMessage.classList.remove("show")
+}

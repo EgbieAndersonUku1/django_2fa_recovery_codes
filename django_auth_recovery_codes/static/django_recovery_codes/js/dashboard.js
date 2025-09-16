@@ -30,7 +30,11 @@ const navigationIconContainerElement = document.getElementById("navigation-icon-
 // input
 invalidateInputFieldElement.addEventListener("input", handleInputFieldHelper);
 deleteInputFieldElement.addEventListener("input", handleInputFieldHelper);
-testSetupInputFieldElement.addEventListener("input", handleInputFieldHelper);
+
+if (testSetupInputFieldElement) {
+     testSetupInputFieldElement.addEventListener("input", handleInputFieldHelper);
+
+}
 
 // clicking
 
@@ -162,7 +166,7 @@ function handleEventDelegation(e) {
             appStateManager.setCodeGeneration(true)
             toggleElement(alertMessage);
             handleRegenerateCodeButtonClick(e, REGENERATE_BUTTON_ID, alertMessage);
-            appStateManager.setTequestCodeRegeneration(true);
+            appStateManager.setRequestCodeRegeneration(true);
             break;
 
         case DELETE_CURRENT_CODE_BUTTON_ID:

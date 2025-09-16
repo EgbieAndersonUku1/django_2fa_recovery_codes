@@ -17,10 +17,11 @@ export function showTemporaryMessage(container, message, duration = 6000) {
 
     container.classList.add("show");
 
-    const pElement = container.querySelector("p")
+    let pElement = container.querySelector("p")
     
     if (!pElement) {
-        pElement = document.createElement("p")
+        pElement = document.createElement("p");
+        container.appendChild(pElement);
     }
     
     pElement.textContent = message;

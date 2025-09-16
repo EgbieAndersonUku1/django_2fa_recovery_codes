@@ -4,12 +4,12 @@ import { generateCodeActionAButtons } from "../generateCodeActionButtons.js";
 import { toggleSpinner, clearElement } from "../utils.js";
 
 
-const codeActionContainerElement = document.getElementById("page-buttons");
-const tableCoderSpinnerElement   = document.getElementById("table-loader");
-const codeTableElement           = document.getElementById("table-code-view");
-
-const messageContainerElement    = document.getElementById("messages");
-const messagePTag                = document.getElementById("message-p-tag");
+const codeActionContainerElement          = document.getElementById("page-buttons");
+const tableCoderSpinnerElement            = document.getElementById("table-loader");
+const codeTableElement                    = document.getElementById("table-code-view");
+const generaterecoveryBatchSectionElement = document.getElementById("generate-code-section");
+const messageContainerElement             = document.getElementById("messages");
+const messagePTag                         = document.getElementById("message-p-tag");
 
 import { HTMLTableBuilder } from "../generateTable.js";
 
@@ -42,7 +42,7 @@ export function populateTableWithUserCodes(codes) {
             appStateManager.setCodeGeneration(false)
 
             // show the code action buttons
-            if (appStateManager.shouldGenerateCodeActionButtons) {
+            if (appStateManager.shouldGenerateCodeActionButtons()) {
                 showCodeActionsButton();
                 return;
             }
@@ -84,7 +84,7 @@ function pickRightDivAndPopulateTable(tableCodesElement) {
 function showCodeActionsButton() {
     const buttons = generateCodeActionAButtons();
     codeActionContainerElement.appendChild(buttons);
-    appStateManager.setCodeGeneration(false);
+    // appStateManager.setCodeGeneration(false);
     return;
 }
   

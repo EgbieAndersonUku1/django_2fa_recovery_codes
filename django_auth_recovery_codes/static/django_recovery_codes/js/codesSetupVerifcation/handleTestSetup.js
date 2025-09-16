@@ -1,4 +1,5 @@
-import { handleButtonAlertClickHelper } from "../helpers/handleButtonAlertClicker.js";
+import appStateManager from "../state/appStateManager.js";
+import { handleButtonAlertClickHelper, toggleProcessMessage } from "../helpers/handleButtonAlertClicker.js";
 import { clearTestResultContainer, displayResults } from "./generateSetupElement.js";
 import { handleFormSubmissionHelper } from "../helpers/formUtils.js";
 import { toggleElement } from "../utils.js";
@@ -12,9 +13,12 @@ const testSetupFormElement        = document.getElementById("verify-setup-form")
 
 const testSetupInputFieldElement  = document.getElementById("verify-code-input");
 
-testSetupFormElement.addEventListener("submit", handleTestSetupFormSubmission);
-testSetupFormElement.addEventListener("input", handleTestSetupFormSubmission);
-testSetupFormElement.addEventListener("blur", handleTestSetupFormSubmission);
+if (testSetupFormElement) {
+    testSetupFormElement.addEventListener("submit", handleTestSetupFormSubmission);
+    testSetupFormElement.addEventListener("input", handleTestSetupFormSubmission);
+    testSetupFormElement.addEventListener("blur", handleTestSetupFormSubmission);
+}
+
 
 
 const VERIFY_SETUP_BUTTON  = "verify-code-btn";
@@ -97,13 +101,14 @@ export async function handleTestCodeVerificationSetupClick(e, verifySetupButtonI
             testFormSectionElement.reset();
 
             if (isComplete) {
-                verificationTestComplete();
+                appStateManager.setVerificationTest(false);
             }
 
 
 
         } catch (error) {
             doNothing();
+            appStateManager.setVerificationTest(false);
 
         }
     }
@@ -114,7 +119,6 @@ export async function handleTestCodeVerificationSetupClick(e, verifySetupButtonI
 
 
 export async function displayTestResults(data) {
-
 
     if (data) {
 
@@ -141,13 +145,15 @@ export async function displayTestResults(data) {
             testFormSectionElement.reset();
 
             if (isComplete) {
-                verificationTestComplete();
+                appStateManager.setVerificationTest(false);
             }
 
+            toggleProcessMessage(false);
 
 
         } catch (error) {
             doNothing();
+            toggleProcessMessage(false);
 
         }
     }

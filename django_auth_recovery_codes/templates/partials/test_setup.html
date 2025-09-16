@@ -22,10 +22,12 @@
     </div>
 
     <!-- Conditional form (only shown for users who haven't completed setup) -->
-    {% if is_generated and not user_has_done_setup %}
-    <div class="form-container margin-top-xlg" id="verify-form-container" aria-labelledby="verify-form-label">
-        {% include "partials/partial_forms/test_setup_form.html" %}
-    </div>
+    {% if is_generated %}
+        {% if not user_has_done_setup %}
+            <div class="form-container margin-top-xlg" id="verify-form-container" aria-labelledby="verify-form-label">
+                {% include "partials/partial_forms/test_setup_form.html" %}
+            </div>
+        {% endif %}
     {% endif %}
 
   

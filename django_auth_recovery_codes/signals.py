@@ -1,6 +1,8 @@
 import logging
 
-from django.db.models.signals import post_save, pre_save, post_delete
+from django.db.models.signals import post_save, pre_save, post_delete, post_migrate
+from django_auth_recovery_codes.utils.schedulers import schedule_recovery_code_cleanup, schedule_cleanup_audit
+
 from django.dispatch import receiver
 from django_auth_recovery_codes.models import (RecoveryCodeCleanUpScheduler, 
                                                RecoveryCodeAudit, 
@@ -117,3 +119,12 @@ def handle_post_delete_recovery_setup(sender, instance, **kwargs):
         if cache_data:
             cache_data[SETUP_FLAG] = False
             set_cache_with_retry(CACHE_KEY, cache_data)
+
+
+@receiver(post_migrate)
+def schedule_tasks(sender, **kwargs):
+    """
+    Schedule cleanup tasks after migrations to ensure Django is fully loaded.
+    """
+    schedule_recovery_code_cleanup()
+    schedule_cleanup_audit()

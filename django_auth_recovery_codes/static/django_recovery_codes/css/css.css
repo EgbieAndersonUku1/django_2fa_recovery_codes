@@ -1101,6 +1101,34 @@ button {
     overflow: hidden;
 }
 
+#processing-code-loader {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    background: blue;
+
+}
+
+.process-container {
+    border: 1px solid black;
+    background-color: white;
+}
+
+#process-message {
+    width: 30%;
+    position: fixed;
+    bottom: 3%;
+    display: none;
+    left: 2%;
+
+   
+}
+
+#process-message-p-tag {
+  font-weight: 300;
+  font-size: 0.9rem;
+}
+
 
 /* Keyframes for continuous rotation */
 @keyframes rotation {
@@ -1116,17 +1144,18 @@ button {
 /*      FLOATING MESSAGE BOX FOR NOTIFICATIONS */
 /* ------------------------------------------ */
 
+
 #messages,
 #notification {
     position: fixed;
     left: 10px;
     bottom: 0;
-    width: 45%;
+    width: 30%;
     background: #28a745;
     color: white;
     border: 1px solid black;
     border-radius: 4px;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 400;
     text-align: left;
     transform: translateY(100%);
@@ -1164,11 +1193,19 @@ button {
 
 
 
+#process-message.show {
+    display: block;
+}
+
+
 .notification-status {
     margin-right: var(--md-spacing);
     border-right: 2px solid black;
    
 }
+
+
+
 
 @keyframes messageFloat {
     0% {
