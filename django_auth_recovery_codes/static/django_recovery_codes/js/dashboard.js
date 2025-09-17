@@ -132,22 +132,22 @@ function handleEventDelegation(e) {
 
     switch (elementID) {
         case GENERATE_CODE_WITH_EXPIRY_BUTTON_ID:
-            appStateManager.setCodeGeneration(true)
+            appStateManager.setCodeGeneration(true);
             handleGenerateCodeWithExpiryClick(e, GENERATE_CODE_WITH_EXPIRY_BUTTON_ID);
             loadTestVerificationElements();
-            appStateManager.setGenerateActionButtons(false);
+            appStateManager.setGenerateActionButtons(true);
             break;
         case GENERATE_CODE_WITH_NO_EXPIRY:
             appStateManager.setCodeGeneration(true)
             handleGenerateCodeWithNoExpiryClick(e, GENERATE_CODE_WITH_NO_EXPIRY);
-            appStateManager.setGenerateActionButtons(false);
+            appStateManager.setGenerateActionButtons(true)
             loadTestVerificationElements();
             break;
         case EMAIL_BUTTON_ID:
             handleEmailCodeeButtonClick(e, EMAIL_BUTTON_ID);
             break;
         case EXCLUDE_EXPIRY_CHECKBOX_ID:
-            handleIncludeExpiryDateCheckMark(e, EXCLUDE_EXPIRY_CHECKBOX_ID);
+            handleIncludeExpiryDateCheckMark(e);
             break;
         case VERIFY_SETUP_BUTTON:
             appStateManager.setVerificationTest(true);

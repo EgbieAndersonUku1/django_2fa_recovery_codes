@@ -41,12 +41,6 @@ export function populateTableWithUserCodes(codes) {
 
             appStateManager.setCodeGeneration(false)
 
-            // show the code action buttons
-            if (appStateManager.shouldGenerateCodeActionButtons()) {
-                showCodeActionsButton();
-                return;
-            }
-
             if (generaterecoveryBatchSectionElement === null) {
                 clearElement(codeActionContainerElement);
 
@@ -63,9 +57,8 @@ export function populateTableWithUserCodes(codes) {
 
 function pickRightDivAndPopulateTable(tableCodesElement) {
 
-    if (config.generateCodeActionButtons) {
+    if (appStateManager.shouldGenerateCodeActionButtons()) {
        showCodeActionsButton();
-       return;
     }
 
     if (codeTableElement) {

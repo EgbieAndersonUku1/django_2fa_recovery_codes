@@ -1,4 +1,4 @@
-import { toggleSpinner, toggleButtonDisabled } from "../utils.js";
+import { toggleSpinner, toggleButtonDisabled, toggleElement } from "../utils.js";
 import { logError } from "../logger.js";
 import { AlertUtils } from "../alerts.js";
 
@@ -71,6 +71,7 @@ export async function handleButtonAlertClickHelper(e, buttonElementID, buttonSpi
         if (resp) {
             
             toggleProcessMessage(true);
+
             if (func) {
                 return func()
             }

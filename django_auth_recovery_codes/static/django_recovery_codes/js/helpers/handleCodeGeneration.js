@@ -23,7 +23,8 @@ import fetchData from "../fetch.js";
 // Elements
 const daysToExpiryGroupWrapperElement = document.getElementById("days-to-expiry-group");
 const generaterecoveryBatchSectionElement = document.getElementById("generate-code-section");
-const recoveryBatchSectionElement = document.getElementById("static-batch-cards-history")
+const recoveryBatchSectionElement = document.getElementById("static-batch-cards-history");
+const codeActionButtons           = document.getElementById("code-actions");   
 
 // spinner elements
 const generateCodeWithExirySpinnerElement = document.getElementById("generate-code-loader");
@@ -249,14 +250,13 @@ function handleCanGenerateCodeSuccessUI(resp) {
         );
 
         updateBatchHistorySection(recoveryBatchSectionElement, resp.BATCH, resp.ITEM_PER_PAGE);
+        toggleElement(codeActionButtons, false);
 
         appStateManager.setCodeGeneration(false);
 
-        console.log(resp)
         // show the optional verification form
         // toggleElement(testSetupFormContainerElement, false);
         if (!resp.HAS_COMPLETED_SETUP) {
-            console.log("I am here.....................")
             toggleElement(dynamicTestFormSetupElement, false);
             loadTestVerificationElements();
         }
@@ -268,9 +268,25 @@ function handleCanGenerateCodeSuccessUI(resp) {
 }
 
 
-function handleCannotGenerateCodeUI(resp, milliseconds = 5000) {
 
-    showTemporaryMessage(messageContainerElement, resp.MESSAGE);
+function handleCannotGenerateCodeError(milliseconds = 5000, message  = "OOps, something went wrong and your request wasn't processed") {
+    handleGenerateBaseMessage(message, milliseconds);
+}
+
+
+function handleCannotGenerateCodeUI(resp, milliseconds = 5000) {
+    handleGenerateBaseMessage(resp.MESSAGE, milliseconds);
+}
+
+
+function handleCancelMessage(message = "No, codes were generated, since the action was cancelled") {
+    handleGenerateBaseMessage(message = message);
+}
+
+
+
+function handleGenerateBaseMessage(message, milliseconds = 5000) {
+    showTemporaryMessage(messageContainerElement, message);
 
     tableCoderSpinnerElement.style.display = "none";
     toggleSpinner(tableCoderSpinnerElement, false);
@@ -280,24 +296,6 @@ function handleCannotGenerateCodeUI(resp, milliseconds = 5000) {
         return false;
 
     }, milliseconds)
-}
-
-
-function handleCannotGenerateCodeError(milliseconds = 5000) {
-    const DEFAULT_MESSAGE = "Hang on we are trying to process your request.."
-
-    showTemporaryMessage(messageContainerElement, DEFAULT_MESSAGE)
-    tableCoderSpinnerElement.style.display = "none";
-    toggleSpinner(tableCoderSpinnerElement, false);
-
-    setTimeout(() => {
-
-        appStateManager.setCodeGeneration(false)
-        messageContainerElement.classList.remove("show");
-        return false;
-    }, milliseconds)
-
-
 }
 
 
@@ -350,6 +348,9 @@ async function handleRecoveryCodesAction({ e,
 
     body.forceUpdate = true;
 
+    toggleElement(generaterecoveryBatchSectionElement);
+    toggleElement(codeActionButtons);
+
     const handleGenerateCodeFetchApi = async () => {
 
         const resp = await fetchData({
@@ -362,11 +363,9 @@ async function handleRecoveryCodesAction({ e,
         return resp;
     }
 
-    tableCoderSpinnerElement.style.display = "inline-block"
+    tableCoderSpinnerElement.style.display = "inline-block";
     toggleSpinner(tableCoderSpinnerElement);
     
-  
-
     const resp = await handleButtonAlertClickHelper(e,
         generateCodeBtn,
         generateCodeBtnSpinnerElement,
@@ -374,8 +373,13 @@ async function handleRecoveryCodesAction({ e,
         handleGenerateCodeFetchApi
     )
 
-    console.log(resp);
-    if (resp && resp.SUCCESS) {
+  
+    if (!resp) {
+       handleCancelMessage();
+       return;
+    }
+
+    if (resp.SUCCESS) {
     
         if (resp.CAN_GENERATE) {
 
@@ -392,6 +396,8 @@ async function handleRecoveryCodesAction({ e,
         handleCannotGenerateCodeError();
         toggleProcessMessage(false);
     }
+
+    toggleElement(codeActionButtons, false);
     appStateManager.setCodeGeneration(false);
 
 }
