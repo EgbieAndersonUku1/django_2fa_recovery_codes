@@ -13,11 +13,13 @@ import { showTemporaryMessage } from "./messages/message.js";
  * @param {HTMLElement} spinnerElement - The spinner element to display.
  * @param {number} [timeToDisplay=500] - The duration (in milliseconds) to display the spinner. Defaults to 500ms.
  */
-export function showSpinnerFor(spinnerElement, timeToDisplay = 500, hideToggle=false) {
+export function showSpinnerFor(spinnerElement, timeToDisplay = 500) {
+    
     toggleSpinner(spinnerElement); 
-
+    spinnerElement.style.display = "inline-block";
     setTimeout(() => {
-        toggleSpinner(spinnerElement, false, hideToggle);  
+        spinnerElement.style.display = "none";
+        toggleSpinner(spinnerElement, false);  
     }, timeToDisplay);
 }
 
