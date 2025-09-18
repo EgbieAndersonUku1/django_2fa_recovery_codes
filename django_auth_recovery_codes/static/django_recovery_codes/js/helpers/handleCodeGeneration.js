@@ -375,7 +375,8 @@ async function handleRecoveryCodesAction({ e,
 
   
     if (!resp) {
-       handleCancelMessage();
+        handleCancelMessage();
+        toggleElement(codeActionButtons, false);
        return;
     }
 

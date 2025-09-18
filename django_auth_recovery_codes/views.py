@@ -3,9 +3,13 @@ import json
 import threading
 
 from django.db import IntegrityError
+from django.urls.exceptions import NoReverseMatch
+from django.views.decorators.http import require_POST
+from django.contrib.auth import logout
 from django_q.tasks import async_task
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
@@ -483,3 +487,46 @@ def recovery_dashboard(request):
     return render(request, "django_auth_recovery_codes/dashboard.html", context)
 
 
+
+@csrf_protect
+@require_POST
+@login_required
+def logout_user(request):
+    """
+    logout_user view
+
+    This view logs out the current user and redirects them afterwards.
+
+    How it works?:
+
+    1. Attempts to redirect to the view defined in the project settings:
+    DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW
+
+    2. If the setting is missing or the view does not exist,
+    it falls back to the site root ('/') as a universal, safe location.
+
+    Notes for developers:
+    - Ensure DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW (in your settings.py)
+    points to a valid URL pattern name if you want custom redirect behaviour.
+
+    - Using '/' as the fallback ensures users are never left on an unknown or broken page
+    after logout.
+    """
+
+    logout(request)
+    request.session.flush()
+
+    redirect_view_name = getattr(settings, "DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW", None)
+
+    if redirect_view_name:
+        try:
+            return redirect(reverse(redirect_view_name))
+        except NoReverseMatch:
+            view_logger.error(
+                f"Redirect view '{redirect_view_name}' does not exist. Falling back to site root.",
+               
+            )
+
+
+    return redirect("/")
+    

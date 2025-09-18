@@ -1,5 +1,14 @@
 FLAG_VALIDATORS = {
     
+     # ---logout redirect ---
+    "DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW": {
+        "type": str,
+        "warning_if_missing": "DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW is not set in settings.py.",
+        "error_if_wrong_type": "DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW must be an string.",
+        "error_id": "django_auth_recovery_codes.E000",
+        "warning_id": "django_auth_recovery_codes.W000",
+    },
+
     # --- Cache Settings ---
     "DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL": {
         "type": int,

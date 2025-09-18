@@ -17,5 +17,6 @@ urlpatterns = [
     path("auth/recovery-codes/generate-without-expiry/", views.generate_recovery_code_without_expiry, name="generate_code_without_expiry"),
     path("auth/recovery-codes/generate-with-expiry/", views.generate_recovery_code_with_expiry, name="generate_code_with_expiry"),
     path("auth/recovery-codes/dashboard/", views.recovery_dashboard, name="recovery_dashboard"),
+    path("auth/recovery-codes/logout/", views.logout_user, name="recovery_codes_logout")
 
 ]
