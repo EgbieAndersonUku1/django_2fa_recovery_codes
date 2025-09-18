@@ -1,0 +1,34 @@
+<form action="" method="post" id="login-recovery-form" aria-labelledby="login-recovery-form-label">
+    <h1 id="login-recovery-form-label" class="padding-top-md font-weight-500 medium-title center title">
+        Login using your 2FA Recovery Code Backup
+    </h1>
+    <hr class="divider">
+
+    <div class="login-icon center margin-top-lg margin-bottom-lg">
+        <i class="fa-solid fa-lock" id="login-user-icon"></i>
+    </div>
+
+    <div class="form-inner padding-top-md">
+        <div class="form-group flex-grid">
+            <label for="recovery-code-input">Recovery Code</label>
+            <input 
+                type="text" 
+                id="recovery-code-input" 
+                name="recovery_code" 
+                class="padding-md" 
+                maxlength="41"
+                minlength="41" 
+                placeholder="987A-CCSSS-9875-125468-14789D" 
+                required 
+            />
+        </div>
+        <div class="buttons">
+            <button type="submit" class="btn-medium margin-top-sm padding-sm bg-red text-white" id="login-recovery-btn">
+                <span class="loader" id="login-recovery-loader"></span>
+                <span id="login-recovery-span-text">
+                    <i class="fa-solid fa-key title"></i> Login
+                </span>
+            </button>
+        </div>
+    </div>
+</form>

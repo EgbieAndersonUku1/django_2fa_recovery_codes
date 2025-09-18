@@ -399,6 +399,12 @@ Example: This will create a two-column grid with automatic spacing.
 }
 
 
+.three-column-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: auto;
+}
+
 .two-column-grid--5-95 {
     display: grid;
     grid-template-columns: 5% 95%;
@@ -493,6 +499,11 @@ input:focus {
     text-align: left;
     padding-left: var(--md-spacing);
 }
+
+
+
+
+
 
 
 
@@ -898,6 +909,39 @@ td {
 .pagination-link:hover {
     transform: scale(1.1);
 }
+
+
+
+/* ------------------------------------------ */
+/*                 LOGIN SECTION                */
+/* ------------------------------------------ */
+
+#login-user {
+    width: 55%;
+    border: 1px solid lavender;
+ 
+    padding-left: var(--xxxl-spacing);
+    padding-right: var(--xxxl-spacing);
+    padding-top: 60px;
+    padding-bottom: 90px;
+    margin: auto;
+    margin-top: var(--xxxl-spacing);
+    margin-bottom: var(--xxxl-spacing);
+    box-shadow: var(--box-shadow-primary);
+}
+
+#login-user-icon {
+    font-size: 8rem;
+    opacity: 0.4;
+}
+
+#login-navigation {
+    background: black;
+    color: white;
+    padding: var(--sm-spacing);
+    border: 3px solid black;
+}
+
 
 
 

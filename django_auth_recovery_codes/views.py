@@ -488,6 +488,12 @@ def recovery_dashboard(request):
     return render(request, "django_auth_recovery_codes/dashboard.html", context)
 
 
+def login_user(request):
+    """"""
+    context = {}
+    return render(request, "django_auth_recovery_codes/login.html", context)
+
+
 
 @csrf_protect
 @require_POST
