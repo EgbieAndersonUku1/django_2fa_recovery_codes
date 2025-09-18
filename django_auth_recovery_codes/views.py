@@ -17,7 +17,7 @@ from django.http import HttpResponse
 from django.conf import settings
 from typing import Tuple
 
-from .models import RecoveryCodesBatch, RecoveryCode, Status, RecoveryCodeSetup
+from .models import RecoveryCodesBatch, RecoveryCode, RecoveryCodeSetup
 from .views_helper import  generate_recovery_code_fetch_helper, recovery_code_operation_helper, get_recovery_batches_context
 from .utils.cache.safe_cache import (get_cache_or_set, set_cache, 
                                      get_cache_with_retry, 
@@ -458,6 +458,7 @@ def recovery_dashboard(request):
         if recovery_batch:
             user_data                        = recovery_batch.get_cache_values()
             user_data["user_has_done_setup"] = RecoveryCodeSetup.has_first_time_setup_occurred(user)
+
             view_logger.debug("Data retrieved are: is_generated=%s, is_email=%s, is_viewed=%s, is_downloaded=%s, user_has_done_setup=%s",
                                user_data.get("generated"), user_data.get("emailed"), user_data.get("viewed"),
                                user_data.get("downloaded"), user_data.get("user_has_done_setup")
@@ -526,7 +527,6 @@ def logout_user(request):
                 f"Redirect view '{redirect_view_name}' does not exist. Falling back to site root.",
                
             )
-
 
     return redirect("/")
     
