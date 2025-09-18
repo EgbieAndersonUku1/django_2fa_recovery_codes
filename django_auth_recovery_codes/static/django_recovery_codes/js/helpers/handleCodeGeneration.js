@@ -18,8 +18,6 @@ import fetchData from "../fetch.js";
 
 
 
-
-
 // Elements
 const daysToExpiryGroupWrapperElement = document.getElementById("days-to-expiry-group");
 const generaterecoveryBatchSectionElement = document.getElementById("generate-code-section");
@@ -467,6 +465,7 @@ export function handleRecoveryCodeAlert(data, successCompareMessage, fieldName) 
     if (data && Object.hasOwn(data, "SUCCESS")) {
 
         if (data.OPERATION_SUCCESS) {
+            
             return handleSuccessOperationAlertAndUpdate(data, successCompareMessage, fieldName); 
         }
         
