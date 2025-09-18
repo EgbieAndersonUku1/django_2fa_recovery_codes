@@ -2,8 +2,6 @@ from django import forms
 from django_auth_recovery_codes.models import RecoveryCodeCleanUpScheduler, RecoveryCodeAuditScheduler
 
 
-
-
 class RecoveryCodeCleanUpSchedulerForm(forms.ModelForm):
     
     class Meta:
@@ -17,16 +15,26 @@ class RecoveryCodeCleanUpSchedulerForm(forms.ModelForm):
     def clean_next_run(self):
         cleaned_data = super().clean()
 
-        run_at = cleaned_data.get("run_at")
+        run_at   = cleaned_data.get("run_at")
         next_run = cleaned_data.get("next_run")
 
         if next_run is not None and (run_at > next_run):
             raise forms.ValidationError("The next run cannot be less than run at")
         return next_run
+    
+    def clean_log_per_code(self):
+        """"""
+        cleaned_data = super().clean()
+
+        log_per_code = cleaned_data.get("log_per_code")
+        bulk_delete  = cleaned_data.get("bulk_delete")
+
+        if log_per_code and bulk_delete:
+            raise forms.ValidationError("You cannot set both log_per_code and bulk_delete flag. Only one or the other")
+        return log_per_code
 
 
-
-
+    
 
 class RecoveryCodeAuditForm(forms.ModelForm):
     class Meta:

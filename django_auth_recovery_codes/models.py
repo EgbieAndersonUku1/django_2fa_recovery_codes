@@ -940,7 +940,6 @@ class RecoveryCodesBatch(models.Model):
         recovery_code = RecoveryCode.get_by_code(plaintext_code, user) # returns only the object if plaintext code is valid
 
         logger.debug(f"The recovery code returned {recovery_code == None}")
-
         logger.debug("[VERIFY_SETUP] The recovery code returned %s", recovery_code)
 
 
