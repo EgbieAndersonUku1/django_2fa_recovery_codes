@@ -14,9 +14,9 @@
 # """
 
 
-import logging
 import json
 from django.http import JsonResponse
+from django.conf import settings
 from django.db import IntegrityError
 from django.http import HttpRequest 
 from typing import Callable,  Dict, Any, Tuple, List
@@ -30,15 +30,13 @@ from .models import RecoveryCode, RecoveryCodeSetup, RecoveryCodesBatch, Status
 from .utils.cache.safe_cache import set_cache_with_retry, get_cache_with_retry, delete_cache_with_retry
 from .loggers.loggers import view_logger, purge_code_logger
 
-User = get_user_model()
 
+User = get_user_model()
 
 CACHE_KEY                        = 'recovery_codes_generated_{}'
 RECOVERY_CODES_BATCH_HISTORY_KEY = 'recovery_codes_batch_history_{}'
-ITEM_PER_PAGE                   = 5  # This will be taking from teh settings for now constant
+
  
-
-
 class ResponseDict(TypedDict):
     SUCCESS: bool
     OPERATION_SUCCESS: bool
@@ -191,7 +189,7 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
                     "SUCCESS": True,
                     "CODES": raw_codes,
                     "BATCH": batch_instance.get_json_values(),
-                    "ITEM_PER_PAGE": ITEM_PER_PAGE,
+                    "ITEM_PER_PAGE": settings.DJANGO_AUTH_RECOVERY_CODE_PER_PAGE,
                     "CAN_GENERATE": True,
                     "MESSAGE": "Your recovery code has been generated",
                 }
@@ -222,6 +220,7 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
             "viewed": False,
             "user_has_done_setup": cache_data.get(HAS_SET_UP_FLAG, False)
         }
+
         set_cache_with_retry(cache_key.format(user.id), value=values_to_save_in_cache)
         view_logger.debug(f"[RecoveryCodes] Updated cache for user={user.id}, key={cache_key}")
 
@@ -482,10 +481,10 @@ def get_recovery_batches_context(request):
     recovery_cache_key = RECOVERY_CODES_BATCH_HISTORY_KEY.format(user.id)
     context            = {}
 
-    PAGE_SIZE = 20
-    PER_PAGE  = 5
+    PAGE_SIZE = settings.DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE
+    PER_PAGE  = settings.DJANGO_AUTH_RECOVERY_CODE_PER_PAGE
 
-    # fetch from cache or DB   
+    # fetch from cache or DB. When force_update is True fetch from db and when false cache  
     force_update = request.session.get("force_update", False)
 
     if not force_update:

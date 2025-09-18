@@ -1,3 +1,36 @@
+# ------------------------------------------------------------------------------
+# FLAG_VALIDATORS
+# ------------------------------------------------------------------------------
+#
+# Central registry of all configurable settings (flags) for django_auth_recovery_codes.
+#
+# This dictionary is consumed by a Django system check registered via
+# `python manage.py check` to validate project settings.
+#
+# Each entry defines:
+#   - type: The expected Python type for the flag.
+#   - warning_if_missing: Message if the flag is not set in settings.py.
+#   - error_if_wrong_type: Message if the flag is defined but not of the expected type.
+#   - error_id / warning_id: Unique system check IDs for precise identification.
+#
+# Checks performed:
+#   1. Required flags exist in settings.py.
+#   2. Flags are of the correct type.
+#   3. Optional: Cross-flag consistency (e.g., PER_PAGE <= MAX_VISIBLE)
+#
+# Example usage:
+#   - DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE (int):
+#       Maximum number of recovery codes a user can view in total, even if more exist.
+#   - DJANGO_AUTH_RECOVERY_CODE_PER_PAGE (int):
+#       Number of recovery codes shown per page in the UI. Must not exceed MAX_VISIBLE.
+#
+# Adding new flags:
+#   Append a new entry to FLAG_VALIDATORS with the expected type and
+#   error/warning metadata. Add additional "consistency rules" in the
+#   validator function if flags interact with each other.
+# ------------------------------------------------------------------------------
+
+
 FLAG_VALIDATORS = {
     
      # ---logout redirect ---
@@ -150,6 +183,23 @@ FLAG_VALIDATORS = {
         "error_if_wrong_type": "DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG must be a boolean.",
         "error_id": "django_auth_recovery_codes.E018",
         "warning_id": "django_auth_recovery_codes.W018",
+    },
+
+     # --- Pagination / Display Settings ---
+    "DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE": {
+        "type": int,
+        "warning_if_missing": "DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE is not set in settings.py.",
+        "error_if_wrong_type": "DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE must be an integer.",
+        "error_id": "django_auth_recovery_codes.E019",
+        "warning_id": "django_auth_recovery_codes.W019",
+    },
+
+    "DJANGO_AUTH_RECOVERY_CODE_PER_PAGE": {
+        "type": int,
+        "warning_if_missing": "DJANGO_AUTH_RECOVERY_CODE_PER_PAGE is not set in settings.py.",
+        "error_if_wrong_type": "DJANGO_AUTH_RECOVERY_CODE_PER_PAGE must be an integer.",
+        "error_id": "django_auth_recovery_codes.E020",
+        "warning_id": "django_auth_recovery_codes.W020",
     },
 
    
