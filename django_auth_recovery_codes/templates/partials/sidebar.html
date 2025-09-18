@@ -60,10 +60,17 @@
 
             <h1 class="margin-top-sm small-title title text-white ">Logout</h1>
             <hr class="dividor margin-bottom-sm ">
-            <a href="#view-batch-history"
-                class="padding-left-md padding-right-md padding-top-md title sidebar-link logout-btn-link">
-                <span><i class="fa-solid fa-right-from-bracket nav-icon red"></i></span> Logout
-            </a>
+            
+            
+
+            <form method="post" action="{% url 'recovery_codes_logout' %}" id="logout-form">
+                {% csrf_token %}
+                <button type="submit"
+                    class="padding-left-md padding-right-md padding-top-md title sidebar-link logout-btn-link">
+                    <span><i class="fa-solid fa-right-from-bracket nav-icon red"></i></span> Logout
+                </button>
+            </form>
+
 
         </div>
 

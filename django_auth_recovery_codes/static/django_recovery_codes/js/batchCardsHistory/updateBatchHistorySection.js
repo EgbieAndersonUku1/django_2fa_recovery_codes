@@ -1,11 +1,21 @@
 
-import { toggleSpinner, getNthChildNested, checkIfHTMLElement, addChildWithPaginatorLimit } from "../utils.js";
+import { toggleSpinner, 
+       getNthChildNested, 
+       checkIfHTMLElement, 
+       addChildWithPaginatorLimit }         from "../utils.js";
 import { generateRecoveryCodesSummaryCard } from "../generateBatchHistoryCard.js";
-import { markCardAsDeleted } from "./markCardAsDeleted.js";
+import { markCardAsDeleted }                from "./markCardAsDeleted.js";
+
+const recoveryBatchSectionElement  = document.getElementById("static-batch-cards-history");
+const dynamicBatchSpinnerElement   = document.getElementById("dynamic-batch-loader");
 
 
 
-const dynamicBatchSpinnerElement = document.getElementById("dynamic-batch-loader");
+export function getCurrentCard() {
+    const tagName       = "div";
+    const classSelector = "card-head";
+    return getNthChildNested(recoveryBatchSectionElement, 1, tagName, classSelector);
+}
 
 
 export function incrementRecoveryCardField(cardBatchElement, fieldSelector, MILLI_SECONDS = 6000) {

@@ -8,14 +8,17 @@ import { toggleElement } from "../utils.js";
 import { AlertUtils } from "../alerts.js";
 import { doNothing } from "../utils.js";
 import { toggleProcessMessage } from "./handleButtonAlertClicker.js";
+import { markCardAsDeleted } from "../batchCardsHistory/markCardAsDeleted.js";
+import { getCurrentCard } from "../batchCardsHistory/updateBatchHistorySection.js";
 
 
-export const deleteInputFieldElement    = document.getElementById("delete-code-input");
-const testSetupFormContainerElement     = document.getElementById("dynamic-verify-form-container");
 
-const deleteAllCodeButtonSpinnerElement = document.getElementById("delete-all-code-loader");
-const deleteCodeButtonSpinnerElement    = document.getElementById("delete-current-code-loader");
-const deleteFormElement                 = document.getElementById("delete-form");
+export const deleteInputFieldElement      = document.getElementById("delete-code-input");
+const testSetupFormContainerElement       = document.getElementById("dynamic-verify-form-container");
+
+const deleteAllCodeButtonSpinnerElement   = document.getElementById("delete-all-code-loader");
+const deleteCodeButtonSpinnerElement      = document.getElementById("delete-current-code-loader");
+const deleteFormElement                   = document.getElementById("delete-form");
 
 
 deleteFormElement.addEventListener("submit", handleDeleteFormSubmission);
@@ -188,13 +191,14 @@ export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID,
     if (resp && resp.SUCCESS) {
 
         const {codeActionButtons, tableCodes} = getDynamicCodeUIElements();
-         toggleProcessMessage(false);
+        toggleProcessMessage(false);
+
         if (!(checkIfHTMLElement(codeActionButtons) && checkIfHTMLElement(tableCodes))) {
             warnError("handleDeleteAllCodeButtonClick", "The button container element wasn't found");
             return;
         }
 
-       
+        markCardAsDeleted(getCurrentCard());
         toggleCodeUIElementsOff(codeActionButtons, tableCodes);
         showSuccessDeleteAlert();
         toggleAlertAndFormElements();
@@ -211,3 +215,5 @@ export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID,
         }
 
 }
+
+
