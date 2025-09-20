@@ -15,6 +15,10 @@ import { checkIfHTMLElement } from "../utils.js";
  */
 export function showTemporaryMessage(container, message, duration = 6000) {
 
+    if (!checkIfHTMLElement(container, "container")) {
+        return;
+    }
+    
     container.classList.add("show");
 
     let pElement = container.querySelector("p")

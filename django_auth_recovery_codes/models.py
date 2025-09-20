@@ -198,7 +198,6 @@ class RecoveryCodePurgeHistory(models.Model):
 class Status(models.TextChoices):
     ACTIVE         = "a", "Active"
     INVALIDATE     = "i", "Invalidate"
-    USED           = "u", "Used"
     PENDING_DELETE = "p", "Pending Delete"
 
 
@@ -258,6 +257,7 @@ class RecoveryCodesBatch(models.Model):
     DELETED_AT_FIELD         = "deleted_at"
     DELETED_BY_FIELD         = "deleted_by"
     REQUEST_ATTEMPT_FIELD    = "requested_attempt"
+    NUMBER_USED_FIELD        = "number_used"
 
     # constant flags
     VIEWED_FLAG              = "viewed"
@@ -342,7 +342,7 @@ class RecoveryCodesBatch(models.Model):
             int: The new TTL (in seconds) for the cooldown.
         """
         multiplier = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER", 2)
-        cutoff = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT", 3600)
+        cutoff     = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT", 3600)
 
         data = cache.get(cache_key, {})
 
@@ -614,6 +614,55 @@ class RecoveryCodesBatch(models.Model):
         overrides = {Status.PENDING_DELETE: "Deleted"}
         return overrides.get(Status(self.status), Status(self.status).label)
  
+    def update_used_code_count(self, save = False) -> "RecoveryCode":
+        """
+        Increment the count of used codes by 1.
+
+        This method ensures consistent updates to the used code count.
+        Optionally, it can save the instance immediately if `save` is True; 
+        otherwise, the update is deferred, allowing additional operations before saving.
+
+        Parameters
+        ----------
+        save (bool), default=False
+            If True, saves the instance immediately after incrementing.  
+            If False, the update is performed in memory and can be saved later.
+
+        Raises
+
+        TypeError
+            If `save` is not a boolean.
+
+        Returns
+       
+        RecoveryCode
+            Returns self to allow method chaining.
+
+        Notes
+        -----
+        This can also be done in the views like this:
+
+            # views.py
+
+            >>> recovery_code_batch = RecoveryCodeBatch.get_by_user(user='eu')
+            >>> recovery_code_batch.number_used += 1
+            >>> recovery_code.save()
+
+        However this can also introduce errors because anyone working in the views can introduce errors e.g
+            >>> recovery_code.number_used += 2  # mistake
+            >>> recovery_code.save()
+
+        - Using this method prevents accidental mis-increments in views (e.g., adding 2 instead of 1).  
+        - Encourages encapsulation of business logic in the model rather than in views.
+
+        """
+       
+        self.number_used += 1
+        
+        # Increment counter safely (atomic by default)
+        self._update_field_counter(self.NUMBER_USED_FIELD, save=save, atomic=True)
+        return self
+    
     def update_invalidate_code_count(self, save = False) -> "RecoveryCode":
         """
         Increment the count of invalidated codes by 1.
@@ -833,6 +882,14 @@ class RecoveryCodesBatch(models.Model):
             RecoveryCode.objects.bulk_create(batch)
 
     @classmethod
+    def _ensure_setup_for_user(cls, user):
+        """Ensures that RecoveryCodeSetup for a user is set, creating it if it doesn't exist."""
+
+        recovery_code_setup = RecoveryCodeSetup.get_by_user(user)
+        if recovery_code_setup is None:
+            RecoveryCodeSetup.create_for_user(user)
+
+    @classmethod
     def create_recovery_batch(cls, user, days_to_expire: int = 0, batch_number: int = 10):
         """
         Creates a batch of recovery codes for a user, efficiently handling large batches.
@@ -850,9 +907,7 @@ class RecoveryCodesBatch(models.Model):
         if days_to_expire and days_to_expire < 0:
             raise ValueError("daysToExpiry must be a positive integer")
 
-        recovery_code_setup = RecoveryCodeSetup.get_by_user(user)
-        if recovery_code_setup is None:
-            RecoveryCodeSetup.create_for_user(user)
+        cls._ensure_setup_for_user(user)
 
         raw_codes = []
         batch     = []
@@ -937,7 +992,7 @@ class RecoveryCodesBatch(models.Model):
             })
             return response_data
 
-        recovery_code = RecoveryCode.get_by_code(plaintext_code, user) # returns only the object if plaintext code is valid
+        recovery_code = RecoveryCode.get_by_code_and_user(plaintext_code, user) # returns only the object if plaintext code is valid
 
         logger.debug(f"The recovery code returned {recovery_code == None}")
         logger.debug("[VERIFY_SETUP] The recovery code returned %s", recovery_code)
@@ -1043,8 +1098,15 @@ class RecoveryCodesBatch(models.Model):
 
         cls.objects.filter(
             user=current_batch.user, 
-            status=Status.ACTIVE
+            status=Status.ACTIVE,
         ).exclude(id=current_batch.id).update(status=Status.PENDING_DELETE)
+
+        RecoveryCode.objects.filter(
+                    user=current_batch.user,
+                    status=Status.ACTIVE
+                ).update(status=Status.PENDING_DELETE, mark_for_deletion=True, is_deactivated=True)
+
+  
 
 
 class RecoveryCode(models.Model):
@@ -1067,6 +1129,7 @@ class RecoveryCode(models.Model):
      # constant field
     STATUS_FIELD             = "status"
     MARK_FOR_DELETION_FIELD  = "mark_for_deletion"
+    IS_USED_FIELD            = "is_used"
     MODIFIED_AT_FIELD        = "modified_at"
     DELETED_AT_FIELD         = "deleted_at"
     DELETED_BY_FIELD         = "deleted_by"
@@ -1092,9 +1155,49 @@ class RecoveryCode(models.Model):
         email = self.user.email
         return f"{email}" if self.user.email else self.id
   
+    def mark_code_as_used(self, save: bool = True):
+        """
+        Marks the recovery code as used. Once the code has been marked for used 
+        it can never be used again.
+
+        If `save` is True (default), the change is immediately persisted to the database.
+        If `save` is False, the change is applied in memory and will not be written 
+        to the database until you explicitly call `.save()` later.
+
+        Without the optional `save` parameter, making multiple changes in a single 
+        operation can result in multiple database writes.
+
+        Example 1 (less efficient):
+            # This results in TWO database hits
+            code.mark_code_as_used()  # First hit (inside method)
+            code.some_other_field = "new value"
+            code.save()                    # Second hit
+
+        Example 2 (optimised):
+            # This results in ONE database hit
+            code.mark_code_as_used(save=False)
+            code.some_other_field = "new value"
+            code.save()  # Both changes persisted together
+        """
+        self.is_used        = True
+        self.status         = Status.PENDING_DELETE
+        self.is_deactivated = True
+        self.mark_code_for_deletion(save=False)
+        self.batch.update_used_code_count()
+      
+        if save:
+            self.save(update_fields=[self.MARK_FOR_DELETION_FIELD, 
+                                     self.IS_USED_FIELD,
+                                     self.MODIFIED_AT_FIELD,
+                                     self.STATUS_FIELD, 
+                                     self.IS_DEACTIVATED_FIELD,
+
+                                     ])
+        return True
+
     def mark_code_for_deletion(self, save: bool = True):
         """
-        Marks this recovery code for deletion.
+        Marks the recovery code for deletion.
 
         If `save` is True (default), the change is immediately persisted to the database.
         If `save` is False, the change is applied in memory and will not be written 
@@ -1117,7 +1220,7 @@ class RecoveryCode(models.Model):
         """
         self.mark_for_deletion = True
         if save:
-            self.save(update_fields=["mark_for_deletion"])
+            self.save(update_fields=[self.MARK_FOR_DELETION_FIELD, self.MODIFIED_AT_FIELD])
         return True
 
     def invalidate_code(self, save: bool = True):
@@ -1255,7 +1358,7 @@ class RecoveryCode(models.Model):
         return check_password(plaintext_code.strip(), self.hash_code)
 
     @classmethod
-    def get_by_code(cls, plaintext_code: str, user: User) -> RecoveryCode | None:
+    def get_by_code_and_user(cls, plaintext_code: str, user: User) -> RecoveryCode | None:
         """
         Retrieve a RecoveryCode instance for a user by plaintext code.
 
@@ -1271,7 +1374,7 @@ class RecoveryCode(models.Model):
         Args:
             user (User): The user who owns the recovery code.
             code (str):  The plaintext recovery code entered by the user.
-
+         
         Returns:
 
         RecoveryCode or None
@@ -1290,20 +1393,25 @@ class RecoveryCode(models.Model):
 
         Example
         -------
-        >>> recovery_code = RecoveryCode.get_by_code("ABCD-1234", user)
+        >>> recovery_code = RecoveryCode.get_by_code_and_user("ABCD-1234", user)
         >>> if recovery_code:
         >>>     print("Code verified!", recovery_code.batch)
         """
         if not isinstance(plaintext_code, str):
             raise ValueError(f"The code parameter is not a string. Expected a string but got an object with type {type(code)}")
         
-        plaintext_code = plaintext_code.replace("-", "")
+        plaintext_code = plaintext_code.replace("-", "").strip()
         lookup = make_lookup_hash(plaintext_code.strip())
 
         try:
             # Use lookup_hash to narrow down the correct recovery code.
             # Each user can have multiple codes, so filtering by user alone is insufficient.
-            candidate = cls.objects.select_related("batch").get(user=user, look_up_hash=lookup)
+            candidate = cls.objects.select_related("batch").get(user=user, 
+                                                                look_up_hash=lookup, 
+                                                                is_used=False,
+                                                                is_deactivated=False,
+                                                                mark_for_deletion=False,
+                                                                  )
         except cls.DoesNotExist:
             return None
         

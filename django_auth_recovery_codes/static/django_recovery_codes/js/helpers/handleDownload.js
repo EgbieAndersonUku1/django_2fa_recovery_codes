@@ -40,6 +40,7 @@ function getFilenameFromDisposition(disposition) {
 
 async function triggerDownload(fetchResponse) {
 
+  
     const disposition = extractDispositionFromHeaders(fetchResponse.headers);
 
     if (!disposition) {
@@ -83,7 +84,7 @@ function handleDownloadSuccessMessageUI(e) {
 
 }
 
-function handleDownloadFailureMessageUI() {
+function handleDownloadFailureMessageUI(resp) {
     
     warnError("handleDownloadButtonClick", "The button container element wasn't found");
     toggleSpinner(downloadCodeButtonElementSpinner, false)
@@ -123,7 +124,23 @@ export async function downloadFromResponse(resp) {
     }
 
 
-    return  triggerDownload(resp);
+    return await triggerDownload(resp);
+}
+
+
+async function ifJsonResponseAndProcess(resp) {
+    toggleSpinner(downloadCodeButtonElementSpinner, false);
+
+ 
+    const clone = resp.clone(); 
+
+    try {
+        const data = await clone.json();
+        showTemporaryMessage(messageContainerElement, data.message || data.MESSAGE);
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 
@@ -143,9 +160,9 @@ export async function handleDownloadButtonClick(e, downloadButtonID) {
     const MILLI_SECONDS = 2000;
 
     toggleSpinner(downloadCodeButtonElementSpinner);
-    messageContainerElement.classList.add("show");  
 
-    messagePTag.textContent = "Preparing your download... just a moment!";
+    showTemporaryMessage(messageContainerElement, "Preparing your download... just a moment!");
+    
 
     const handleDownloadCodesApiRequest = async () => {
 
@@ -167,9 +184,16 @@ export async function handleDownloadButtonClick(e, downloadButtonID) {
                                                     handleDownloadCodesApiRequest,
                                                      )
 
-   
-    const respData = await downloadFromResponse(resp)
+    toggleProcessMessage(false);
+    const isProcessed = await ifJsonResponseAndProcess(resp);
+  
+    if (isProcessed) {
+        return;
+    }
 
+    const respData = await downloadFromResponse(resp);
+    // console.log(respData)
+   
     setTimeout(() => {
          toggleProcessMessage(false)
         if (respData && respData.success) {

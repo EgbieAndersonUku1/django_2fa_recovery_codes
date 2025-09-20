@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title  %}Login{% endblock  %}
+
+
+{% block content  %}
+ <nav id="login-navigation" class="two-column-grid">
+    <div class="head">
+        site name
+    </div>
+    <div class="body">
+        2FA Recovery codes
+    </div>
+</nav>
+<section id="login-user">
+   
+    {% include "partials/django_messages.html" %}
+    {% include "partials/partial_forms/login_form.html" %}
+</section>
+
+
+<div class="copyright">
+    <p class="center title" id="copryright">@copyright 2FA Recovery code backup</p>
+</div>
+
+{% endblock  %}
+
+
+
+{% block extra_scripts %}
+
+<script src="{% static 'django_recovery_codes/js/login/login.js' %}" defer type="module"></script>
+
+{% endblock %}

@@ -4,6 +4,8 @@ import threading
 
 from django.db import IntegrityError
 from django.urls.exceptions import NoReverseMatch
+from django.contrib import messages
+from django.contrib.auth import login
 from django.views.decorators.http import require_POST
 from django.contrib.auth import logout
 from django_q.tasks import async_task
@@ -13,10 +15,12 @@ from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_protect
 from django.views.decorators.http import require_http_methods
+from django.contrib.auth import get_user_model
 from django.http import HttpResponse
 from django.conf import settings
 from typing import Tuple
 
+from .forms.login_form import LoginForm
 from .models import RecoveryCodesBatch, RecoveryCode, RecoveryCodeSetup
 from .views_helper import  generate_recovery_code_fetch_helper, recovery_code_operation_helper, get_recovery_batches_context
 from .utils.cache.safe_cache import (get_cache_or_set, set_cache, 
@@ -42,6 +46,7 @@ SENDER_EMAIL =  settings.DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL
 # Create your views here.
 
 logger = logging.getLogger("app.views")
+User   = get_user_model()
 
 
 
@@ -70,7 +75,7 @@ def delete_recovery_code(request):
     operation, including JSON parsing, error handling, and response formatting.
 
     The internal function `delete_code` defines the operation logic:
-        - Retrieves the recovery code using `RecoveryCode.get_by_code`.
+        - Retrieves the recovery code using `RecoveryCode.get_by_code_and_user`.
         - If the code exists, it delets the code and updates the batch.
         - Returns a tuple (success: bool, response_data: dict) indicating the result.
 
@@ -133,7 +138,7 @@ def invalidate_user_code(request):
     operation, including JSON parsing, error handling, and response formatting.
 
     The internal function `invalidate_code` defines the operation logic:
-        - Retrieves the recovery code using `RecoveryCode.get_by_code`.
+        - Retrieves the recovery code using `RecoveryCode.get_by_code_and_user`.
         - If the code exists, it invalidates the code and updates the batch.
         - Returns a tuple (success: bool, response_data: dict) indicating the result.
 
@@ -191,17 +196,23 @@ def download_code(request):
                               ttl=TTL
                             )
     if cache and cache.get("downloaded"):
-
-        request.session["is_downloaded"] = True     # set to the session to be able to hide download button in the UI
-        response = HttpResponse(content=b"", content_type="application/octet-stream")
-        response["X-Success"] = True
-        return response
+        return JsonResponse({
+            "SUCCESS": False,
+            "MESSAGE": "You have already downloaded your codes, only one download per batch"
+        }, status=200)
+      
     
     raw_codes = request.session.get("recovery_codes_state", {}).get("codes", [])
 
+    if not raw_codes:
+        return JsonResponse({
+            "SUCCESS": False,
+            "MESSAGE": "You logged out before downloading the codes, and due to security reasons you can no longer download the codes"
+        }, status=200)
+
     if raw_codes:
         request.session["is_downloaded"] = True     # set to the session to be able to hide download button in the UI
-
+     
     recovery_batch = RecoveryCodesBatch.get_by_user(user)
     recovery_batch.mark_as_downloaded()
 
@@ -232,14 +243,17 @@ def download_code(request):
             response_content = to_pdf(raw_codes)
             content_type     = "application/pdf"
    
-
     if not file_name:
         file_name = defaault_file_name
         
     response = HttpResponse(response_content, content_type=content_type)
-    response["Content-Disposition"] = f'attachment; filename="{file_name}"'
-    response["X-Success"]           = "true"
-    request.session["force_update"] = True
+
+    response["Content-Disposition"]  = f'attachment; filename="{file_name}"'
+    response["X-Success"]            = "true"
+    
+    request.session["is_downloaded"] = False
+    request.session["force_update"]  = True
+
     return response
 
 
@@ -255,12 +269,10 @@ def mark_all_recovery_codes_as_pending_delete(request):
     # reset the cache values
     if recovery_batch:
 
-        request.session["is_downloaded"] = False
         request.session["is_emailed"]    = False
         request.session["force_update"]  = True
         
     
-
         # removes the raw codes from the session to ensure that it can't be downloaded or emailed 
         # when the frontend buttons are clicked
         request.session.get("recovery_codes_state", {}).pop("codes")  
@@ -308,9 +320,11 @@ def email_recovery_codes(request):
 
     if not raw_codes:
         resp.update({
-            "MESSAGE": "Something went wrong and recovery codes weren't generated"
+            "MESSAGE": "Backup codes can only be emailed once while you’re logged in. "
+                       "Since you logged out, they’re no longer available. Please log in to generate new codes."
+
         })
-        return JsonResponse(resp, status=400)
+        return JsonResponse(resp, status=200)
 
     user = request.user
 
@@ -447,13 +461,13 @@ def recovery_dashboard(request):
     context                = {}
     recovery_batch_context = get_recovery_batches_context(request)
     
-
     if user_data is None:
 
         view_logger.debug("The cache has expired. Pulling data from db and rewriting to the cache")
 
         # cache has expired, get data and re-add to cache
         recovery_batch = RecoveryCodesBatch.get_by_user(user)
+      
 
         if recovery_batch:
             user_data                        = recovery_batch.get_cache_values()
@@ -464,13 +478,17 @@ def recovery_dashboard(request):
                                user_data.get("downloaded"), user_data.get("user_has_done_setup")
                     )
 
-        set_cache_with_retry(cache_key, user_data)
+            set_cache_with_retry(cache_key, user_data)
 
     else:
         view_logger.debug("Getting the data from the cache instead of the database")
-     
+   
     if user_data:
-        
+
+        request.session["is_emailed"]    = user_data.get("emailed")
+        request.session["is_viewed"]     = user_data.get("viewed")
+        request.session["is_downloaded"] = user_data.get("downloaded")
+
         context.update({
                 "is_generated": user_data.get("generated"),
                 "is_email": user_data.get("emailed"),
@@ -478,14 +496,52 @@ def recovery_dashboard(request):
                 "is_downloaded": user_data.get("downloaded"),
                 "user_has_done_setup": user_data.get("user_has_done_setup"),
             })
+        
     
  
     if not isinstance(recovery_batch_context, dict):
         raise TypeError(f"Expected a context dictionary but got object with type {type(recovery_batch_context).__name__}")
 
-    context.update(recovery_batch_context);
+    context.update(recovery_batch_context)
     
     return render(request, "django_auth_recovery_codes/dashboard.html", context)
+
+
+def login_user(request):
+    """"""
+    form    = LoginForm()
+    context = {}
+
+    if request.user.is_authenticated:
+        return redirect(reverse("recovery_dashboard"))
+
+    if request.method == "POST":
+        form = LoginForm(request.POST)
+
+        if form.is_valid():
+
+            recovery_code = form.cleaned_data["recovery_code"]
+            email         = form.cleaned_data["email"].strip()
+     
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                messages.add_message(request, messages.ERROR, "The code and email is invalid")
+            else:
+
+                code  = RecoveryCode.get_by_code_and_user(recovery_code, user)
+            
+                if code:
+
+                    code.mark_code_as_used()
+                    login(request, user)
+                    return redirect(reverse("recovery_dashboard"))
+                
+                messages.add_message(request, messages.ERROR, "The code and email is invalid")
+
+    context["form"] = form
+
+    return render(request, "django_auth_recovery_codes/login.html", context)
 
 
 
@@ -528,5 +584,5 @@ def logout_user(request):
                
             )
 
-    return redirect("/")
+    return redirect(reverse("login_user"))
     
