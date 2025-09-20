@@ -35,7 +35,7 @@ export function showSpinnerFor(spinnerElement, timeToDisplay = 500) {
  */
 export function toggleSpinner(spinnerElement, show=true) {
    
-    if (!checkIfHTMLElement(spinnerElement)) {
+    if (!checkIfHTMLElement(spinnerElement, "spinner element")) {
         console.log("spinner not found")
         return;
     };
@@ -89,14 +89,33 @@ export function formatIsoDate(isoDate, locale = "en-GB") {
 
 
 export function checkIfHTMLElement(element, elementName = "Unknown") {
-    if (!(element instanceof HTMLElement || element instanceof DocumentFragment)) {
-        console.error(`Could not find the element: '${elementName}'. Ensure the selector is correct.`);
+    const msg = `Could not find the element: '${elementName}'. Ensure the selector is correct.`;
+    return checkIfCorrectHTMLElementHelper(element, HTMLElement, msg);
+
+}
+
+
+export function checkIfFormHTMLElement(formElement) {
+    const msg = `The element entered is not a form element. Expected a form element got ${typeof formElement}`;
+    return checkIfCorrectHTMLElementHelper(formElement, HTMLFormElement, msg)  
+    
+}
+
+
+export function checkIfInputHTMLElement(inputElement) {
+    const msg = `The element entered is not a form element. Expected a form element got ${typeof inputElement}`;
+    return checkIfCorrectHTMLElementHelper(inputElement, HTMLInputElement, msg);
+  
+}
+
+
+function checkIfCorrectHTMLElementHelper(element, htmlElement, msg) {
+    if (!(element instanceof htmlElement)) {
+        console.error(msg);
         return false;
     }
     return true;
 }
-
-
 
 
 

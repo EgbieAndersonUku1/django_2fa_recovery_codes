@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title  %}Login{% endblock  %}
 
@@ -13,9 +14,8 @@
     </div>
 </nav>
 <section id="login-user">
-    <!-- <div id="login-message" class="center bg-green text-white bold">
-        <p>The code is invalid</p>
-    </div> -->
+   
+    {% include "partials/django_messages.html" %}
     {% include "partials/partial_forms/login_form.html" %}
 </section>
 
@@ -25,3 +25,11 @@
 </div>
 
 {% endblock  %}
+
+
+
+{% block extra_scripts %}
+
+<script src="{% static 'django_recovery_codes/js/login/login.js' %}" defer type="module"></script>
+
+{% endblock %}

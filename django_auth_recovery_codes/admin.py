@@ -120,11 +120,11 @@ class RecoveryCodesBatchAdmin(admin.ModelAdmin):
 
 class RecoveryCodeAdmin(admin.ModelAdmin):
 
-    list_display       = ["id", "status", "is_deactivated", "mark_for_deletion", "automatic_removal", "created_at", "modified_at"]
+    list_display       = ["id", "status", "is_used", "is_deactivated", "mark_for_deletion", "automatic_removal", "created_at"]
     list_display_links = ["id"]
     list_per_page      = 25
     readonly_fields    = ["id", "created_at", "modified_at", "hash_code", "days_to_expire", "user", "batch", "is_used", "status"]
-    list_filter        = ["automatic_removal", "status"]
+    list_filter        = ["automatic_removal", "status", "is_used", "is_deactivated", ]
     search_fields      = ["id", "status", "user__email", "user__username"]
     exclude            = ("look_up_hash", )
 

@@ -13,14 +13,19 @@
     <div class="margin-top-sm bg-warning-with-padding">
         <i class="fa-solid fa-exclamation font-medium-bold"></i> Important: Save Your 2FA Recovery Codes
         <p class="margin-top-sm">
-            Your recovery codes are shown and can be downloaded only once. Please save them securely, as
-            you will not be able
-            to view or receive them again by email or download. If you plan to download or email the
-            codes, do not refresh the
-            page. Refreshing the page before you email or download the codes will make them
-            inaccessible, and you will need to
-            generate a new set or access them from memory.
+            Your recovery codes are shown and can be downloaded only once. Please save them securely.
         </p>
+        <p>
+            You will not be able to view or receive them again by email or download. If you plan to download or email
+            the codes, do not log out first.
+        </p>
+        <p class="margin-top-sm">
+            Logging out before saving the codes will make them inaccessible, and you will need to generate a new set or
+            access them from memory.
+            This is done by design to ensure maximum security: only the hash of the codes is stored in the database, so
+            the raw codes are lost when you log out.
+        </p>
+
 
         <p class="padding-top-md">
             If you lose your recovery codes, you can generate a new set, but this will invalidate all
@@ -51,7 +56,7 @@
 
     {% if is_viewed %}
 
-   <p class="alert-message" id="alert-message">
+    <p class="alert-message" id="alert-message">
         <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
         You’ve already checked these codes. No worries, you can explore the other available codes options instead!
     </p>
@@ -108,10 +113,8 @@
 
             <button class="generate btn-medium padding-sm title 
                     {% if request.session.is_downloaded %} bg-orange {% else %} bg-blue {% endif %}
-                    text-white" type="button" id="download-code-btn"
-                {% if request.session.is_downloaded %} disabled title="You have already downloaded your recovery codes."
-                {% endif %}
-                >
+                    text-white" type="button" id="download-code-btn" {% if request.session.is_downloaded %} disabled
+                title="You have already downloaded your recovery codes." {% endif %}>
                 <span class="loader" id="download-code-loader"></span>
                 <span id="download-code-span-text">
                     {% if request.session.is_downloaded %}

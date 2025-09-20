@@ -373,7 +373,7 @@ def _process_recovery_code_response(plaintext_code: str, request: HttpRequest, f
               OPERATION_SUCCESS, TITLE, MESSAGE, and ALERT_TEXT.
     """
   
-    recovery_code      = RecoveryCode.get_by_code(plaintext_code, request.user)
+    recovery_code      = RecoveryCode.get_by_code_and_user(plaintext_code, request.user)
     REQUIRED_FUNC_KEYS = {"delete", "deactivate"}
 
     if recovery_code is None:

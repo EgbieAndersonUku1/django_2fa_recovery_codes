@@ -943,7 +943,9 @@ td {
 }
 
 
-
+#login-email-id {
+    text-align: left;
+}
 
 /* ------------------------------------------ */
 /*                  BORDERS                   */
@@ -1167,21 +1169,26 @@ button {
 .process-container {
     border: 1px solid black;
     background-color: white;
+    font-size: 0.85rem;
+
 }
 
 #process-message {
-    width: 30%;
+    width: 50%;
     position: fixed;
     bottom: 3%;
     display: none;
     left: 2%;
-
+    padding: 6px 8px;
+ 
    
 }
 
+
 #process-message-p-tag {
   font-weight: 300;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
+  padding: 6px 8px;
 }
 
 
@@ -1205,7 +1212,7 @@ button {
     position: fixed;
     left: 10px;
     bottom: 0;
-    width: 30%;
+    width: 50%;
     background: #28a745;
     color: white;
     border: 1px solid black;
@@ -1217,6 +1224,7 @@ button {
     border-left: 4px solid var(--red-primary);
     box-shadow: var(--box-shadow-primary);
     border-right: 2px solid var(--red-primary);
+  
 
     box-shadow:
         rgba(0, 0, 0, 0.35) 0 5px 15px,
@@ -1226,13 +1234,17 @@ button {
 
 /* Content wrapper inside the message box */
 .message-container {
-    padding: var(--sm-spacing);
-    background: #28a745;
-    border-left: 1px solid black;
+    padding: var(--md-spacing);
+   
+    background: #2b2b2b; 
+    border-left: 4px solid #ef4444; 
     color: white;
-    font-weight: 500;
+    font-weight: 400;
     text-align: left;
+    font-size: 0.8rem;
+    width: 100%;
 }
+
 
 /* Variant for white background message */
 .message-check-message {
@@ -1280,7 +1292,7 @@ button {
 .alert-message {
     color: #b71c1c; 
     background-color: #ffcdd2; /* light red/pink background */
-    padding: 10px 15px;
+    padding: 6px 15px;
     border-radius: 5px;
     display: flex;
     align-items: center;
@@ -1292,11 +1304,6 @@ button {
 .alert-message.success {
     color: #1b5e20;
     background-color: #c8e6c9;
-    padding: 10px 15px;
-    border-radius: 5px;
-    display: flex;
-    align-items: center;
-    gap: var(--sm-spacing);
     font-weight: 500;
 }
 
