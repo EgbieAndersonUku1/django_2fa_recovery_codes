@@ -202,5 +202,14 @@ FLAG_VALIDATORS = {
         "warning_id": "django_auth_recovery_codes.W020",
     },
 
+
+    # --- Max login attempts / Display Settings ---
+    "DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS":  {
+        "type": int,
+        "warning_if_missing": "DJANGO_AUTH_RECOVERY_CODE_PER_PAGE is not set in settings.py.",
+        "error_if_wrong_type": "DJANGO_AUTH_RECOVERY_CODE_PER_PAGE must be an integer.",
+        "error_id": "django_auth_recovery_codes.E021",
+        "warning_id": "django_auth_recovery_codes.W021",
+    },
    
 }

@@ -36,3 +36,7 @@ def default_cooldown_seconds():
 
 def default_multiplier():
     return getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER", 1)
+
+
+def default_max_login_attempts():
+    return getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS", 3)

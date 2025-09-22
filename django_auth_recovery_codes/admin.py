@@ -11,7 +11,31 @@ from .models import (RecoveryCode,
                      RecoveryCodeAuditScheduler,
                      RecoveryCodeEmailLog,
                      RecoveryCodeSetup,
+                     LoginRateLimiter,
+                     LoginRateLimterAudit,
                      )
+
+
+
+class LoginRateLimiterAdmin(admin.ModelAdmin):
+    list_display    = ["id", "user", "login_attempts", "max_login_attempts", "last_attempt", "created_at", "modified_at"]
+    readonly_fields = ["id", "user", "login_attempts", "max_login_attempts", "last_attempt", "created_at", "modified_at"]
+
+
+
+"""
+    user           = models.OneToOneField(User, on_delete=models.SET_NULL, null=True)
+    created_at     = models.DateTimeField(auto_now_add=True)
+    modified_at    = models.DateTimeField(auto_now=True)
+    login_attempts = models.PositiveSmallIntegerField(default=0)
+
+
+"""
+
+class LoginRateLimterAuditAdmin(admin.ModelAdmin):
+    list_display    = ["id", "user",  "login_attempts", "created_at", "modified_at"]
+    readonly_fields = ["id", "user",  "login_attempts", "created_at", "modified_at"]
+
 
 
 class RecoveryCodeSetupAdmin(admin.ModelAdmin):
@@ -154,3 +178,5 @@ admin.site.register(RecoveryCodePurgeHistory, RecoveryCodePurgeHistoryAdmin)
 admin.site.register(RecoveryCodeAuditScheduler, RecoveryCodeAuditSchedulerAdmin)
 admin.site.register(RecoveryCodeEmailLog, RecoveryCodeEmailLogAdmin)
 admin.site.register(RecoveryCodeSetup, RecoveryCodeSetupAdmin)
+admin.site.register(LoginRateLimiter, LoginRateLimiterAdmin)
+admin.site.register(LoginRateLimterAudit, LoginRateLimterAuditAdmin)
