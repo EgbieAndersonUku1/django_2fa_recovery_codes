@@ -21,7 +21,8 @@ from django.conf import settings
 from typing import Tuple
 
 from .forms.login_form import LoginForm
-from .models import RecoveryCodesBatch, RecoveryCode, RecoveryCodeSetup
+from django_auth_recovery_codes.utils.converter import SecondsToTime
+from .models import RecoveryCodesBatch, RecoveryCode, RecoveryCodeSetup, LoginRateLimiter
 from .views_helper import  generate_recovery_code_fetch_helper, recovery_code_operation_helper, get_recovery_batches_context
 from .utils.cache.safe_cache import (get_cache_or_set, set_cache, 
                                      get_cache_with_retry, 
@@ -498,7 +499,6 @@ def recovery_dashboard(request):
             })
         
     
- 
     if not isinstance(recovery_batch_context, dict):
         raise TypeError(f"Expected a context dictionary but got object with type {type(recovery_batch_context).__name__}")
 
@@ -522,25 +522,37 @@ def login_user(request):
 
             recovery_code = form.cleaned_data["recovery_code"]
             email         = form.cleaned_data["email"].strip()
-     
+            can_login, wait_time = None, None
+
             try:
                 user = User.objects.get(email=email)
             except User.DoesNotExist:
                 messages.add_message(request, messages.ERROR, "The code and email is invalid")
             else:
-
-                code  = RecoveryCode.get_by_code_and_user(recovery_code, user)
             
-                if code:
+                user                 = User.objects.get(email=email)
+                can_login, wait_time = LoginRateLimiter.is_locked_out(user)
+              
+                if can_login and wait_time == 0:
+                    
+                    code  = RecoveryCode.get_by_code_and_user(recovery_code, user)
+                    
+                    if code:
 
-                    code.mark_code_as_used()
-                    login(request, user)
-                    return redirect(reverse("recovery_dashboard"))
+                        code.mark_code_as_used()
+                        login(request, user)
+                        return redirect(reverse("recovery_dashboard"))
+                    else:
+                        messages.add_message(request, messages.ERROR, "The code and email is invalid")
+                    
+                else:
+                    message_ban       =  f"You have already exceed the maximum number of login attempts"
+                    message_wait_time =  f"You have to wait {SecondsToTime(wait_time).format_to_human_readable()} before you can attempt to login in"
+
+                    messages.add_message(request, messages.ERROR, message_ban)
+                    messages.add_message(request, messages.ERROR, message_wait_time)
                 
-                messages.add_message(request, messages.ERROR, "The code and email is invalid")
-
     context["form"] = form
-
     return render(request, "django_auth_recovery_codes/login.html", context)
 
 

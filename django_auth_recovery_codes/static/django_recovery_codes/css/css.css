@@ -916,16 +916,15 @@ td {
 /*                 LOGIN SECTION                */
 /* ------------------------------------------ */
 
-#login-user {
-    width: 55%;
+#login-user{
+    width: 65%;
     border: 1px solid lavender;
- 
     padding-left: var(--xxxl-spacing);
     padding-right: var(--xxxl-spacing);
-    padding-top: 60px;
-    padding-bottom: 90px;
+    padding-top: 33px;
+    padding-bottom: 40px;
     margin: auto;
-    margin-top: var(--xxxl-spacing);
+    margin-top: var(--xxl-spacing);
     margin-bottom: var(--xxxl-spacing);
     box-shadow: var(--box-shadow-primary);
 }
@@ -1191,6 +1190,10 @@ button {
   padding: 6px 8px;
 }
 
+
+#login-messages {
+    font-size: 0.85rem;
+}
 
 /* Keyframes for continuous rotation */
 @keyframes rotation {

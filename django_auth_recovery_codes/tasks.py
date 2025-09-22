@@ -1,5 +1,3 @@
-import logging
-
 from django.conf import settings
 from django_email_sender.email_logger import EmailSenderLogger
 from django_email_sender.email_sender import EmailSender
@@ -12,7 +10,6 @@ from django_auth_recovery_codes.models import (RecoveryCodePurgeHistory,
                                                RecoveryCodesBatch, 
                                                RecoveryCodeAudit, 
                                                RecoveryCodeCleanUpScheduler,
-                                               Status
                                                )
 
 from django_auth_recovery_codes.app_settings import app_settings

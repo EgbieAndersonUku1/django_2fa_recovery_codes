@@ -14,8 +14,11 @@ from django_email_sender.models import EmailBaseLog
 from django.conf import settings
 from django.core.cache import cache
 
-from django_auth_recovery_codes.loggers.loggers import purge_code_logger
-from django_auth_recovery_codes.base_models import AbstractCleanUpScheduler
+from django_auth_recovery_codes.base_models import AbstractBaseModel
+from django_auth_recovery_codes.base_models import flush_cache_and_write_attempts_to_db
+from django_auth_recovery_codes.utils.cooldown_period import RecoveryCooldownManager
+from django_auth_recovery_codes.loggers.loggers import purge_code_logger, view_logger
+from django_auth_recovery_codes.base_models import AbstractCleanUpScheduler, AbstractCooldownPeriod
 from django_auth_recovery_codes.utils.converter import SecondsToTime
 from django_auth_recovery_codes.utils.security.generator import generate_2fa_secure_recovery_code
 from django_auth_recovery_codes.utils.security.hash import is_already_hashed, make_lookup_hash
@@ -24,8 +27,9 @@ from django_auth_recovery_codes.utils.utils import (schedule_future_date,
                                                     create_unique_string,
                                                    
                                                     )
-from django_auth_recovery_codes.app_settings import default_cooldown_seconds, default_multiplier
-from django_auth_recovery_codes.utils.cache.safe_cache import delete_cache_with_retry
+from .utils.attempt_guard import AttemptGuard
+from django_auth_recovery_codes.app_settings import default_max_login_attempts
+from django_auth_recovery_codes.utils.cache.safe_cache import delete_cache_with_retry, get_cache_with_retry, set_cache_with_retry
 from django_auth_recovery_codes.enums import (CreatedStatus, 
                                               BackendConfigStatus, 
                                               SetupCompleteStatus, 
@@ -38,10 +42,18 @@ from django_auth_recovery_codes.enums import (CreatedStatus,
 User   = get_user_model()
 logger = logging.getLogger("auth_recovery_codes")
 
-CAN_GENERATE_CODE_CACHE_KEY =  "can_generate_code:{}"
+
+MULTIPLIER                  = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER", 2)
+CUTOFF                      = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT", 3600)
+CAN_GENERATE_CODE_CACHE_KEY = "can_generate_code:{}"
+CAN_LOGIN_CACHE_KEY         = "can_login_{}"
 
 
-class RecoveryCodeSetup(models.Model):
+cooldown_manager = RecoveryCooldownManager(multiplier=MULTIPLIER, cutoff=CUTOFF, logger=purge_code_logger)
+
+
+
+class RecoveryCodeSetup(AbstractBaseModel):
     user        = models.OneToOneField(User, on_delete=models.CASCADE, related_name='code_setup')
     verified_at = models.DateTimeField(auto_now_add=True)
     created_at  = models.DateTimeField(auto_now_add=True)
@@ -56,17 +68,6 @@ class RecoveryCodeSetup(models.Model):
     def is_setup(self):
         """Returns True if the setup is verified."""
         return self.success
-
-    @classmethod
-    def get_by_user(cls, user: User):
-        """
-        Fetches the setup for a user without creating it.
-        Returns None if no setup exists.
-        """
-        try:
-            return cls.objects.get(user=user)
-        except cls.DoesNotExist:
-            return None
 
     @classmethod
     def create_for_user(cls, user: User):
@@ -91,9 +92,8 @@ class RecoveryCodeSetup(models.Model):
         Example:
             >>> RecoveryCode.has_first_time_setup_occurred(user)
             True
-        """
-        if not isinstance(user, User):
-            raise TypeError(f"Expected a User instance, got {type(user).__name__}")
+        """       
+        cls.is_user_valid(user)
         return cls.objects.filter(user=user, success=True).exists()
 
 
@@ -140,13 +140,13 @@ class RecoveryCodeAudit(models.Model):
             raise ValueError(f"Invalid action '{action}'. Use RecoveryCodeAudit.Action constants.")
 
         if user_issued_to is not None and not isinstance(user_issued_to, models.Model):
-            raise TypeError("user_issued_to must be a User instance or None.")
+            raise TypeError(f"user_issued_to must be a User instance or None. Expect instance but got {type(user_issued_to).__name__}")
 
         if deleted_by is not None and not isinstance(deleted_by, models.Model):
-            raise TypeError("deleted_by must be a User instance or None.")
+            raise TypeError(f"deleted_by must be a User instance or None. Expect instance but got {type(deleted_by).__name__}")
 
         if batch is not None and not isinstance(batch, models.Model):
-            raise TypeError("batch must be a RecoveryCodesBatch instance or None.")
+            raise TypeError(f"batch must be a RecoveryCodesBatch instance or None. Expect instance but got {type(batch).__name__}")
 
         return cls.objects.create(
             user_issued_to=user_issued_to,
@@ -167,7 +167,7 @@ class RecoveryCodeAudit(models.Model):
         
         if retention_days == 0:
             num_deleted, _ = cls.objects.all().delete()  
-            return  True, num_deleted# test to see if it works remove this to return 0
+            return  True, num_deleted
         
         cut_of_date       = timezone.now() - timedelta(days=retention_days)
         old_recovery_audit_qs = cls.objects.filter(updated_at__lt=cut_of_date)
@@ -215,7 +215,7 @@ class RecoveryCodeAuditScheduler(AbstractCleanUpScheduler):
      name         = models.CharField(max_length=180, default=create_unique_string("Remove Recovery code audit"), unique=True)
 
 
-class RecoveryCodesBatch(models.Model):
+class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
     CACHE_KEYS = ["generated", "downloaded", "emailed", "viewed"]
     JSON_KEYS  = ["id", "number_issued", "number_removed", "number_invalidated", "number_used", "created_at",
                   "modified_at", "expiry_date", "deleted_at", "deleted_by", "viewed", "downloaded",
@@ -235,13 +235,6 @@ class RecoveryCodesBatch(models.Model):
     expiry_date        = models.DateTimeField(blank=True, null=True)
     deleted_at         = models.DateTimeField(null=True, blank=True)
     deleted_by         = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name="deleted_batches")
-    last_generated     = models.DateTimeField(auto_now=True)
-    cooldown_seconds   = models.PositiveSmallIntegerField(default=default_cooldown_seconds, 
-                                                          help_text="The number of seconds before a new request can be made. Default " \
-                                                          "valued used from the settings.DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN flag")
-    multiplier         = models.PositiveSmallIntegerField(default=default_multiplier, 
-                                                          help_text="The multiplier used to increase the wait time ." \
-                                                          "Default value used from the settings.DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER flag")
     requested_attempt  = models.PositiveSmallIntegerField(default=0)
 
      # Action tracking
@@ -272,131 +265,7 @@ class RecoveryCodesBatch(models.Model):
 
     def __str__(self):
         return f"Batch {self.id} for {self.user or 'Deleted User'}"
-    
-    def _get_next_allowed_time_to_generate_code(self):
-        """"""
-        return self.last_generated + timedelta(seconds=self.cooldown_seconds)
-
-    def _get_remaining_time_till_generate_code(self):
-        """"""
-        next_allowed_time = self._get_next_allowed_time_to_generate_code()
-        current_time_now  = timezone.now()
-
-        return max(int((next_allowed_time - current_time_now).total_seconds()), 0)
-    
-    def _increment_request_attempt(self, save: bool = True):
-        """
-        Increment the number of request attempts made by the user
-        by a value of one. The method can either save on the spot 
-        (if save = true) or defers saving to later if saving = False. 
-        This is usefulif you want to perform other actions before hitting 
-        the database.
-
-        Args:
-            save (bool): Saves on the spot or defers to later
-
-        """
-        self.requested_attempt += 1
-        if save:
-            self.save(update_fields=[self.REQUEST_ATTEMPT_FIELD, self.MODIFIED_AT_FIELD])
-        return self
-
-    @classmethod
-    def _flush_attempts_to_db(cls, batch, cache_key: str):
-        """
-        Add cached attempts to the batch and clear cache.
-        """
-        data = cache.get(cache_key, {})
-
-        purge_code_logger.debug(
-            "[RecoveryCodes] Flushing cache: batch_id=%s, key=%s, data=%s",
-            getattr(batch, "id", None), cache_key, data,
-        )
-
-        attempts = data.get("attempts", 0)
-        if attempts > 0:
-            batch.attempts = attempts
-            batch.save(update_fields=["attempts"])
-
-            purge_code_logger.info(f"[RecoveryCodes] Persisted attempts: batch_id={batch.id}, attempts={attempts}")
-        else:
-            purge_code_logger.debug("[RecoveryCodes] No attempts to flush: batch_id=%s, key=%s", getattr(batch, "id", None), cache_key,)
-
-        delete_cache_with_retry(cache_key)
-
-        purge_code_logger.debug(
-            "[RecoveryCodes] Cleared cache after flush: batch_id=%s, key=%s", getattr(batch, "id", None), cache_key)
-
-    @staticmethod
-    def _update_recovery_cooldown(cache_key: str) -> int:
-        """
-        Increment cached recovery attempts and extend cooldown 
-        using progressive back-off without hitting the db.
-
-        - Increments the attempt counter stored in cache.
-        - Extends the TTL (time-to-live) by multiplying the 
-        current TTL with a configured multiplier.
-        - Caps the TTL at a maximum cutoff.
-
-        Returns:
-            int: The new TTL (in seconds) for the cooldown.
-        """
-        multiplier = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER", 2)
-        cutoff     = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT", 3600)
-
-        data = cache.get(cache_key, {})
-
-        purge_code_logger.debug(f"[RecoveryCodes] Pre-update state: key={cache_key}, data={data}")
-
-        current_ttl = data.get("remaining_seconds", 0)
-        new_ttl     = min(int(current_ttl * multiplier) or 1, cutoff)
-
-        attempts = data.get("attempts", 0) + 1
-        data.update({"attempts": attempts, "remaining_seconds": new_ttl})
-
-        cache.set(cache_key, data, timeout=new_ttl)
-
-        purge_code_logger.info(
-            f"[RecoveryCodes] Cooldown updated: key={cache_key}, attempts={attempts}, "
-            f"prev_ttl={current_ttl}, new_ttl={new_ttl}, multiplier={multiplier}, cutoff={cutoff}",
-        )
-
-        return new_ttl
-        
-    @staticmethod
-    def _start_recovery_cooldown(current_batch: RecoveryCodesBatch, cache_key: str, remaining_seconds: int) -> tuple[bool, int]:
-        """
-        Handle the first attempt during cooldown:
-        - Increment DB requested_attempt
-        - Save current_batch
-        - Seed cache with initial attempt
-
-        Args:
-            current_batch (RecoverCodeBatch): The current batch each user has, only one batch is active batch at any given time. 
-                                              Needed to mark the attempts when a user is attempting to create a new batch.
-                                              When a new batch is requested it disables the last current one.
-
-            cache_key: str: The cache key associated with the user, used to cache the remaining seconds left before they can
-                            request a new batch. 
-            
-            remaining_seconds: int, The remaining seconds left before a user can make a request to the app to generate a set
-                                    of new codes. As long as the cooling period (remaining seconds) is active the user can't create 
-                                    a new batch.
-        """
-        FIRST_ATTEMPT = 1
-
-        current_batch._increment_request_attempt()
-        current_batch.save(update_fields=[current_batch.REQUEST_ATTEMPT_FIELD])
-
-        data = {
-            "attempts": FIRST_ATTEMPT,
-            "remaining_seconds": remaining_seconds,
-        }
-
-        purge_code_logger.info(f"Starting recovery cooldown with attempt: {FIRST_ATTEMPT} and a timeout value of: {remaining_seconds} and the data: {data}")
-        cache.set(cache_key, data, timeout=remaining_seconds)
-        return False, remaining_seconds
-
+       
     @classmethod
     def can_generate_new_code(cls, user: User) -> tuple[bool, int]:
         """
@@ -409,7 +278,7 @@ class RecoveryCodesBatch(models.Model):
 
         ⚠️ Note:
 
-        This method may *look simple*, but it orchestrates a mini-engine:
+        This method may *look simple*, but it orchestrates a mini-engine done with AttemptGuard class:
 
         - checks the cache
         - increments attempts
@@ -417,9 +286,9 @@ class RecoveryCodesBatch(models.Model):
         - may write to the DB if necessary otherwise cache is used avoiding hiting the db
 
         Helpers used to navigate the mini-engine:
-        - _update_recovery_cooldown
+        -  update_cooldown
         - _start_recovery_cooldown
-        - _flush_attempts_to_db
+        - flush_cache_and_write_attempts_to_db
 
         Without the helper functions the can_generate_new_code` is doing:
 
@@ -440,30 +309,11 @@ class RecoveryCodesBatch(models.Model):
         >>> can_generate_new_codes = Recovery.can_generate_new_code(user)
         >>> True
         >>>
-
         """
-        
-        cache_key = CAN_GENERATE_CODE_CACHE_KEY.format(user.id)
-        data      = cache.get(cache_key, {})
-        attempts  = data.get("attempts", 0)
-
-        if attempts > 0:
-            purge_code_logger.debug(f"Recovery code attempts: {attempts}")
-            return False, cls._update_recovery_cooldown(cache_key)
-
-        current_batch = cls.get_by_user(user)
-
-        if current_batch is None:
-            raise ValueError("No recovery code batch for this user")
-
-        remaining = current_batch._get_remaining_time_till_generate_code()
-        if remaining > 0:
-            purge_code_logger.debug(f"You still have a waiting time of {SecondsToTime(remaining).format_to_human_readable()}")
-            return cls._start_recovery_cooldown(current_batch, cache_key, remaining)
-
-        cls._flush_attempts_to_db(current_batch, cache_key)
-        return True, 0
+        attempt_guard = AttemptGuard[RecoveryCodesBatch](instance=cls, instance_attempt_field_name=cls.REQUEST_ATTEMPT_FIELD)
+        return attempt_guard.can_proceed(user=user, action="recovery_code")
     
+
     def _get_expired_recovery_codes_qs(self, retention_days: int = None) -> QuerySet[RecoveryCode]:
         """
         Return a queryset of recovery codes eligible for automatic removal with two extra conditions.
@@ -897,9 +747,7 @@ class RecoveryCodesBatch(models.Model):
 
         Returns a list of raw recovery codes.
         """
-
-        if not isinstance(user, User):
-            raise TypeError(f"Expected User instance, got {type(user).__name__}")
+        cls.is_user_valid(user)
         if not isinstance(batch_number, int):
             raise TypeError(f"Expected int for batch_number, got {type(batch_number).__name__}")
         if days_to_expire and not isinstance(days_to_expire, int):
@@ -922,14 +770,16 @@ class RecoveryCodesBatch(models.Model):
         with transaction.atomic(): 
             
             batch_instance = cls(user=user, number_issued=batch_number)
+
             if days_to_expire:
                 batch_instance.expiry_date = schedule_future_date(days=days_to_expire)
-            batch_instance.last_generated = timezone.now()
+            batch_instance.last_attempt = timezone.now()
             batch_instance.mark_as_generated()
 
             cls._deactivate_all_batches_except_current(batch_instance)
-            cls._flush_attempts_to_db(batch, CAN_GENERATE_CODE_CACHE_KEY.format(user.id))
-
+            cache_key = CAN_GENERATE_CODE_CACHE_KEY.format(user.id)
+            flush_cache_and_write_attempts_to_db(instance=batch_instance, field_name=cls.REQUEST_ATTEMPT_FIELD, cache_key=cache_key, logger=purge_code_logger)
+          
             for _ in range(batch_number):
                 raw_code = generate_2fa_secure_recovery_code()
                 recovery_code = RecoveryCode(user=user, batch=batch_instance)
@@ -962,8 +812,8 @@ class RecoveryCodesBatch(models.Model):
         Returns:
             dict: Status of verification, including success and other flags.
         """
-        if not isinstance(user, User):
-            raise TypeError(f"Expected a user instance but got object with type {type(user).__name__}")
+      
+        cls.is_user_valid(user)
         
         if not isinstance(plaintext_code, str):
             raise TypeError(f"Expected the plaintext code to be a string but got object with type {type(plaintext_code).__name__}")
@@ -1460,6 +1310,73 @@ class RecoveryCode(models.Model):
 
 
 
-
 class RecoveryCodeEmailLog(EmailBaseLog):
     pass
+
+
+
+class LoginRateLimterAudit(AbstractBaseModel):
+
+    user           = models.OneToOneField(User, on_delete=models.SET_NULL, null=True)
+    created_at     = models.DateTimeField(auto_now_add=True)
+    modified_at    = models.DateTimeField(auto_now=True)
+    login_attempts = models.PositiveSmallIntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.user} with {self.login_attempts} login attempt"
+
+    @classmethod
+    def create_record_login_audit(cls, user: User, login_attempts: int):
+        """"""
+        cls.is_user_valid(user)
+        if not cls.objects.filter(user=user).exists():
+            cls.objects.get_or_create(user=user, login_attempts=login_attempts)
+
+
+class LoginRateLimiter(AbstractCooldownPeriod, AbstractBaseModel):
+    
+    user                     = models.OneToOneField(User, on_delete=models.CASCADE)
+    login_attempts           = models.PositiveSmallIntegerField(default=0)
+    max_login_attempts       = models.PositiveSmallIntegerField(default=default_max_login_attempts)
+    created_at               = models.DateTimeField(auto_now_add=True)
+    modified_at              = models.DateTimeField(auto_now=True)
+    last_login_attempt       = models.DateTimeField(auto_now=True)
+    LOGIN_ATTEMPT_FIELD      = "login_attempts"
+
+    def __str__(self):
+        return f"User {self.user}, login attempts {self.login_attempts}"
+
+    def record_failed_attempts(self):
+        """Record the failed attempts""" 
+        self.login_attempts += 1 
+        self.save(update_fields=["login_attempts", "modified_at", "last_attempt"])
+
+    def reset_attempts(self):
+        """Reset attempts (e.g. after successful login)."""
+        self.login_attempts = 0
+        self.save(update_fields=["login_attempts", "modified_at"])
+
+    @classmethod
+    def is_locked_out(cls, user):
+        """"""
+
+        login_rate_limiter = LoginRateLimiter.get_by_user(user)
+      
+        if login_rate_limiter.login_attempts < login_rate_limiter.max_login_attempts:
+            login_rate_limiter.record_failed_attempts()
+            return True, 0
+        
+        attempt_guard                = AttemptGuard[LoginRateLimiter](instance=cls, instance_attempt_field_name=cls.LOGIN_ATTEMPT_FIELD)
+        is_not_locked_out, wait_time = attempt_guard.can_proceed(user=user, action="Login_rate_limiter")
+
+        if not is_not_locked_out:
+            return is_not_locked_out, wait_time   
+        
+        login_rate_limiter = LoginRateLimiter.get_by_user(user)
+        LoginRateLimterAudit.create_record_login_audit(user=user, login_attempts=login_rate_limiter.login_attempts)    
+        login_rate_limiter.reset_attempts()
+
+        return is_not_locked_out, wait_time        
+
+     
+   
