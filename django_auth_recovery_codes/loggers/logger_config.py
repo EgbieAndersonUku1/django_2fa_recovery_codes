@@ -122,6 +122,11 @@ DJANGO_AUTH_RECOVERY_CODES_LOGGING = {
             "filename": LOG_DIR / "django_q.log",
             "formatter": "default",
         },
+        "attempt_guard": {  
+            "class": "logging.FileHandler",
+            "filename": LOG_DIR / "attempt_guard.log",
+            "formatter": "default",
+        },
     },
     "root": {
         "handlers": ["all_file"],

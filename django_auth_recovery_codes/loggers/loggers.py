@@ -1,6 +1,20 @@
 import logging
 
 # ----------------------------------------
+# default helper
+# ----------------------------------------
+default_logger  = logging.getLogger(__name__)
+
+
+
+# ----------------------------------------
+# Attempt guard helper
+# ----------------------------------------
+attempt_guard_logger  = logging.getLogger("app.attempt_guard")
+
+
+
+# ----------------------------------------
 # Views helper
 # ----------------------------------------
 view_logger          = logging.getLogger("app.views_helper")

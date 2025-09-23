@@ -1,9 +1,11 @@
 from __future__ import annotations 
 
+
 import uuid
 import logging
 from django.db import models, connections
 from django.db.models.query import QuerySet
+from typing import Tuple
 from django.db.models import F
 from django.db import transaction
 from django.utils import timezone
@@ -11,13 +13,13 @@ from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.contrib.auth.hashers import make_password, check_password
 from django_email_sender.models import EmailBaseLog
+
 from django.conf import settings
-from django.core.cache import cache
 
 from django_auth_recovery_codes.base_models import AbstractBaseModel
 from django_auth_recovery_codes.base_models import flush_cache_and_write_attempts_to_db
 from django_auth_recovery_codes.utils.cooldown_period import RecoveryCooldownManager
-from django_auth_recovery_codes.loggers.loggers import purge_code_logger, view_logger
+from django_auth_recovery_codes.loggers.loggers import purge_code_logger, default_logger
 from django_auth_recovery_codes.base_models import AbstractCleanUpScheduler, AbstractCooldownPeriod
 from django_auth_recovery_codes.utils.converter import SecondsToTime
 from django_auth_recovery_codes.utils.security.generator import generate_2fa_secure_recovery_code
@@ -29,7 +31,11 @@ from django_auth_recovery_codes.utils.utils import (schedule_future_date,
                                                     )
 from .utils.attempt_guard import AttemptGuard
 from django_auth_recovery_codes.app_settings import default_max_login_attempts
-from django_auth_recovery_codes.utils.cache.safe_cache import delete_cache_with_retry, get_cache_with_retry, set_cache_with_retry
+from django_auth_recovery_codes.utils.cache.safe_cache import (delete_cache_with_retry,
+                                                               get_cache_with_retry,
+                                                               set_cache_with_retry,
+                                                               get_cache_or_set,
+                                                               )
 from django_auth_recovery_codes.enums import (CreatedStatus, 
                                               BackendConfigStatus, 
                                               SetupCompleteStatus, 
@@ -38,6 +44,8 @@ from django_auth_recovery_codes.enums import (CreatedStatus,
                                               UsageStatus,
                                               )
 
+
+from django_auth_recovery_codes.app_settings import default_cooldown_seconds
 
 User   = get_user_model()
 logger = logging.getLogger("auth_recovery_codes")
@@ -49,7 +57,7 @@ CAN_GENERATE_CODE_CACHE_KEY = "can_generate_code:{}"
 CAN_LOGIN_CACHE_KEY         = "can_login_{}"
 
 
-cooldown_manager = RecoveryCooldownManager(multiplier=MULTIPLIER, cutoff=CUTOFF, logger=purge_code_logger)
+cooldown_manager = RecoveryCooldownManager(multiplier=MULTIPLIER, cutoff=CUTOFF, logger=default_logger)
 
 
 
@@ -1334,38 +1342,142 @@ class LoginRateLimterAudit(AbstractBaseModel):
 
 
 class LoginRateLimiter(AbstractCooldownPeriod, AbstractBaseModel):
-    
+    """
+    Tracks failed login attempts and enforces cooldown periods.
+
+    This model ensures a user cannot exceed a configurable number
+    of failed login attempts before being locked out for a set
+    duration.
+
+    key Attributes fields:
+        user (ForeignKey): The user associated with this limiter.
+        login_attempts (int): Number of failed attempts.
+        last_attempt (datetime): Timestamp of the last attempt.
+        max_login_attemts(int): The maximum login attempts before lockout is initiated
+       
+    """
     user                     = models.OneToOneField(User, on_delete=models.CASCADE)
     login_attempts           = models.PositiveSmallIntegerField(default=0)
     max_login_attempts       = models.PositiveSmallIntegerField(default=default_max_login_attempts)
     created_at               = models.DateTimeField(auto_now_add=True)
     modified_at              = models.DateTimeField(auto_now=True)
     last_login_attempt       = models.DateTimeField(auto_now=True)
+
+    # fields
     LOGIN_ATTEMPT_FIELD      = "login_attempts"
+    MODIFIED_AT_FIELD        = "modified_at"
+    LAST_ATTEMPT_FIELD       = "last_attempt"
 
     def __str__(self):
         return f"User {self.user}, login attempts {self.login_attempts}"
 
-    def record_failed_attempts(self):
-        """Record the failed attempts""" 
+    def record_failed_attempt(self):
+        """"""
+        use_with_cache = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE", False)
+
+        if use_with_cache:
+            self._record_failed_attempts_using_cache_first()
+        else:
+            self._record_failed_attempts_db_only()
+       
+    
+    def _record_failed_attempts_using_cache_first(self):
+        """
+        Increment failed attempts in cache. 
+
+        Failed attempts are stored in cache to reduce database writes.
+        The database is only updated when the user reaches the maximum
+        number of allowed attempts (lockout) or when the cooldown expires.
+        """
+
+        self._increment_failed_login_attempt_count()
+        self.last_attempt   = timezone.now()
+        self.modified_at    = timezone.now()
+
+        default_logger.debug(f"Getting cache for user={self.user}: failed_attempts={self.login_attempts} (max={self.max_login_attempts})")
+
+        # only hit and save to the database once the failed attempts matches the maximum login attempts
+        if self.login_attempts >= self.max_login_attempts:
+
+            self.last_attempt   = timezone.now()
+            self.modified_at    = timezone.now()
+
+            default_logger.debug(f"Saving to database, user={self.user}: failed_attempts={self.login_attempts} (max={self.max_login_attempts})")
+            self.save(update_fields=[self.LOGIN_ATTEMPT_FIELD, self.MODIFIED_AT_FIELD, self.LAST_ATTEMPT_FIELD])
+     
+    def _record_failed_attempts_db_only(self):
+        """
+        Record a failed attempt directly in the database.
+
+        Increments the login attempt counter and persists changes
+        immediately. This is the safest and most consistent mode,
+        but under heavy traffic it may generate more database writes.
+
+        Returns:
+            None
+        """
+        self._increment_failed_login_attempt_count()
+        self.save(update_fields=[self.LOGIN_ATTEMPT_FIELD, self.MODIFIED_AT_FIELD, self.LAST_ATTEMPT_FIELD])
+
+    def _increment_failed_login_attempt_count(self):
+        """
+        A safe private method that Increment the login attempt by one.
+
+        """
         self.login_attempts += 1 
-        self.save(update_fields=["login_attempts", "modified_at", "last_attempt"])
 
     def reset_attempts(self):
         """Reset attempts (e.g. after successful login)."""
+
         self.login_attempts = 0
-        self.save(update_fields=["login_attempts", "modified_at"])
+        self.save(update_fields=[self.LOGIN_ATTEMPT_FIELD, self.MODIFIED_AT_FIELD])
 
     @classmethod
-    def is_locked_out(cls, user):
-        """"""
+    def is_locked_out(cls, user: User) -> Tuple[bool, int]:
+        """
+        A class method that determines whether a given user can log in or is 
+        locked out.
 
-        login_rate_limiter = LoginRateLimiter.get_by_user(user)
-      
-        if login_rate_limiter.login_attempts < login_rate_limiter.max_login_attempts:
-            login_rate_limiter.record_failed_attempts()
-            return True, 0
+        The method returns a tuple containing two values, a boolean to determine
+        whether they can log in or not, and a wait time in seconds to determing how
+        long they are locked out for. A wait time value of 0 means they are not locked
+        out.
+
+        Args:
+            user (instance): The user instance to check
+
+        Returns:
+           Can login   : Returns a bool value of true and a wait time of 0
+           Cannot login: Returns a bool value of false along with a wait time
         
+        Examples:
+
+        from my_app import User
+
+        >>> user = User.objects.get(username="eu")
+        >>> LoginRateLimiter.is_locked_out(user)  # assume can login
+        (True, 0)
+
+        >>> user = User.objects.get(username="eu")
+        >>> LoginRateLimiter.is_locked_out(user)  # assume cannot login
+        (False, 140)
+        """
+
+        HOUR_IN_SECONDS      = 3600
+        cache_key            = f"login_rate_limiter_{user.id}"
+        login_rate_limiter   = get_cache_with_retry(cache_key, default=None)
+       
+        if login_rate_limiter is None:
+            login_rate_limiter = LoginRateLimiter.get_by_user(user)
+
+            default_logger.debug(f"[DATBABASE_RETRIEVAL] Getting the value from the database using 'LoginRateLimiter.get_by_user()'")
+            set_cache_with_retry(cache_key, value=login_rate_limiter, ttl=HOUR_IN_SECONDS)
+
+        if login_rate_limiter.login_attempts < login_rate_limiter.max_login_attempts:
+            login_rate_limiter.record_failed_attempt()
+            set_cache_with_retry(cache_key, login_rate_limiter, ttl=HOUR_IN_SECONDS)
+            return True, 0
+
         attempt_guard                = AttemptGuard[LoginRateLimiter](instance=cls, instance_attempt_field_name=cls.LOGIN_ATTEMPT_FIELD)
         is_not_locked_out, wait_time = attempt_guard.can_proceed(user=user, action="Login_rate_limiter")
 

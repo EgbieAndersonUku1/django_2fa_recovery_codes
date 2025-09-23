@@ -1,7 +1,5 @@
 from __future__ import annotations 
 
-
-
 from django.contrib.auth import get_user_model
 from django.db import models
 from typing import TypeVar, Generic
@@ -9,7 +7,7 @@ from django.conf import settings
 
 from django_auth_recovery_codes.base_models import flush_cache_and_write_attempts_to_db, AbstractBaseModel
 from django_auth_recovery_codes.utils.cooldown_period import RecoveryCooldownManager
-from django_auth_recovery_codes.loggers.loggers import purge_code_logger
+from django_auth_recovery_codes.loggers.loggers import attempt_guard_logger
 from django_auth_recovery_codes.utils.converter import SecondsToTime
 from django_auth_recovery_codes.utils.cache.safe_cache import get_cache_with_retry
 
@@ -19,7 +17,7 @@ CUTOFF      = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POIN
 
 T = TypeVar("T", bound=models.Model)
 
-cooldown_manager = RecoveryCooldownManager(multiplier=MULTIPLIER, cutoff=CUTOFF, logger=purge_code_logger)
+cooldown_manager = RecoveryCooldownManager(multiplier=MULTIPLIER, cutoff=CUTOFF, logger=attempt_guard_logger)
 
 
 User = get_user_model()
@@ -162,8 +160,10 @@ class AttemptGuard(Generic[T]):
 
         # Cached cooldown check
         if attempts > 0 and next_allowed_time > 0:
+
             wait_time = SecondsToTime(next_allowed_time).format_to_human_readable()
-            purge_code_logger.debug(f"[CACHE RETRIEVAL] Getting data from cache with user {user.id}. The cache expires in {wait_time} left")
+            attempt_guard_logger.debug(f"[CACHE RETRIEVAL] Getting data from cache with user {user.id}. The cache expires in {wait_time} left")
+            
             return False, cooldown_manager.update()
 
         # Database fallback
@@ -178,12 +178,14 @@ class AttemptGuard(Generic[T]):
       
         if remaining_time > 0:
             wait_time = SecondsToTime(remaining_time).format_to_human_readable()
-            purge_code_logger.debug(f"[DB RETRIEVAL] User {user.id} cooldown period to wait: {wait_time} left")
+            attempt_guard_logger.debug(f"[DB RETRIEVAL] User {user.id} cooldown period to wait: {wait_time} left")
             return self._start_recovery_cooldown(user_instance=user_instance, remaining_seconds=remaining_time)
+
+        attempt_guard_logger.info(f"User {user} is now allowed to attempt another login attempt.")
 
         flush_cache_and_write_attempts_to_db(instance=user_instance,
                                             field_name=self.attempt_field_name,
                                             cache_key=cache_key,
-                                            logger=purge_code_logger,
+                                            logger=attempt_guard_logger,
                                             )
         return True, 0
