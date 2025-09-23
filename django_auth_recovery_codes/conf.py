@@ -212,4 +212,12 @@ FLAG_VALIDATORS = {
         "warning_id": "django_auth_recovery_codes.W021",
     },
    
+   # --- writes to cache if true on any failed login attempts / Cache Settings ---
+   'DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE': {
+        "type": bool,
+        "warning_if_missing": "DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE is not set in settings.py.",
+        "error_if_wrong_type": "DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE must be a boolean.",
+        "error_id": "django_auth_recovery_codes.E022",
+        "warning_id": "django_auth_recovery_codes.W022",
+    },
 }

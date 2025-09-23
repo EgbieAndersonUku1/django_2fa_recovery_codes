@@ -1,12 +1,21 @@
-import logging
+# 
+# base_models.py
 
+# Provides abstract base classes and utility functions for models
+# that implement login attempt tracking, cooldowns, and rate-limiting
+# behaviour. These classes are not meant to be instantiated directly,
+# but extended by concrete models.
+# 
+
+import logging
 from typing import Self
 from datetime import timedelta
 from django.core.cache import cache
 from django.db import models
 from django.utils import timezone
 from django.contrib.auth import get_user_model
-from .utils.cache.safe_cache import delete_cache_with_retry
+
+from .utils.cache.safe_cache import delete_cache_with_retry, get_cache_with_retry
 from django_auth_recovery_codes.app_settings import default_cooldown_seconds, default_multiplier
 
 
@@ -244,8 +253,8 @@ def flush_cache_and_write_attempts_to_db(instance, field_name, cache_key: str, l
     if not hasattr(instance, field_name):
         raise ValueError(f"This field name: '{field_name}' was not found in the instance model")
     
-    data = cache.get(cache_key, {})
-
+    data = get_cache_with_retry(cache_key, default={})
+    
     try:
         logger.debug("Flushing cache: object_id=%s, key=%s, data=%s", getattr(instance, "id", None), cache_key, data)
 
