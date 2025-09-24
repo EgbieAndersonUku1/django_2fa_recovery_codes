@@ -3,25 +3,23 @@
 ![Brute Force](https://img.shields.io/badge/Brute--force-Impractical-red)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
-# 🔐 2FA Recovery Codes
+## 🔐 2FA Recovery Codes
 
 The premises of this resuable application, is that it takes any Django application and extends that application so that it can now use the 2FA recovery codes as a backup login for that application.
 
 `django-2fa-recovery-codes` is a Django app that provides a robust system for generating, storing, and managing **2FA recovery codes**. Unlike a full two-factor authentication apps, this package focuses solely on **recovery codes**, although this is a lightweight application it is a very powerful tool, offering fine-grained control and asynchronous management for better UX and performance.
 
-## Table of Contents
+### Table of Contents
 
 * [Introduction](#introduction)
 * [Features](#features)
-* [How it differs from full two-factor-auth apps](#how-it-differs-from-full-two-factor-auth-apps)
+* [How it Differs from Full Two-Factor-Auth Apps](#how-it-differs-from-full-two-factor-auth-apps)
 * [2FA Recovery Code Generator](#2fa-recovery-code-generator)
 * [Why It’s Secure](#why-its-secure)
-
   * [Entropy](#entropy)
   * [Total Combinations](#total-combinations)
 * [Brute-Force Resistance](#brute-force-resistance)
 * [Perspective](#perspective)
-
   * [Time to Crack at Different Speeds](#time-to-crack-at-different-speeds)
 * [Developer Appendix 🛠️](#developer-appendix-)
 * [Summary](#summary)
@@ -31,9 +29,10 @@ The premises of this resuable application, is that it takes any Django applicati
 * [Contributing](#contributing)
 * [License](#license)
 
+
 ---
 
-## Features
+### Features
 
 * Generate recovery codes in configurable batches.
 * Track recovery codes individually:
@@ -62,7 +61,7 @@ The premises of this resuable application, is that it takes any Django applicati
 
 ---
 
-## How it Differs from Full Two-Factor Authentication Apps?
+### How it Differs from Full Two-Factor Authentication Apps?
 
 `django-2fa-recovery-codes` is designed **solely for recovery codes**, offering fine-grained control, asynchronous management, and admin-friendly batch handling.
 
@@ -153,7 +152,7 @@ The premises of this resuable application, is that it takes any Django applicati
 ```
 
 
-## 2FA Recovery Code Generator
+### 2FA Recovery Code Generator
 
 This app generates **2FA recovery codes** that can be used if you lose access to your authenticator app.
 
@@ -174,9 +173,9 @@ XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX
 
 ---
 
-## Why It’s Secure
+### Why It’s Secure
 
-### Entropy
+#### Entropy
 
 * Each character contributes **≈5.91 bits** (`log2(60) ≈ 5.91`) where the 60 is (`A–Z`, `a–z`, `2–9`)
 * Each group has 6 characters → 6 × 5.91 ≈ **35.46 bits per group**
@@ -184,7 +183,7 @@ XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX
 
 > With 60 characters and 36-character codes, entropy is significantly higher than AES-128 (128 bits), making brute-force attacks astronomically impractical.
 
-### Total Combinations
+#### Total Combinations
 
 * **Number of unique codes:**
 
@@ -195,7 +194,7 @@ $$
 > This astronomical number of possible codes ensures that guessing a valid code is virtually impossible.
 
 
-## What this means?
+#### What this means?
 
 * Each character is chosen randomly from 60 possibilities.
 * With 36 characters, the number of possible codes is **more than 2 followed by 63 zeros**.
@@ -207,7 +206,7 @@ $$
 
 ---
 
-## Brute-Force Resistance
+#### Brute-Force Resistance
 
 Assuming a supercomputer that tests **10^9 codes per second** with no rate limiting:
 
@@ -225,7 +224,7 @@ $$
 
 > Even a supercomputer cannot realistically brute-force a single code.
 
-### Time to Crack at Different Speeds
+#### Time to Crack at Different Speeds
 
 | Guesses per Second | Time to Crack (Years) |
 | ------------------ | --------------------- |
@@ -239,7 +238,7 @@ $$
 
 ---
 
-## Developer Appendix 🛠️
+#### Developer Appendix 🛠️
 
 ```python
 import math
@@ -266,7 +265,7 @@ Years to crack: 1.043e+45
 
 ---
 
-## ✅ Summary
+#### ✅ Summary
 
 * **212.8 bits recovery codes** → astronomically secure
 * **≈3.3 × 10^61 combinations** → impossible to brute-force
@@ -275,7 +274,7 @@ Years to crack: 1.043e+45
 
 ---
 
-## Use Cases
+#### Use Cases
 
 * Integrate with any existing 2FA system to provide a secure set of recovery codes.
 * Large-scale systems where thousands of users might need recovery codes, ensuring database performance is not impacted.
@@ -300,7 +299,7 @@ INSTALLED_APPS = [
 
 ---
 
-## Quick Example
+#### Quick Example
 
 ```python
 from django_2fa_recovery_codes.models import RecoveryCodeBatch
@@ -314,9 +313,9 @@ plain_codes, batch_instance = RecoveryCodeBatch.create_recovery_batch(user, days
 ---
 
 
-# How to Use 2FA Recovery Codes
+## How to Use 2FA Recovery Codes
 
-## Set up the Cache or using default cache
+### Set up the Cache or using default cache
 
 To use this application, you can either set up a permanent cache system in the backend or allow it to use the default cache.
 
@@ -433,6 +432,238 @@ Key points:
 ---
 
 In short: the app is **built to use caching by default**, but if no backend is configured it automatically falls back to an in-memory cache. However, because it is an in-memory when the Django sever restarts it **resets the cache**. For production, a persistent backend like Redis is recommended.
+
+
+
+
+## Using and setting up Django-q
+
+### What is Django-Q?
+
+**Django-Q** is a task queue and asynchronous job manager for Django. It allows your application to run tasks **outside the normal request/response cycle**, this is useful for background processing, scheduling, or parallel execution.
+
+### Key features include:
+
+* Asynchronous Task Execution
+
+Allows tasks to run in the background so users don’t have to wait for them to complete, for example:
+
+* Sending emails
+* Generating reports
+* Processing files
+* Performing API requests
+* Deleting tasks
+
+### Scheduled Tasks
+
+Supports scheduling tasks similar to cron jobs:
+
+* One-off tasks at a specific time
+* Recurring tasks (daily, weekly, etc.)
+
+### Multiple Brokers
+
+Tasks can be stored in different backends (brokers):
+
+* **Django ORM (default)**: stored in the database
+* **Redis**: faster and suitable for high-performance needs
+* Other databases (PostgreSQL, MySQL)
+
+### Cluster Mode
+
+Runs multiple worker processes in parallel for better performance and scalability.
+
+### Result Storage
+
+Stores task results so you can check completion status and retrieve outputs.
+
+---
+
+To run the worker cluster, use:
+
+```bash
+python manage.py qcluster
+```
+
+---
+
+## Django-Q vs Celery and why Django Auth Recovery codes use Django-q
+
+
+Both Django-Q and Celery are task queues, but they differ in complexity and use cases:
+
+| Feature                   | Django-Q | Celery   |
+| ------------------------- | -------- | -------- |
+| Async tasks               | ✅        | ✅        |
+| Scheduled tasks           | ✅        | ✅        |
+| Periodic/recurring tasks  | ✅        | ✅        |
+| Multiple brokers          | ✅        | ✅        |
+| Result backend            | ✅        | ✅        |
+| Retry/failure handling    | Basic    | Advanced |
+| Task chaining & workflows | Limited  | ✅        |
+
+
+**Key differences**:
+
+* **Django-Q** is simpler, uses Django’s ORM as a broker by default, and is ideal for small to medium projects.
+* **Celery** is more complex, requires an external broker like Redis or RabbitMQ, and is better suited for large-scale, high-load projects with advanced workflows.
+
+---
+
+## Why this application uses Django-Q
+
+`Django Auth Recovery Codes` uses Django-Q to handle background tasks such as:
+
+1. When the user email themselves a copy of their plaintext code
+2. When the admin runs or sets up scheduler (once, daily, weekly, etc) to delete invalid or expired codes, a report is also generated and sent to the admin via email 
+
+
+Without using Django-q whenever a user deletes their code or sends a copy of their plaintext code it will block normal request/response, and if multiple users are deleting their codes at the same time it can causes problems in the database by. With this it ensures that these tasks do not block normal request/response cycles and can run efficiently in the background without impacting the user experience.
+
+
+---
+
+### ⚠️ Note on Batch Deletion
+
+Even though expired codes are deleted asynchronously, deleting **millions of codes at once** can still cause performance issues such as long transactions or database locks.
+
+To avoid this, `Django Auth Recovery Codes` supports **batch deletion** via the configurable setting:
+
+```python
+# settings.py
+Django Auth Recovery Codes_BATCH_DELETE_SIZE = 1000
+```
+
+* If set, expired codes will be deleted in **chunks of this size** (e.g. 1000 at a time).
+* If not set, all expired codes are deleted in a single query.
+
+---
+
+
+### Using Django-Q with `Django Auth Recovery Codes`
+
+Django Auth Recovery Codes provides a utility task to clean up expired recovery codes, but since this is a reusable app, the scheduling of this task is **left up to you**, depending on your project’s needs and dataset size.
+
+---
+
+####. Scheduling the Task with Django-Q via the admin interface `Recovery code batch scheduler`
+
+You can schedule this cleanup task to run at whatever time that that suits via the admin. For example every date at a given time.
+
+See the [Django-Q scheduling docs](https://django-q.readthedocs.io/en/latest/schedules.html) for more options.
+
+---
+
+---
+
+### How does Django-Q delete codes if the user deletes them from the frontend?
+
+`Django Auth Recovery Codes` does **not** immediately delete a code when the user deletes it from the frontend. Instead, it performs a **soft delete**, the code is marked as invalid and can no longer be used. From the user’s perspective, the code is “gone,” but the actual row still exists in the database until the cleanup task runs.
+
+When the Django-Q scheduler task runs (either automatically or triggered by the admin), any codes marked for deletion are permanently removed in the background (in batches).
+
+---
+
+### Why not delete the code immediately?
+
+Since this is a **reusable app** that can be plugged into Django projects of any size (small apps or large-scale environments), immediate deletion is avoided for two key reasons:
+
+1. **Database contention**
+   In environments with thousands of users, many codes could be deleted at the same time. Deleting them synchronously could lock rows or put heavy strain on the database.
+
+2. **User experience**
+   Immediate deletion happens in the request/response cycle. If many users delete codes at once, their requests would take longer, and the frontend might “freeze” while deletions are processed leading to a poor UX.
+
+---
+
+### Benefits of using Django-Q
+
+By offloading deletion to Django-Q:
+
+* Deletion is handled as a **background task**, so it doesn’t block the frontend.
+* The database can process deletions more efficiently, especially when using **batch deletion**.
+* Users get a smoother experience ,the code disappears instantly from their view, while the actual cleanup happens safely in the background.
+
+
+### Deletion flow
+
+<p align="center">
+  <img src="docs/images/deletion_flowchart.png" alt="Code deletion flowchart" width="500"/>
+</p>
+---
+
+### Batch deletion configuration
+
+For projects with very large datasets, batch deletion can be enabled via the `Django Auth Recovery Codes_BATCH_DELETE_SIZE` setting:
+
+```python
+# settings.py
+Django Auth Recovery Codes_BATCH_DELETE_SIZE = 1000
+```
+
+* If set, expired or soft-deleted codes will be removed in chunks of this size.
+* If not set, all deletions happen in a single query.
+
+This approach provides flexibility,  small apps can use one-shot deletes, while larger systems can safely handle deletions in manageable batches.
+
+---
+
+
+## Setting up Django-Q
+
+The `Django Auth Recovery Codes` library uses **Django-Q** internally. You don’t need to install it separately, but you must configure it in your Django project to ensure background tasks run properly.
+
+---
+
+### 1. Add Django-Q to Installed Apps
+
+In your `settings.py`:
+
+```python
+INSTALLED_APPS = [
+    ...
+    'django_q',
+]
+```
+
+---
+
+### 2. Configure the Q\_CLUSTER
+
+Example configuration:
+
+```python
+Q_CLUSTER = {
+    'name': 'recovery_codes',
+    'workers': 2,
+    'timeout': 300,    # Maximum time (seconds) a task can run
+    'retry': 600,      # Retry after 10 minutes if a task fails (retry must be greater than timeout)
+    'recycle': 500,    # Recycle workers after this many tasks
+    'compress': True,  # Compress data for storage
+    'cpu_affinity': 1, # Assign workers to CPU cores
+    'save_limit': 250, # Maximum number of task results to store
+    'queue_limit': 500,# Maximum number of tasks in the queue
+    'orm': 'default',  # Use the default database for task storage
+}
+```
+
+For more configuration options, see the [official Django-Q documentation](https://django-q.readthedocs.io/en/latest/configure.html).
+
+---
+
+### 3. Running the Cluster
+
+Don’t forget to start the Django-Q worker cluster so scheduled tasks actually run:
+
+```bash
+python manage.py qcluster
+```
+
+---
+
+
+
+
 
 
 
