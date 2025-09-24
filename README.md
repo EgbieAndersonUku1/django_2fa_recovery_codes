@@ -72,10 +72,13 @@ The premises of this resuable application, is that it takes any Django applicati
 	* Generate a batch of 2FA recovery codes (default=10 generated, configurable via settings flags) with expiry date or doesn't expiry
         * Regenerate code (Uses brute force rate limiter with a penalty that increases wait time if codes is regenerated within that time window)
         * Email, Delete or Download entire codes via the buttons
+        * One-time verification code setup form
+          * A one-time setup that allows the user to enter a 2FA code after generation (for the first time) to verify that the backend has configured it correctly without marking the code as used. The tests indicate whether the code has been set up correctly.
+
         * Invalidate or delete a code via interactive form
         * view batch histories
 	
-          ### Example a single recovery code batch View
+          #### Example a single recovery code batch View
 
           | Field                     | Value                                |
           | ------------------------- | ------------------------------------ |
@@ -95,20 +98,19 @@ The premises of this resuable application, is that it takes any Django applicati
 
       * Pagination to split the batch recovery codes history on different pages instead of one long page
 
-* Focuses **exclusively on recovery codes** rather than full 2FA flows.
-* Built in **asynchronous usage**
-        * Built-in **asynchronous cleanup scheduler** using Django-Q for expired or invalid code, audit report with option to send the report to admin after a successful scheduler delete.
-        * Uses asynchronous to send emails with the optional to use synchronous for testing or when in development configurable in `DEBUG` settings. 
-	  DEBUG = True
-	     * Uses synchronous (easy for development or testing) to send emails
- 	  DEBUG = False
-	     * use asynchronous good for production, doesn't lock the application while sending in the background
+* Focuses **exclusively on recovery codes**, rather than full 2FA flows.
+* Built with **asynchronous usage** using Django-Q:
+  * Automatically deletes expired or invalid codes when uses with scheduler.
+  * On a successful delete scheduler generates an audit report of the number of deleted codes and sends it to admin via email. The sending of the email is optional.
+  * Email sending can be configured to run **asynchronous or synchronous** depending on your environment:
+    * `DEBUG = True` : uses synchronous sending (easy for development or testing).  
+    * `DEBUG = False` : uses asynchronous sending (recommended for production; doesn’t block the application while sending in the background).
 
-* **Admin-friendly view interface code management**, including the ability to scheduler deletion for expired or invalid codes e.g (every 2 days, etc).
+* **Admin-friendly view interface code management**, including the ability to scheduler deletion for expired or invalid codes e.g (every 2 days, etc) or even the audit history.
 * **Individual code tracking** with granular control over each code.
-* Optional **logger** to track the actions of users generating recovery codes, email sent, various aspect of the models, etc.
+* Optional configuration to  turn **logger** on or off to track the actions of users generating recovery codes, email sent, various aspect of the models, etc.
 * Optional **storage of user email** in the model for auditing purposes.
-* Utilises **caching** (Redis, Memcached, or any backend) 
+* Utilises **caching** (Redis, Memcached, default cache, etc) doe
   * Pagination and page reads
   * Brute-force rate limiting
   * Other database-heavy operations
@@ -145,6 +147,9 @@ The premises of this resuable application, is that it takes any Django applicati
   * DJANGO_AUTH_RECOVERY_CODE_PER_PAGE                            = 5
   * DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS                 = 3
   * DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE        = True
+  * DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL                          = 300      # Default 5 minutes
+  * DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN                          = 60       # Minimum 1 minute
+  * DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX                          = 3600     # Maximum 1 hour
 ```
 
 
@@ -161,11 +166,11 @@ Codes are generated in the following format:
 ```
 XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX
 ```
-
+---
 * **6 groups**, each with **6 characters**
-* **Alphabet size:** 52 characters (`A–Z`, `a–z`, `2–9`)
+* **Alphabet size:** 60 characters (`A–Z`, `a–z`, `2–9`)
 * **Cryptographic randomness** (not guessable, not sequential)
-* **Entropy total:** 215 bits (5.71 bits per character × 36 characters)
+* **Entropy total:** 213 bits (≈5.91 bits per character × 36 characters)
 
 ---
 
@@ -173,19 +178,32 @@ XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX
 
 ### Entropy
 
-* Each character contributes **5.71 bits** (`log2(52+8?) ≈ 5.71`)
-* Each group has 6 characters → 6 × 5.71 ≈ **34.26 bits per group**
-* 6 groups → 6 × 34.26 ≈ **205.56 bits total**
+* Each character contributes **≈5.91 bits** (`log2(60) ≈ 5.91`) where the 60 is (`A–Z`, `a–z`, `2–9`)
+* Each group has 6 characters → 6 × 5.91 ≈ **35.46 bits per group**
+* 6 groups → 6 × 35.46 ≈ **212.8 bits total**
 
-> With 52 characters and 36-character codes, entropy is higher than AES-128 (128 bits), making brute-force attacks astronomically impractical.
+> With 60 characters and 36-character codes, entropy is significantly higher than AES-128 (128 bits), making brute-force attacks astronomically impractical.
 
 ### Total Combinations
 
 * **Number of unique codes:**
 
 $$
-52^{36} \approx 3.3 \times 10^{61}
+60^{36} \approx 2.03 \times 10^{63}
 $$
+
+> This astronomical number of possible codes ensures that guessing a valid code is virtually impossible.
+
+
+## What this means?
+
+* Each character is chosen randomly from 60 possibilities.
+* With 36 characters, the number of possible codes is **more than 2 followed by 63 zeros**.
+* That’s **so many possibilities** that even the fastest computers would take **longer than the age of the universe** to try them all.
+* This makes guessing a valid code virtually impossible and this is without brute rate limiter.
+
+> In short: it’s **far stronger than standard encryption like AES-128**. You can trust these codes to be safe.
+
 
 ---
 
@@ -250,7 +268,7 @@ Years to crack: 1.043e+45
 
 ## ✅ Summary
 
-* **215-bit recovery codes** → astronomically secure
+* **212.8 bits recovery codes** → astronomically secure
 * **≈3.3 × 10^61 combinations** → impossible to brute-force
 * Even with a supercomputer, cracking a single code would take **trillions of times longer than the age of the universe**
 * With **rate limiting**, brute-force becomes completely infeasible
@@ -294,6 +312,130 @@ plain_codes, batch_instance = RecoveryCodeBatch.create_recovery_batch(user, days
 ```
 
 ---
+
+
+# How to Use 2FA Recovery Codes
+
+## Set up the Cache or using default cache
+
+To use this application, you can either set up a permanent cache system in the backend or allow it to use the default cache.
+
+### Why is a cache necessary for this app?
+
+This application is designed to be scalable, meaning it can support anything from a few users to thousands without compromising performance or putting unnecessary load on the database. It relies heavily on caching: 
+
+  - Everything from page reads
+  - Pagination
+  - Brute-force rate limiting, waiting time for failed login attempts to the cooling period for regenerating new codes is computed and cached. 
+  - Database-heavy operations
+
+The database is only accessed when the cache expires or an update is made e.g the user uses, deletes or invalidates a code.
+
+
+#### Cache Expiry and TTL Settings
+
+Cache entries have a configurable **Time-To-Live (TTL)**, which determines how long the data is stored before being refreshed. The following settings are used by default:
+
+```python
+DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL = 300      # Default 5 minutes
+DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN = 60       # Minimum 1 minute
+DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX = 3600     # Maximum 1 hour
+
+# Ensure cache TTL stays within safe bounds do not change this only modify the above flags
+DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL = max(
+    DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN,
+    min(DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL, DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX)
+)
+```
+
+These settings **can be adjusted by the developer** in the Django settings to balance performance with data freshness. This ensures cache expiry times remain within safe and predictable bounds.
+
+### How does the cache work?
+
+The cache helps prevent issues such as **race conditions** and **stale data**.
+
+#### What is a race condition?
+
+A race condition occurs when two or more processes try to modify the same data at the same time, leading to unpredictable results.
+
+**Example:**
+
+Imagine two requests to generate a new 2FA recovery code arrive simultaneously for the same user. If both try to write to the cache at the same time, one could overwrite the other, resulting in lost data. To prevent this, the application ensures that only one process can write to a specific cache key at a time.
+
+This mechanism guarantees that cache data remains consistent, preventing conflicts and ensuring that recovery codes are always valid and reliable.
+
+---
+
+### What cache should I use?
+
+That depends entirely on you. The application is designed to **use caching**, but it’s backend-agnostic. It will work with any cache supported by Django (e.g. Redis, Memcached, or in-memory cache). It assumes no cache over the other and leaves it to the developer to decide which one to use under the hood.
+
+This flexibility is possible because the application only interacts with **Django’s cache framework abstraction**. Under the hood, all cache operations (`cache.set`, `cache.get`, etc.) are handled by Django. The actual backend Redis, Memcached, or in-memory is just a plug-in configured in `settings.py`.
+
+* **Redis** : A common choice for production, especially in distributed systems. It supports persistence, clustering, and advanced features like pub/sub.
+* **Memcached** : Lightweight and very fast, best for simple key/value caching when persistence is not required.
+* **In-memory cache** : Used by default if no backend is configured. Easiest to set up, but limited to a single process and **wipes entirely when the application restarts**, so best for development or small-scale setups.
+
+#### Example configurations (Django)
+
+```python
+# settings.py
+
+# Redis
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6379/1",
+    }
+}
+
+# Memcached
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.memcached.MemcachedCache",
+        "LOCATION": "127.0.0.1:11211",
+    }
+}
+
+# In-memory (local memory cache, default if none configured)
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "unique-snowflake",
+    }
+}
+```
+
+#### Example usage
+
+```python
+from django.core.cache import cache
+
+# Store a value for 5 minutes
+cache.set("greeting", "Hello, world!", timeout=300)
+
+# Retrieve the value
+message = cache.get("greeting")
+print(message)  # "Hello, world!"
+```
+
+### Using Django Cache Without Configuring a Backend
+
+Even if you don’t explicitly define a cache backend in `settings.py`, Django provides a **default in-memory cache (`LocMemCache`)** which the application uses by using the handlers `cache.get()` and `cache.set()` via a specifically designed cache functions:
+
+
+Key points:
+
+1. Django uses `LocMemCache` internally if `CACHES` is not defined.
+2. If a in-memory cache is used (nothing added in the settings) when Django is restarted, the cache is automatically cleared by Django
+3. Each worker process has its own separate cache.
+
+---
+
+In short: the app is **built to use caching by default**, but if no backend is configured it automatically falls back to an in-memory cache. However, because it is an in-memory when the Django sever restarts it **resets the cache**. For production, a persistent backend like Redis is recommended.
+
+
+
 
 ## Contributing
 
