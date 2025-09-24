@@ -3,9 +3,9 @@
 ![Brute Force](https://img.shields.io/badge/Brute--force-Impractical-red)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
-## 🔐 2FA Recovery Codes
+## 🔐 Django 2FA Recovery Codes
 
-The premises of this resuable application, is that it takes any Django application and extends that application so that it can now use the 2FA recovery codes as a backup login for that application.
+The premises of this resuable application, is that it takes any Django application and extends that application so that it can now use the 2FA recovery codes as a backup login should you lose access.
 
 `django-2fa-recovery-codes` is a Django app that provides a robust system for generating, storing, and managing **2FA recovery codes**. Unlike a full two-factor authentication apps, this package focuses solely on **recovery codes**, although this is a lightweight application it is a very powerful tool, offering fine-grained control and asynchronous management for better UX and performance.
 
@@ -61,14 +61,14 @@ The premises of this resuable application, is that it takes any Django applicati
 
 ---
 
-### How it Differs from Full Two-Factor Authentication Apps?
+### How It Differs From A Full Two-Factor Authentication Apps?
 
 `django-2fa-recovery-codes` is designed **solely for recovery codes**, offering fine-grained control, asynchronous management, and admin-friendly batch handling.
 
 * User UI interface
    * Dedicated login interface page to enter your email and 2FA recovery code
    * Dashboard that allows the user to:
-	* Generate a batch of 2FA recovery codes (default=10 generated, configurable via settings flags) with expiry date or doesn't expiry
+	      * Generate a batch of 2FA recovery codes (default=10 generated, configurable via settings flags) with expiry date or doesn't expiry
         * Regenerate code (Uses brute force rate limiter with a penalty that increases wait time if codes is regenerated within that time window)
         * Email, Delete or Download entire codes via the buttons
         * One-time verification code setup form
@@ -129,30 +129,30 @@ The premises of this resuable application, is that it takes any Django applicati
 * Users can **view batch details**, e.g., number of codes generated, emailed, or downloaded.
 
 * **Configurable flags for developer**
-## Example Configuration for settings
+#### Configuration flags settings for the Django Auth Recovery code
 ```python
-  * DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME                  = "recovery_codes"
-  * DJANGO_AUTH_RECOVERY_KEY                                      = "recovery-key-to-create-the-hash-and-use-for-deterministic-lookup"
-  * DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS                = 0
-  * DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP           = True
-  * DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS         = 30
-  * DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER               = "example_email@hotmail.com"
-  * DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL                         = "example_admin_email@hotmail.com"
-  * DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME                      = "egibe"
-  * DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER   = False
-  * DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG                     = False
-  * DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW                       = "app name"
-  * DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE                         = 20
-  * DJANGO_AUTH_RECOVERY_CODE_PER_PAGE                            = 5
-  * DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS                 = 3
-  * DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE        = True
-  * DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL                          = 300      # Default 5 minutes
-  * DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN                          = 60       # Minimum 1 minute
-  * DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX                          = 3600     # Maximum 1 hour
+  * DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME                 
+  * DJANGO_AUTH_RECOVERY_KEY                                    
+  * DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS                
+  * DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP         
+  * DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS        
+  * DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER               
+  * DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL                         
+  * DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME                      
+  * DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER  
+  * DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG                     
+  * DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW                       
+  * DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE                         
+  * DJANGO_AUTH_RECOVERY_CODE_PER_PAGE                           
+  * DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS                
+  * DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE        
+  * DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL                         
+  * DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN                         
+  * DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX                        
 ```
 
 
-### 2FA Recovery Code Generator
+## 2FA Recovery Code Generator
 
 This app generates **2FA recovery codes** that can be used if you lose access to your authenticator app.
 
@@ -299,7 +299,7 @@ INSTALLED_APPS = [
 
 ---
 
-#### Quick Example
+## Quick Example
 
 ```python
 from django_2fa_recovery_codes.models import RecoveryCodeBatch
