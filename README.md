@@ -516,7 +516,7 @@ Both Django-Q and Celery are task queues, but they differ in complexity and use 
 
 ## Why this application uses Django-Q
 
-`Django Auth Recovery Codes` uses Django-Q to handle background tasks such as:
+`django-2fa-recovery-codes` uses Django-Q to handle background tasks such as:
 
 1. When the user email themselves a copy of their plaintext code
 2. When the admin runs or sets up scheduler (once, daily, weekly, etc) to delete invalid or expired codes, a report is also generated and sent to the admin via email 
@@ -531,7 +531,7 @@ Without using Django-q whenever a user deletes their code or sends a copy of the
 
 Even though expired codes are deleted asynchronously, deleting **millions of codes at once** can still cause performance issues such as long transactions or database locks.
 
-To avoid this, `Django Auth Recovery Codes` supports **batch deletion** via the configurable setting:
+To avoid this, `django-2fa-recovery-codes` supports **batch deletion** via the configurable setting:
 
 ```python
 # settings.py
@@ -544,7 +544,7 @@ Django Auth Recovery Codes_BATCH_DELETE_SIZE = 1000
 ---
 
 
-### Using Django-Q with `Django Auth Recovery Codes`
+### Using Django-Q with `django-2fa-recovery-codes`
 
 Django Auth Recovery Codes provides a utility task to clean up expired recovery codes, but since this is a reusable app, the scheduling of this task is **left up to you**, depending on your project’s needs and dataset size.
 
@@ -562,7 +562,7 @@ See the [Django-Q scheduling docs](https://django-q.readthedocs.io/en/latest/sch
 
 ### How does Django-Q delete codes if the user deletes them from the frontend?
 
-`Django Auth Recovery Codes` does **not** immediately delete a code when the user deletes it from the frontend. Instead, it performs a **soft delete**, the code is marked as invalid and can no longer be used. From the user’s perspective, the code is “gone,” but the actual row still exists in the database until the cleanup task runs.
+`django-2fa-recovery-codes` does **not** immediately delete a code when the user deletes it from the frontend. Instead, it performs a **soft delete**, the code is marked as invalid and can no longer be used. From the user’s perspective, the code is “gone,” but the actual row still exists in the database until the cleanup task runs.
 
 When the Django-Q scheduler task runs (either automatically or triggered by the admin), any codes marked for deletion are permanently removed in the background (in batches).
 
@@ -615,7 +615,7 @@ This approach provides flexibility,  small apps can use one-shot deletes, while 
 
 ## Setting up Django-Q
 
-The `Django Auth Recovery Codes` library uses **Django-Q** internally. You don’t need to install it separately, but you must configure it in your Django project to ensure background tasks run properly.
+The `django-2fa-recovery-codes` library uses **Django-Q** internally. You don’t need to install it separately, but you must configure it in your Django project to ensure background tasks run properly.
 
 ---
 
@@ -913,6 +913,181 @@ python manage.py runserver
 # Terminal 2
 python manage.py qcluster
 ```
+
+
+## Sending Emails and Logging
+
+Django Auth 2FA Recovery provides the ability to email yourself a copy of your raw recovery codes and can only be done once for a given batch, and only if you haven't logged out after generating the code. This is achieved using a lightweight yet powerful library called **`EmailSender`**, which is responsible for delivering the message.
+
+In addition to sending, the process can be logged for developers through a companion model named **`EmailSenderLogger`**. Together, these ensure that not only are emails dispatched, but the details of each operation can also be recorded for auditing, debugging, or monitoring purposes. 
+
+The application uses **SSE (Server-Sent Events)** to notify the user when an email has been sent.
+
+### What is SSE?
+
+SSE is a way for a **server to push real-time updates to a client** over HTTP. Unlike WebSockets, which allow **two-way communication**, SSE is **one-way**: the server sends messages to the client, but the client cannot send messages back over the same connection.
+
+It’s commonly used for:
+
+* Live notifications
+* Stock tickers
+* Chat message feeds
+* Real-time monitoring dashboards
+
+In this application, SSE is used for live notifications when an email is sent.
+
+### Why is the app is using SSE?
+
+The app uses SSE because emails are sent asynchronously using **Django-Q**. This ensures that sending an email does not block the request/response cycle which simply means the user's screen doesn't lock while the email is sending. Emails are placed in a task queue and may be sent immediately or after a short delay, depending on the queue load.
+
+Without SSE, the user would have to constantly check their email inbox to know if the codes have been sent. With SSE, the user can continue using the app normally and receive a notification popup **as soon as the email is processed and sent**, providing a better real-time experience.
+
+
+### Using async vs synchronous
+
+The application supports both **asynchronous** and **synchronous** email sending for development and production.
+
+In production, emails are sent **asynchronously** via **Django-Q**, which places the email in a task queue. Depending on the queue load, this may take a few seconds or minutes to process.
+
+In development, you might want to send emails **synchronously** to see the results immediately and verify that everything is working correctly.
+
+This behaviour is controlled by the `DEBUG` setting:
+
+* When `DEBUG = True`, emails are sent **synchronously**.
+* When `DEBUG = False`, emails are sent **asynchronously** via Django-Q.
+
+This setup allows developers to test email functionality quickly in development but at the same time keep production efficient and non-blocking.
+
+
+### Configuration
+
+Whether emails are logged is determined by a configuration flag in your project’s `settings.py`.
+
+```python
+# settings.py
+
+# Enable or disable logging of sent emails
+DJANGO_AUTH_RECOVERY_CODES_EMAIL_SENDER_LOGGING = True  # Logs the email process
+DJANGO_AUTH_RECOVERY_CODES_EMAIL_SENDER_LOGGING = False  # Disables logging
+```
+
+* **`True`**: The application records details of the email process via `EmailSenderLogger`.
+* **`False`**: No logging takes place.
+
+
+## Hang on a minute, why can I email myself the code only once, and only if I haven’t logged out after generating it?
+
+The way **Django Auth Recovery Code** works is that it never stores the plain text recovery codes in the database. Instead, it stores only their **hash values**.  
+
+A **hash** is a one-way function: it takes an input, applies a hashing algorithm, and produces an output that cannot be reversed to recover the original input. This is different from encryption/decryption, where data can be restored to its original form. Hashing is therefore safer for storing sensitive values such as recovery codes.  
+
+### What does this mean for your codes?  
+
+Since the generated codes are stored as hashes, the system cannot send you the hash (as it is meaningless to you) and it cannot retrieve the original plain text version (because it was never stored in the database).  
+
+To work around this, the application temporarily stores a copy of the plain text codes in your **backend session** when they are first generated. This session is unique to your login and user account. Because it is session-based, the codes are removed once you log out.  
+
+### What happens if I refresh the page, can I still email myself the code?  
+
+Yes. Refreshing the page does not clear the backend session. However, for security reasons, the plain text codes will no longer be displayed in the frontend after the initial page load. As long as you remain logged in, you can still email yourself a copy of the codes.  
+
+### But if I’m still logged in, why can I only email myself a single copy?  
+
+This is a deliberate **security measure**. Allowing multiple emails of the same batch would unnecessarily increase the risk of exposure. Limiting it to a single email ensures you have one secure copy without duplicating it across your inbox.  
+
+### Can I email myself a copy if I generate a new batch?  
+
+Yes. Generating a new batch creates a new set of plain text codes, which are again stored in your backend session. You may therefore email yourself one copy of each new batch.  
+
+---
+
+## Using Logging with the Application  
+
+`django-2fa-recovery-codes` includes a built-in logging configuration, so you do not need to create your own in `settings.py`. This reduces the risk of misconfiguration.  
+
+Because the application uses `django-q` (an asynchronous task manager), the logger is already set up to work with it. Conveniently, everything is preconfigured for you. All you need to do is import the logging configuration and assign it to Django’s `LOGGING` variable.  
+
+```python
+# settings.py
+
+from django_auth_recovery_codes.loggers.logger_config import DJANGO_AUTH_RECOVERY_CODES_LOGGING
+
+LOGGING = DJANGO_AUTH_RECOVERY_CODES_LOGGING
+```
+
+The `LOGGING` variable is the standard Django setting for logging. Assigning the provided configuration ensures that log files are correctly created and stored in a dedicated folder.
+
+---
+
+## What if I don’t want to override my existing LOGGING configuration?
+
+If you already have a logging configuration and prefer not to overwrite it, you can simply **merge** it with `DJANGO_AUTH_RECOVERY_CODES_LOGGING`. Since logging configurations are dictionaries, merging them is straightforward:
+
+```python
+# settings.py
+
+LOGGING = {**LOGGING, **DJANGO_AUTH_RECOVERY_CODES_LOGGING}
+```
+
+This approach allows you to keep your existing logging settings intact but still allow you to add support for `django-2fa-recovery-codes`.
+
+
+---
+
+## Downloading Recovery Codes  
+
+In addition to emailing your recovery codes, `django-2fa-recovery-codes` also allows you to **download them directly**. This gives you flexibility in how you choose to back up your codes.  
+
+### How downloads work  
+
+When recovery codes are generated, a plain text copy is stored temporarily in the `request.session`. This enables you to either:  
+
+- **Email yourself a copy**, or  
+- **Download a copy** in one of the following formats:  
+  - Plain text (`.txt`)  
+  - PDF (`.pdf`)  
+  - CSV (`.csv`)  
+
+
+The format in which the recovery codes are returned (TXT, PDF, or CSV) is determined by a settings flag. By default, the codes are returned as **TXT**, but this can be customised using the following setting:
+
+```python
+# Default download format
+DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT = 'txt'  # options: 'txt', 'csv', 'pdf'
+```
+
+By default, the downloaded file is named `recovery_codes` (plus the extension) used when using the default format. You can also change the file name using this setting:
+
+```python
+# Default download file name
+DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME = "recovery_codes"
+
+```
+
+
+Just like with emailing, once you log out, the session is cleared and the plain text codes are no longer available.  
+
+### Important security notes  
+
+- You may **only download a copy once** per batch of recovery codes.  
+- The downloaded file contains the **exact same content** as the emailed version (the plain text recovery codes).  
+- If you lose the downloaded file after logging out, you will not be able to retrieve it. You will need to generate a new batch of recovery codes.  
+
+### Example usage  
+
+When generating recovery codes in the application, you will be presented with options to:  
+
+- **Email yourself a copy** (retrieves codes from `request.session`)  
+- **Download a copy** (also retrieves codes from `request.session`)  
+
+Both options use the same temporary storage mechanism, which ensures your plain text recovery codes are only ever available for the current session and cannot be recovered after logout.  
+
+---
+
+
+
+
+
 
 
 ## Contributing
