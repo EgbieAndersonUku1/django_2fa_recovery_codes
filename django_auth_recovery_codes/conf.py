@@ -220,4 +220,13 @@ FLAG_VALIDATORS = {
         "error_id": "django_auth_recovery_codes.E022",
         "warning_id": "django_auth_recovery_codes.W022",
     },
+
+     # --- Deletes the code in chunks instead of all at once / Delete batch  Settings ---
+    'DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE' : {
+        "type": bool,
+        "warning_if_missing": "DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE is not set in settings.py.",
+        "error_if_wrong_type": "DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE must be a boolean.",
+        "error_id": "django_auth_recovery_codes.E023",
+        "warning_id": "django_auth_recovery_codes.W023",
+    },
 }
