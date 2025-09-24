@@ -152,89 +152,90 @@ The premises of this resuable application, is that it takes any Django applicati
 ```
 
 
-## 2FA Recovery Code Generator
+## Django 2FA Recovery Code Generator
 
-This app generates **2FA recovery codes** that can be used if you lose access to your authenticator app.
+### **Security Overview**
 
-Each code is generated using **cryptographically secure randomness** and avoids confusing characters (e.g., `0` vs `O`, `1` vs `l`).
+These 2FA recovery codes generated are designed to be **extremely secure** and practically impossible to guess.
 
-### Code Format
-
-Codes are generated in the following format:
+### **Code Format**
 
 ```
 XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX
 ```
----
-* **6 groups**, each with **6 characters**
-* **Alphabet size:** 60 characters (`A–Z`, `a–z`, `2–9`)
-* **Cryptographic randomness** (not guessable, not sequential)
-* **Entropy total:** 213 bits (≈5.91 bits per character × 36 characters)
+
+* **6 groups** of **6 characters** each (36 characters)
+* **Alphabet:** 60 characters (`A–Z`, `a–z`, `2–9`), the app avoiding confusing characters like `0` vs `O` and `1` vs `l`
+* **Cryptographically secure randomness** ensures codes are unpredictable
 
 ---
 
-### Why It’s Secure
+### **Entropy**
 
-#### Entropy
+Entropy measures how unpredictable a code is, the higher the entropy, the harder it is to guess.
 
-* Each character contributes **≈5.91 bits** (`log2(60) ≈ 5.91`) where the 60 is (`A–Z`, `a–z`, `2–9`)
-* Each group has 6 characters → 6 × 5.91 ≈ **35.46 bits per group**
-* 6 groups → 6 × 35.46 ≈ **212.8 bits total**
-
-> With 60 characters and 36-character codes, entropy is significantly higher than AES-128 (128 bits), making brute-force attacks astronomically impractical.
-
-#### Total Combinations
-
-* **Number of unique codes:**
+* **Entropy per character:**
 
 $$
-60^{36} \approx 2.03 \times 10^{63}
+\log_2(60) \approx 5.91 \text{ bits}
 $$
 
-> This astronomical number of possible codes ensures that guessing a valid code is virtually impossible.
+* **Entropy per group (6 characters):**
+
+$$
+6 \times 5.91 \approx 35.5 \text{ bits}
+$$
+
+* **Total entropy for the full 36-character code:**
+
+$$
+36 \times 5.91 \approx 213 \text{ bits}
+$$
+
+> For comparison, AES-128 encryption has 128 bits of entropy. These recovery codes are **much stronger** in terms of guessing resistance.
+
+---
+
+### **Total Combinations**
+
+With 36 characters chosen from 60 possibilities each:
+
+$$
+60^{36} \approx 2 \times 10^{63} \text{ unique codes}
+$$
+
+This astronomical number of possibilities ensures that **guessing a valid code is virtually impossible**.
+
+---
+
+### **Brute-Force Resistance**
+
+Even with a supercomputer that tests codes extremely quickly, brute-forcing a valid recovery code is **completely impractical**:
+
+| Attack Speed              | Seconds   | Years     |
+| ------------------------- | --------- | --------- |
+| 1 billion/sec (10^9)      | 2 × 10^54 | 6 × 10^46 |
+| 1 trillion/sec (10^12)    | 2 × 10^51 | 6 × 10^43 |
+| 1 quintillion/sec (10^18) | 2 × 10^45 | 6 × 10^37 |
+
+> **For comparison:** the age of the universe is only \~1.4 × 10^10 years. Even a computer testing a **quintillion codes per second** would need far longer than the universe has existed to find a valid code.
+
+---
 
 
-#### What this means?
+
+### What this means?
 
 * Each character is chosen randomly from 60 possibilities.
 * With 36 characters, the number of possible codes is **more than 2 followed by 63 zeros**.
+* Each recovery code has **≈213 bits of entropy**, making it **extremely resistant to guessing or brute-force attacks**.
 * That’s **so many possibilities** that even the fastest computers would take **longer than the age of the universe** to try them all.
-* This makes guessing a valid code virtually impossible and this is without brute rate limiter.
+* The vast number of possible codes ensures that **every code is unique and unpredictable**.
+* This makes guessing a valid code virtually impossible and this is without brute rate limiter, with a rate limiter (which this app uses it is virtually impossible).
 
-> In short: it’s **far stronger than standard encryption like AES-128**. You can trust these codes to be safe.
+> In short: it’s **far stronger than standard encryption like AES-128**. 
+> You can trust these recovery codes to keep your account safe even against attackers with enormous computational power.
 
-
----
-
-#### Brute-Force Resistance
-
-Assuming a supercomputer that tests **10^9 codes per second** with no rate limiting:
-
-* **Seconds to brute-force:**
-
-$$
-3.3 \times 10^{61} ÷ 10^9 ≈ 3.3 × 10^{52} \text{ seconds}
-$$
-
-* **Convert to years:**
-
-$$
-≈ 1.05 × 10^{45} \text{ years}
-$$
-
-> Even a supercomputer cannot realistically brute-force a single code.
-
-#### Time to Crack at Different Speeds
-
-| Guesses per Second | Time to Crack (Years) |
-| ------------------ | --------------------- |
-| 1                  | 3.3 × 10^61           |
-| 10^6 (1 million)   | 3.3 × 10^55           |
-| 10^9 (1 billion)   | 1.05 × 10^45          |
-| 10^18 (exascale)   | 1.05 × 10^36          |
-
-* Age of the universe: ≈ 13.8 × 10^9 years
-* Brute-force time: trillions of times longer than the universe's age
 
 ---
 
