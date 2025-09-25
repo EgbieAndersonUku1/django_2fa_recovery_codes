@@ -27,6 +27,7 @@ The premises of this resuable application, is that it takes any Django applicati
 * [Use Cases](#use-cases)
 * [Installation](#installation)
 * [Quick Example](#quick-example)
+* [Walkthrough](#Walkthrough)
 * [Contributing](#contributing)
 * [License](#license)
 
@@ -110,7 +111,7 @@ The premises of this resuable application, is that it takes any Django applicati
 * **Individual code tracking** with granular control over each code.
 * Optional configuration to  turn **logger** on or off to track the actions of users generating recovery codes, email sent, various aspect of the models, etc.
 * Optional **storage of user email** in the model for auditing purposes.
-* Utilises **caching** (Redis, Memcached, default cache, etc) doe
+* Utilises **caching** (Redis, Memcached, default cache, etc) for
   * Pagination and page reads
   * Brute-force rate limiting
   * Other database-heavy operations
@@ -894,7 +895,6 @@ SECRET_KEY = os.getenv("DJANGO_AUTH_RECOVERY_KEY")
 
 
 
-```markdown
 To ensure that all configurations and flags are correct, run the following command before starting the application:
 ```
 
@@ -1085,7 +1085,351 @@ Both options use the same temporary storage mechanism, which ensures your plain 
 ---
 
 
+## Walkthrough
 
+### Setup
+---
+
+This guide shows you how to set up a fresh Django project and integrate **2FA Recovery Codes** using the `django_auth_recovery_codes` package.  
+
+The walkthrough assumes you don’t already have a Django project, which is why we create a new one called `test_project`.  
+
+If you already have an existing Django project, skip to Existing project :
+
+- then follow the steps in this guide that apply to integration (skipping project creation).
+
+---
+
+### Installation (with Virtual Environment)
+
+### 1. Create a virtual environment
+
+```bash
+python -m venv env
+````
+
+* `env` is the folder name for your virtual environment. You can name it anything.
+
+### 2. Activate the virtual environment
+
+* **Windows (PowerShell)**
+
+  ```powershell
+  .\env\Scripts\Activate.ps1
+  ```
+* **Windows (CMD)**
+
+  ```cmd
+  .\env\Scripts\activate.bat
+  ```
+* **macOS/Linux**
+
+  ```bash
+  source env/bin/activate
+  ```
+
+### 3. Upgrade pip (optional but recommended)
+
+```bash
+pip install --upgrade pip
+```
+
+### 4. Install Django (latest version)
+
+```bash
+pip install django
+```
+
+### 5. Install the recovery codes package
+
+```bash
+pip install django_auth_recovery_codes
+```
+
+### 6. Verify installation
+
+```bash
+python -m django --version
+pip show django_auth_recovery_codes
+```
+
+---
+
+## Project Setup
+
+### 7. Create a new Django project
+
+```bash
+django-admin startproject test_project
+cd test_project
+```
+
+### 8. Run initial migrations
+
+```bash
+python manage.py migrate
+```
+
+### 9. Create a Django superuser
+
+```bash
+python manage.py createsuperuser
+```
+
+* Follow the prompts to set username, email, and password.
+
+### 10. Start a new app called `home`
+
+```bash
+python manage.py startapp home
+```
+
+### 11. Add `home`, `django_auth_recovery_codes`, and `django_q` to `INSTALLED_APPS`
+
+Edit `test_project/settings.py`:
+
+```python
+INSTALLED_APPS = [
+    ...,
+
+    # third-party apps
+    "django_auth_recovery_codes",
+    "django_q",
+
+    # your app
+    "home",
+]
+```
+
+### 12. Run the development server
+
+```bash
+python manage.py runserver
+```
+
+Open [http://127.0.0.1:8000/admin](http://127.0.0.1:8000/admin) and log in with your superuser credentials.
+
+---
+
+## Configure URLs
+
+### 13. In `home/urls.py`
+
+Create the file if it doesn’t exist:
+
+```python
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path("", view=views.home, name="home"),
+]
+```
+
+### 14. In your **main** `urls.py` (same folder as `settings.py`)
+
+```python
+from django.contrib import admin
+from django.urls import path, include
+
+urlpatterns = [
+    path("admin/", admin.site.urls),
+    path("", include("django_auth_recovery_codes.urls")),  # recovery codes
+    path("", include("home.urls")),  # home app
+]
+```
+
+---
+
+### Configure Settings
+
+### 15. Add recovery code settings in `settings.py`
+
+```python
+# Required values – customise for your project
+DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL = "your-email-address"
+DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER = "main-smtp-email"
+DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME = "username"
+DJANGO_AUTH_RECOVERY_KEY = "add-some-key"
+
+# Default values (can be left as-is or overridden)
+DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP = 30
+DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS = 30
+DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE = 20
+DJANGO_AUTH_RECOVERY_CODE_PER_PAGE = 5
+DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS = 30
+DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER = True
+DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW = "login_user"
+DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG = True
+DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE = True
+DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN = 3600
+DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE = 1000
+DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX = 3600
+DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN = 0
+DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL = 300
+DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT = 3600
+DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER = 2
+DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME = "recovery_codes"
+DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT = "txt"
+DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS = 3
+```
+
+### 16. Use the file-based email backend (for testing)
+
+This will create a `sent_emails` folder where Django saves emails instead of sending them.
+
+```python
+EMAIL_BACKEND = "django.core.mail.backends.filebased.EmailBackend"
+EMAIL_FILE_PATH = BASE_DIR / "sent_emails"
+```
+
+### 17. Run system checks
+
+Stop the server (`Ctrl+C`) if it’s running, then run:
+
+```bash
+python manage.py check
+```
+
+This will raise errors if any settings are misconfigured (e.g., wrong data types).
+
+---
+
+### Run Services
+
+### 18. Open two terminals
+
+**Terminal 1** – run the server:
+
+```bash
+python manage.py runserver
+```
+
+**Terminal 2** – run django-q cluster:
+
+```bash
+python manage.py qcluster
+```
+
+---
+### Create a Home View
+
+#### 19. In `home/views.py`
+
+```python
+from django.http import HttpResponse
+
+def home(request):
+    return HttpResponse("This is the home page")
+```
+
+---
+
+### Verify the Home Page
+
+Open your browser and go to:
+
+```
+http://127.0.0.1:8000/
+```
+
+You should see:
+*"This is the home page"*
+
+---
+
+### Access the Admin
+
+Since we don’t have a login portal yet, log in via the admin:
+
+```
+http://127.0.0.1:8000/admin/
+```
+
+* Enter the superuser credentials you created with `createsuperuser`.
+
+---
+
+### Access the Recovery Codes Dashboard
+
+Once logged in, go to the dashboard via:
+
+```
+http://127.0.0.1:8000/auth/recovery-codes/dashboard/
+```
+
+
+
+
+
+
+---
+
+### 2. Existing Project Setup
+
+If you already have a Django project running, integration is simple:
+
+1. **Install the package**
+
+   ```bash
+   pip install django_auth_recovery_codes
+   ```
+
+2. **Update `INSTALLED_APPS` in `settings.py`**
+
+   ```python
+   INSTALLED_APPS = [
+       ...,
+       "django_auth_recovery_codes",
+       "django_q",  # required for background jobs
+   ]
+   ```
+
+3. **Add a recovery key and email backend (for testing)**
+
+   ```python
+   EMAIL_BACKEND = "django.core.mail.backends.filebased.EmailBackend"
+   EMAIL_FILE_PATH = BASE_DIR / "sent_emails"
+
+   DJANGO_AUTH_RECOVERY_KEY = "add-some-key"
+   ```
+
+4. **Include URLs in your main `urls.py`**
+
+   ```python
+   from django.urls import path, include
+
+   urlpatterns = [
+       ...,
+       path("", include("django_auth_recovery_codes.urls")),
+   ]
+   ```
+
+5. **Run migrations**
+
+   ```bash
+   python manage.py migrate
+   ```
+
+   > ⚠️ You don’t need to run `makemigrations` for this package — it already ships with its own migrations.
+   > Just running `migrate` will apply them.
+
+6. **Start services**
+
+   ```bash
+   # Terminal 1
+   python manage.py runserver
+
+   # Terminal 2
+   python manage.py qcluster
+   ```
+
+---
+
+
+
+
+---
 
 
 

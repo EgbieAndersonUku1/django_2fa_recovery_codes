@@ -402,7 +402,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
 
                 while expired_codes.exists():
 
-                    deleted_codes_count, _ = expired_codes[:batch_size]s.delete()
+                    deleted_codes_count, _ = expired_codes[:batch_size].delete()
                     expired_codes          = self._get_expired_recovery_codes_qs(retention_days)
                     deleted_counts.append(deleted_codes_count)
 

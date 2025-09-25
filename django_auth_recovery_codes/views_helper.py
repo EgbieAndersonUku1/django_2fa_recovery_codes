@@ -340,13 +340,14 @@ def recovery_code_operation_helper(
     
     try:
         response_data = _process_recovery_code_response(plaintext_code, request, func)
-
+      
     except IntegrityError as e:
         response_data["ERROR"] = str(e)
         response_data["SUCCESS"] = 400
     except Exception as e:
         response_data["ERROR"] = str(e)
         response_data["SUCCESS"] = 400
+    
 
     return JsonResponse(response_data, status=201 if response_data["SUCCESS"] else 400)
 
