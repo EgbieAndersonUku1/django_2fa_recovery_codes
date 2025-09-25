@@ -57,7 +57,7 @@ class RecoveryCodePurgeHistoryAdmin(admin.ModelAdmin):
 class RecoveryCodeCleanupSchedulerAdmin(admin.ModelAdmin):
     """"""
     form = RecoveryCodeCleanUpSchedulerForm
-    list_display    = ["id", "name", "enable_scheduler", "run_at", "next_run", "retention_days", "log_per_code", "schedule_type"]   
+    list_display    = ["id", "name", "enable_scheduler", "run_at", "next_run", "retention_days", "schedule_type"]   
     help_texts = {
             'schedule': 'Choose the frequency for this task (admin-only help text).'
         }

@@ -50,7 +50,6 @@ def update_recovery_code_scheduler(sender, instance, **kwargs):
                 "kwargs": {
                     "retention_days": instance.retention_days,
                     "bulk_delete": instance.bulk_delete,
-                    "log_per_code": instance.log_per_code,
                     "delete_empty_batch": instance.delete_empty_batch,
                     "use_with_logger": instance.use_with_logger,
                     "schedule_name": schedule_name,

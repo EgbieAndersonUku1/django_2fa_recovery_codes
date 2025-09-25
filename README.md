@@ -11,7 +11,7 @@ The premises of this resuable application, is that it takes any Django applicati
 `django-2fa-recovery-codes` is a Django app that provides a robust system for generating, storing, and managing **2FA recovery codes**. Unlike a full two-factor authentication apps, this package focuses solely on **recovery codes**, although this is a lightweight application it is a very powerful tool, offering fine-grained control and asynchronous management for better UX and performance.
 
 ## Table of Contents
-
+* [Requirements & Key Technologies](#requirements--key-technologies)
 * [Key Features](#key-features)
 * [How it Differs From A Full Two-Factor Authentication Apps](#how-it-differs-from-a-full-two-factor-authentication-apps)
   * [User Interface](#user-ui-interface)
@@ -56,15 +56,87 @@ The premises of this resuable application, is that it takes any Django applicati
   * [Email & Admin Settings Flags](#email--admin-settings-flags)
   * [Code Management & Limits](#code-management--limits)
   * [Site Settings Flags](#site-settings-flags)
-
-
-
+  * [Example Flag Usage](#example-flag-usage)
+  * [Best Practices for Managing Environment Variables](#best-practices-for-managing-environment-variables)
+  * [Default Values & Required Variables](#default-values--required-variables)
+  * [Run checks to verify that flags are valid](#run-checks-to-verify-that-flags-are-valid)
+* [Sending Emails and using Logging](#sending-emails-and-using-logging)
+  * [What is SSE?](#what-is-sse)
+  * [Why is the app is using SSE?](#why-is-the-app-is-using-sse)
+  * [Using async vs synchronous](#using-async-vs-synchronous)
+  * [Configuration settings](#configuration-settings)
+  * [Hang on a minute, why can I email myself the code only once, and only if I haven’t logged out after generating it?](#hang-on-a-minute-why-can-i-email-myself-the-code-only-once-and-only-if-i-havent-logged-out-after-generating-it)
+  * [What does this mean for your codes?](#what-does-this-mean-for-your-codes)
+  * [What happens if I refresh the page, can I still email myself the code?](#what-happens-if-i-refresh-the-page-can-i-still-email-myself-the-code)
+  * [But if I’m still logged in, why can I only email myself a single copy?](#but-if-im-still-logged-in-why-can-i-only-email-myself-a-single-copy)
+  * [Can I email myself a copy if I generate a new batch?](#can-i-email-myself-a-copy-if-i-generate-a-new-batch)
+* [Using Logging with the Application](#using-logging-with-the-application)
+  * [What if I don’t want to override my existing LOGGING configuration?](#what-if-i-dont-want-to-override-my-existing-logging-configuration)
+* [Downloading Recovery Codes](#downloading-recovery-codes)
+  * [How downloads work](#how-downloads-work)
+  * [Important security notes](#important-security-notes)
+  * [Example usage](#example-usage)
 * [Walkthrough](#walkthrough)
+  * [Setup](#setup)
+  * [Installation (with Virtual Environment)](#installation-with-virtual-environment)
+  * [3. Upgrade pip (optional but recommended)](#3-upgrade-pip-optional-but-recommended)
+  * [4. Install Django (latest version)](#4-install-django-latest-version)
+  * [5. Install the recovery codes package](#5-install-the-recovery-codes-package)
+  * [6. Verify installation](#6-verify-installation)
+  * [8. Run initial migrations](#8-run-initial-migrations)
+  * [9. Create a Django superuser](#9-create-a-django-superuser)
+  * [10. Start a new app called `home`](#10-start-a-new-app-called-home)
+  * [12. Run the development server](#12-run-the-development-server)
+  * [Configure URLs](#configure-urls)
+  * [Configure your Settings.py file](#configure-your-settingspy-file)
+  * [16. Set up the file-based email backend (for testing)](#16-set-up-the-file-based-email-backend-for-testing)
+  * [17. Run the system checks](#17-run-the-system-checks)
+  * [Run Services](#run-services)
+  * [Create a Home View](#create-a-home-view)
+  * [Access the Admin](#access-the-admin)
+  * [Access the Recovery Codes page dashboard](#access-the-recovery-codes-page-dashboard)
+  * [Code Generation](#code-generation)
+  * [Verifying Generated Codes](#verifying-generated-codes)
+  * [Downloaded and Emailed Code](#downloaded-and-emailed-code)
+  * [Invalidating or Deleting a Code](#invalidating-or-deleting-a-code)
+  * [Viewing the Code Batch History](#viewing-the-code-batch-history)
+  * [Logout of the application](#logout-of-the-application)
+  * [Failed Attempts and Rate Limiting](#failed-attempts-and-rate-limiting)
+  * [Successful Login](#successful-login)
+  * [Existing Project Setup](#2-existing-project-setup)
+
 * [Contributing](#contributing)
 * [License](#license)
 
 
 ---
+
+## Requirements & Key Technologies
+
+- **Python 3.10+**  
+  This library uses [Structural Pattern Matching](https://docs.python.org/3/whatsnew/3.10.html#structural-pattern-matching), introduced in Python 3.10, via the `match`-`case` syntax.
+
+- **Django 5.2+**  
+  The project is built and tested using Django 5.2, which has Long-Term Support (LTS).  
+  Using an earlier version, such as Django 4.1.x, may work in some cases but is **not guaranteed** and could potentially break the application, since it has only been tested with Django 5.2.
+
+### Why Python 3.10?
+
+The project relies on the `match`-`case` syntax, which provides a more readable and expressive way to handle complex conditional logic.
+
+## Key Technologies and Libraries Used
+
+- **EmailSender**: a lightweight, powerful library for sending chainable rich emails with templates.  
+- **EmailSenderLogger**: a lightweight, powerful library for logging emails sent by EmailSender.  
+- **Django-q**: an asynchronous task manager used for processing background tasks, including using EmailSender to send emails.  
+- **JavaScript (JS)**: for interactivity and fetch requests.  
+- **HTML**: for structuring content.  
+- **CSS**: for styling the user interface.
+
+---
+
+---
+
 
 ### Key Features
 
@@ -725,17 +797,16 @@ python manage.py qcluster
 These environment variables configure the **Django Auth Recovery** system, controlling email notifications, audit logs, recovery code display, rate limiting, cooldowns, and code management.
 
 ---
-
 ### **📌 Cheat Sheet: Variable Categories**
 
 | Icon | Category                  | Jump to Section                                        |
 | ---- | ------------------------- | ------------------------------------------------------ |
-| 📧   | Email & Admin Settings    | [Email & Admin Settings](#email--admin-settings)       |
-| 📝   | Audit & Logging           | [Audit & Logging](#audit--logging)                     |
-| 📄   | Code Display & Pagination | [Code Display & Pagination](#code-display--pagination) |
-| ⚡    | Rate Limiting & Caching   | [Rate Limiting & Caching](#rate-limiting--caching)     |
-| ⏱    | Cooldown Settings         | [Cooldown Settings](#cooldown-settings)                |
-| 🗂   | Code Management & Limits  | [Code Management & Limits](#code-management--limits)   |
+| 📧   | Email & Admin Settings    | [Email & Admin Settings Flags](#email--admin-settings-flags)       |
+| 📝   | Audit & Logging           | [Audit & Logging Setting Flags](#audit--logging-setting-flags)     |
+| 📄   | Code Display & Pagination | [Recovery Code Display Settings](#recovery-code-display-settings) |
+| ⚡    | Rate Limiting & Caching   | [Rate Limiting & Caching](#rate-limiting--caching)                   |
+| ⏱    | Cooldown Settings         | [Cooldown Settings Flags](#cooldown-settings-flags)                  |
+| 🗂   | Code Management & Limits  | [Code Management & Limits](#code-management--limits)                 |
 
 > Quick visual roadmap to jump to any section in the README.
 
@@ -1002,7 +1073,7 @@ Then recovery emails and notifications will display the site name "My Awesome Si
 
 --- 
 
-## Example Usage
+## Example Flag Usage
 
 ### .env file
 
@@ -1076,6 +1147,7 @@ SECRET_KEY = os.getenv("DJANGO_AUTH_RECOVERY_KEY")
 ---
 
 
+## Run checks to verify that flags are valid
 
 To ensure that all configurations and flags are correct, run the following command before starting the application:
 ```
@@ -1097,7 +1169,7 @@ python manage.py qcluster
 ```
 
 
-## Sending Emails and Logging
+## Sending Emails and using Logging
 
 Django Auth 2FA Recovery provides the ability to email yourself a copy of your raw recovery codes and can only be done once for a given batch, and only if you haven't logged out after generating the code. This is achieved using a lightweight yet powerful library called **`EmailSender`**, which is responsible for delivering the message.
 
@@ -1106,6 +1178,7 @@ In addition to sending, the process can be logged for developers through a compa
 The application uses **SSE (Server-Sent Events)** to notify the user when an email has been sent.
 
 ### What is SSE?
+---
 
 SSE is a way for a **server to push real-time updates to a client** over HTTP. Unlike WebSockets, which allow **two-way communication**, SSE is **one-way**: the server sends messages to the client, but the client cannot send messages back over the same connection.
 
@@ -1119,6 +1192,7 @@ It’s commonly used for:
 In this application, SSE is used for live notifications when an email is sent.
 
 ### Why is the app is using SSE?
+---
 
 The app uses SSE because emails are sent asynchronously using **Django-Q**. This ensures that sending an email does not block the request/response cycle which simply means the user's screen doesn't lock while the email is sending. Emails are placed in a task queue and may be sent immediately or after a short delay, depending on the queue load.
 
@@ -1126,6 +1200,7 @@ Without SSE, the user would have to constantly check their email inbox to know i
 
 
 ### Using async vs synchronous
+---
 
 The application supports both **asynchronous** and **synchronous** email sending for development and production.
 
@@ -1141,7 +1216,8 @@ This behaviour is controlled by the `DEBUG` setting:
 This setup allows developers to test email functionality quickly in development but at the same time keep production efficient and non-blocking.
 
 
-### Configuration
+### Configuration settings
+---
 
 Whether emails are logged is determined by a configuration flag in your project’s `settings.py`.
 
@@ -1157,33 +1233,39 @@ DJANGO_AUTH_RECOVERY_CODES_EMAIL_SENDER_LOGGING = False  # Disables logging
 * **`False`**: No logging takes place.
 
 
-## Hang on a minute, why can I email myself the code only once, and only if I haven’t logged out after generating it?
+### Hang on a minute, why can I email myself the code only once, and only if I haven’t logged out after generating it?
+---
 
 The way **Django Auth Recovery Code** works is that it never stores the plain text recovery codes in the database. Instead, it stores only their **hash values**.  
 
 A **hash** is a one-way function: it takes an input, applies a hashing algorithm, and produces an output that cannot be reversed to recover the original input. This is different from encryption/decryption, where data can be restored to its original form. Hashing is therefore safer for storing sensitive values such as recovery codes.  
 
 ### What does this mean for your codes?  
+---
 
 Since the generated codes are stored as hashes, the system cannot send you the hash (as it is meaningless to you) and it cannot retrieve the original plain text version (because it was never stored in the database).  
 
 To work around this, the application temporarily stores a copy of the plain text codes in your **backend session** when they are first generated. This session is unique to your login and user account. Because it is session-based, the codes are removed once you log out.  
 
 ### What happens if I refresh the page, can I still email myself the code?  
+---
 
 Yes. Refreshing the page does not clear the backend session. However, for security reasons, the plain text codes will no longer be displayed in the frontend after the initial page load. As long as you remain logged in, you can still email yourself a copy of the codes.  
 
 ### But if I’m still logged in, why can I only email myself a single copy?  
+---
 
 This is a deliberate **security measure**. Allowing multiple emails of the same batch would unnecessarily increase the risk of exposure. Limiting it to a single email ensures you have one secure copy without duplicating it across your inbox.  
 
 ### Can I email myself a copy if I generate a new batch?  
+---
 
 Yes. Generating a new batch creates a new set of plain text codes, which are again stored in your backend session. You may therefore email yourself one copy of each new batch.  
 
 ---
 
-## Using Logging with the Application  
+### Using Logging with the Application  
+---
 
 `django-2fa-recovery-codes` includes a built-in logging configuration, so you do not need to create your own in `settings.py`. This reduces the risk of misconfiguration.  
 
@@ -1201,7 +1283,8 @@ The `LOGGING` variable is the standard Django setting for logging. Assigning the
 
 ---
 
-## What if I don’t want to override my existing LOGGING configuration?
+### What if I don’t want to override my existing LOGGING configuration?
+---
 
 If you already have a logging configuration and prefer not to overwrite it, you can simply **merge** it with `DJANGO_AUTH_RECOVERY_CODES_LOGGING`. Since logging configurations are dictionaries, merging them is straightforward:
 
@@ -1217,10 +1300,12 @@ This approach allows you to keep your existing logging settings intact but still
 ---
 
 ## Downloading Recovery Codes  
+---
 
 In addition to emailing your recovery codes, `django-2fa-recovery-codes` also allows you to **download them directly**. This gives you flexibility in how you choose to back up your codes.  
 
 ### How downloads work  
+---
 
 When recovery codes are generated, a plain text copy is stored temporarily in the `request.session`. This enables you to either:  
 
@@ -1250,6 +1335,7 @@ DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME = "recovery_codes"
 Just like with emailing, once you log out, the session is cleared and the plain text codes are no longer available.  
 
 ### Important security notes  
+---
 
 - You may **only download a copy once** per batch of recovery codes.  
 - The downloaded file contains the **exact same content** as the emailed version (the plain text recovery codes).  
@@ -1423,16 +1509,19 @@ urlpatterns = [
 
 ---
 
-### Configure Settings
+### Configure your Settings.py file
 
-### 15. Add recovery code settings in `settings.py`
+### 15. Add the recovery code settings flags in your `settings.py` file
 
 ```python
-# Required values – customise for your project
+
+# Required values, customise for your project
 DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL = "your-email-address"
 DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER = "main-smtp-email"
 DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME = "username"
 DJANGO_AUTH_RECOVERY_KEY = "add-some-key"
+DJANGO_AUTH_RECOVERY_CODES_SITE_NAME="some site name"
+
 
 # Default values (can be left as-is or overridden)
 DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP = 30
@@ -1456,7 +1545,7 @@ DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT = "txt"
 DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS = 3
 ```
 
-### 16. Use the file-based email backend (for testing)
+### 16.Set up the file-based email backend (for testing)
 
 This will create a `sent_emails` folder where Django saves emails instead of sending them.
 
@@ -1465,7 +1554,7 @@ EMAIL_BACKEND = "django.core.mail.backends.filebased.EmailBackend"
 EMAIL_FILE_PATH = BASE_DIR / "sent_emails"
 ```
 
-### 17. Run system checks
+### 17. Run the system checks
 
 Stop the server (`Ctrl+C`) if it’s running, then run:
 
@@ -1535,7 +1624,7 @@ http://127.0.0.1:8000/admin/
 
 ---
 
-### Access the Recovery Codes Dashboard
+### Access the Recovery Codes page dashboard
 
 Once logged in, go to the dashboard via:
 
@@ -1547,7 +1636,9 @@ http://127.0.0.1:8000/auth/recovery-codes/dashboard/
 
 ---
 
-### Choose whether the code should have an expiry date
+### Code Generation
+
+##### Choose whether the code should have an expiry date
 
 <div align="center">
   <img src="django_auth_recovery_codes/docs/images/generate_code_form.png" alt="Generate code form" width="1000">
@@ -1631,7 +1722,7 @@ http://127.0.0.1:8000/auth/recovery-codes/dashboard/
 ---
 
 
-### Logout
+### Logout of the application
 
 Now click the `logout` but before you do make sure to download a copy of the recovery codes, you will need this when you to login.
 Once you logout you be redirect to the login page.

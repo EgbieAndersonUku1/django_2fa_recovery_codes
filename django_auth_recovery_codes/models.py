@@ -213,7 +213,6 @@ class RecoveryCodeCleanUpScheduler(AbstractCleanUpScheduler):
     name               = models.CharField(max_length=180, default=create_unique_string("Purge Expired Recovery Codes"), unique=True)
     bulk_delete        = models.BooleanField(default=True)
     delete_empty_batch = models.BooleanField(default=True)
-    log_per_code       = models.BooleanField(default=False)
     next_run           = models.DateTimeField(blank=True, null=True)
     deleted_count      = models.PositiveIntegerField(default=0, editable=False)
   
@@ -362,31 +361,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         if retention_days > 0:
             qs = qs.filter(modified_at__lt=self.get_expiry_threshold(retention_days))
         return qs
-    
-    def _execute_code_deletion(self, expired_codes, log_per_code: bool, bulk_delete: bool, batch_size: int, retention_days: int = None) -> int:
-        """
-        Decide whether to delete per code or in bulk, then perform the deletion.
-        """
-        if log_per_code and not bulk_delete:
-            return self._delete_expired_codes_by_scheduler_helper(expired_codes)
-        return self._bulk_delete_expired_codes_by_scheduler_helper(expired_codes, batch_size = batch_size, retention_days = retention_days)
-    
-    def _delete_expired_codes_by_scheduler_helper(self, expired_codes):
-        """"""
-        deleted_count = 0
-        for deleted_count, code in enumerate(expired_codes, start=1):
-            RecoveryCodeAudit.log_action(
-                user_issued_to=code.user,
-                action=RecoveryCodeAudit.Action.BATCH_PURGED,
-                deleted_by=code.deleted_by,
-                batch=self,
-                number_deleted=code.number_removed,
-                number_issued=code.number_issued,
-                reason="Batch of expired or invalidated codes removed by scheduler",
-            )
-            code.delete()
-        return deleted_count
-
+ 
     def _bulk_delete_expired_codes_by_scheduler_helper(self, expired_codes: RecoveryCodesBatch, batch_size : int= None, retention_days: int = None):
         """"""
         number_to_delete = expired_codes.count()
@@ -423,14 +398,13 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
             purge_code_logger.debug(f"There is nothing to delete in the batch. Batch has {number_to_delete} to delete")
         return deleted_count
 
-    def purge_expired_codes(self, bulk_delete=True, log_per_code=False, retention_days=1, delete_empty_batch = True, batch_size: int = None):
+    def purge_expired_codes(self, retention_days=1, delete_empty_batch = True, batch_size: int = None):
         """
         Hard-delete recovery codes in this batch marked for deletion or invalidated,
         optionally logging per code or in bulk. Deletes batch if empty.
 
         Args:
-            bulk_delete (bool): Delete all codes in one query if True, else one by one.
-            log_per_code (bool): Log each code deletion individually if True.
+        
             retention_days (int): Number of days to keep soft-deleted codes.
             batch_size (int): Allows the code to be deleted in smaller chunks instead all at once. 
                               This prevents a database lock if there are million of codes all deleting
@@ -450,7 +424,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
             return 0, True
 
         batch_size               = settings.DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE or batch_size
-        deleted_count            = self._execute_code_deletion(expired_codes, log_per_code, bulk_delete, batch_size, retention_days)
+        deleted_count            = self._bulk_delete_expired_codes_by_scheduler_helper(expired_codes, batch_size = batch_size, retention_days = retention_days)
         active_codes_remaining   = (self.number_issued - deleted_count)
         is_empty                 = active_codes_remaining == 0
 

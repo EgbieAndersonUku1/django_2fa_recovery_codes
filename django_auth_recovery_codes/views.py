@@ -208,7 +208,7 @@ def download_code(request):
     if not raw_codes:
         return JsonResponse({
             "SUCCESS": False,
-            "MESSAGE": "You logged out before downloading the codes, and due to security reasons you can no longer download the codes"
+            "MESSAGE": "You logged or out before downloading the codes or hit the regenerate button, and due to security reasons you can no longer download the codes"
         }, status=200)
 
     if raw_codes:
@@ -276,7 +276,7 @@ def mark_all_recovery_codes_as_pending_delete(request):
     
         # removes the raw codes from the session to ensure that it can't be downloaded or emailed 
         # when the frontend buttons are clicked
-        request.session.get("recovery_codes_state", {}).pop("codes")  
+        request.session.get("recovery_codes_state", {}).pop("codes", None)  
         set_cache(CACHE_KEY.format(request.user.id), recovery_batch.reset_cache_values(), TTL)
       
 
@@ -302,7 +302,7 @@ def mark_all_recovery_codes_as_pending_delete(request):
 def email_recovery_codes(request):
    
     user       = request.user
-    raw_codes  =  request.session.get("recovery_codes_state", {}).get("codes")
+    raw_codes  =  request.session.get("recovery_codes_state", {}).get("codes", None)
     resp       = {"SUCCESS": False, "MESSAGE": ""}
 
     try:
@@ -322,7 +322,7 @@ def email_recovery_codes(request):
     if not raw_codes:
         resp.update({
             "MESSAGE": "Backup codes can only be emailed once while you’re logged in. "
-                       "Since you logged out, they’re no longer available. Please log in to generate new codes."
+                       "Since you logged out or hit the regenerate buttion, they’re no longer available. Please log in to generate new codes."
 
         })
         return JsonResponse(resp, status=200)
