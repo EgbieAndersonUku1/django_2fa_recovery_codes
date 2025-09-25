@@ -1094,22 +1094,6 @@ button {
 
 
 /* ------------------------------------------ */
-/*            STATS BOARD DISPLAY             */
-/* ------------------------------------------ */
-
-/* Small circular loader with rotation animation */
-
-
-#stats-displayboard {
-    background: ghostwhite;
-    border: 2px solid lavender;
-    padding-top: var(--sm-spacing);
-    padding-bottom: var(--sm-spacing);
-}
-
-
-
-/* ------------------------------------------ */
 /*               SPINNER (LOADER)             */
 /* ------------------------------------------ */
 
@@ -1497,22 +1481,11 @@ button {
     }
    
     #buttons-container,
-    #stats-displayboard {
-        display: grid;
-        grid-template-columns: repeat(1, 1fr);
-        grid-template-rows: auto;
-        column-gap: 4px;
-        row-gap: 12px;
-    }
-
+ 
 #buttons-container {
     row-gap: 12px;
     }
 
-
- #stats-displayboard {
-        row-gap: var(--xxxl-spacing)
-    }
 
 
 .form-container {
@@ -1660,13 +1633,6 @@ button {
         grid-template-rows: auto;
     }
 
-    #stats-displayboard {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        grid-template-rows: auto;
-        column-gap: var(--sm-spacing);
-        row-gap: var(--lg-spacing);
-    }
 
     #buttons-container {
         display: grid;
@@ -1715,13 +1681,7 @@ button {
 
     }
 
-    #stats-displayboard {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        grid-template-rows: auto;
-        row-gap: var(--md-spacing);
-        column-gap: var(--xs-spacing);
-    }
+ 
 
     
     #recovery-code-dashboard .container .value {

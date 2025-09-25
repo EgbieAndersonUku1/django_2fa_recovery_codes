@@ -41,8 +41,7 @@ const dynamicTestFormSetupElement = document.getElementById("dynamic-form-setup"
 
 
 
-// Stats display board
-const statsTotalCodesIssuedBoard = document.getElementById("stat__total_codes_issued")
+
 
 
 
@@ -236,7 +235,6 @@ function handleGenerateCodeWithExpiryFormSubmission(e) {
 
 
 function handleCanGenerateCodeSuccessUI(resp) {
-    statsTotalCodesIssuedBoard.textContent = resp.TOTAL_ISSUED;
     toggleElement(generaterecoveryBatchSectionElement);
 
     const isPopulated = populateTableWithUserCodes(resp.CODES);

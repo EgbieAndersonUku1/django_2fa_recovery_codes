@@ -10,31 +10,55 @@ The premises of this resuable application, is that it takes any Django applicati
 
 `django-2fa-recovery-codes` is a Django app that provides a robust system for generating, storing, and managing **2FA recovery codes**. Unlike a full two-factor authentication apps, this package focuses solely on **recovery codes**, although this is a lightweight application it is a very powerful tool, offering fine-grained control and asynchronous management for better UX and performance.
 
-### Table of Contents
+## Table of Contents
 
-* [Introduction](#introduction)
-* [Features](#features)
-* [How it Differs from Full Two-Factor-Auth Apps](#how-it-differs-from-full-two-factor-auth-apps)
-* [2FA Recovery Code Generator](#2fa-recovery-code-generator)
-* [Why It’s Secure](#why-its-secure)
+* [Key Features](#key-features)
+* [How it Differs From A Full Two-Factor Authentication Apps](#how-it-differs-from-a-full-two-factor-authentication-apps)
+  * [User Interface](#user-ui-interface)
+  * [Asynchronous usage](#asynchronous-usage)
+  * [Admin interface](#admin-interface)
+  * [Flag configuration](#flag-configuration)
+  * [Caching](#caching)
+  * [Email and Logging capabilities](#email-and-logging-capabilities)
+  * [Rate limiter](#rate-limiter)
+  * [Code generation attribrutes](#code-generation-attribrutes)
+  * [Configurable flags for developer](#configurable-flags-for-developer)
+* [2FA Recovery Code Generator](#django-2fa-recovery-code-generator)
+  * [Security overview](#security-overview)
   * [Entropy](#entropy)
   * [Total Combinations](#total-combinations)
-* [Brute-Force Resistance](#brute-force-resistance)
-* [Perspective](#perspective)
-  * [Time to Crack at Different Speeds](#time-to-crack-at-different-speeds)
-* [Developer Appendix 🛠️](#developer-appendix-)
-* [Summary](#summary)
-* [Use Cases](#use-cases)
+  * [Brute-Force Resistance](#brute-force-resistance)
+  * [Perspective](#prespective)
+  * [Developer Appendix 🛠️](#developer-appendix)
+  * [Summary](#summary)
+  * [Use Cases](#use-cases)
 * [Installation](#installation)
-* [Quick Example](#quick-example)
-* [Walkthrough](#Walkthrough)
+* [Quick Example](#quick-example) 
+* [How to Use 2FA Recovery Codes](#how-to-use-2fa-recovery-codes)
+  * [Setting up the Cache or using the default cache](#setting-up-the-cache-or-using-the-default-cache)
+  * [How does the cache work?](#how-does-the-cache-work)
+  * [What cache should I use?](#what-cache-should-i-use)
+  * [Using Django Cache Without Configuring a Backend](#using-django-cache-without-configuring-a-backend)
+  * [Django-Q vs Celery and why Django Auth Recovery codes use Django-q](#django-q-vs-celery-and-why-django-auth-recovery-codes-use-django-q)
+  * [Why this application uses Django-Q](#why-this-application-uses-django-q)
+  * [Using Django-Q with `django-2fa-recovery-codes`](#using-django-q-with-django-2fa-recovery-codes)
+  * [Benefits of using Django-Q](#benefits-of-using-django-q)
+  * [Setting up Django-q](#setting-up-django-q)
+* [Django Auth Recovery Settings](#django-auth-recovery-settings)  
+* [Using and setting up Django-q](#using-and-setting-up-django-q)
+* [Django Auth Recovery flag settings](#django-auth-recovery-flag-settings)
+  * [Alphabetical Reference (Easy Copy & Paste)](#alphabetical-reference-easy-copy--paste)
+  * [Alphabetical Reference with defaults variables (Easy Copy & Paste) any thing not added is required](#alphabetical-reference-with-defaults-variables-easy-copy--paste-any-thing-not-added-is-required)
+  * [Email & Admin Settings Flags](#email--admin-settings-flags)
+
+* [Walkthrough](#walkthrough)
 * [Contributing](#contributing)
 * [License](#license)
 
 
 ---
 
-### Features
+### Key Features
 
 * Generate recovery codes in configurable batches.
 * Track recovery codes individually:
@@ -46,6 +70,10 @@ The premises of this resuable application, is that it takes any Django applicati
 
   * Track issued and removed codes per batch.
   * Statuses for active, invalidated, or deleted batches.
+
+* Login
+  
+  * Login in using your 2FA Recovery Backup code
 
 * Asynchronous cleanup using Django-Q:
 
@@ -67,7 +95,7 @@ The premises of this resuable application, is that it takes any Django applicati
 
 `django-2fa-recovery-codes` is designed **solely for recovery codes**, offering fine-grained control, asynchronous management, and admin-friendly batch handling.
 
-* User UI interface
+* ### User UI interface
    * Dedicated login interface page to enter your email and 2FA recovery code
    * Dashboard that allows the user to:
 	      * Generate a batch of 2FA recovery codes (default=10 generated, configurable via settings flags) with expiry date or doesn't expiry
@@ -100,64 +128,75 @@ The premises of this resuable application, is that it takes any Django applicati
       * Pagination to split the batch recovery codes history on different pages instead of one long page
 
 * Focuses **exclusively on recovery codes**, rather than full 2FA flows.
-* Built with **asynchronous usage** using Django-Q:
+* Built-in **logger configuration** which can be imported into settings or merged with an existing logger.
+
+* ### Asynchronous Usage
+
+  * Built with **asynchronous usage** using Django-Q:
   * Automatically deletes expired or invalid codes when uses with scheduler.
   * On a successful delete scheduler generates an audit report of the number of deleted codes and sends it to admin via email. The sending of the email is optional.
   * Email sending can be configured to run **asynchronous or synchronous** depending on your environment:
     * `DEBUG = True` : uses synchronous sending (easy for development or testing).  
     * `DEBUG = False` : uses asynchronous sending (recommended for production; doesn’t block the application while sending in the background).
 
-* **Admin-friendly view interface code management**, including the ability to scheduler deletion for expired or invalid codes e.g (every 2 days, etc) or even the audit history.
-* **Individual code tracking** with granular control over each code.
-* Optional configuration to  turn **logger** on or off to track the actions of users generating recovery codes, email sent, various aspect of the models, etc.
-* Optional **storage of user email** in the model for auditing purposes.
-* Utilises **caching** (Redis, Memcached, default cache, etc) for
-  * Pagination and page reads
-  * Brute-force rate limiting
-  * Other database-heavy operations
-  * Reduces database hits until cache expires or updates are made.
-* Built-in **logger configuration** which can be imported into settings or merged with an existing logger.
-* **Email sending capabilities** via `EmailSender` library.
-* **Email logging** via `EmailSenderLogger` library.
-* **Maximum login attempt control** with a brute-force rate limiter:
+* ### Admin interface
+  * **Admin-friendly view interface code management**, including the ability to scheduler deletion for expired or invalid codes e.g (every 2 days, etc) or even the audit history.
+* ### Code tracking
+  * **Individual code tracking** with granular control over each code.
+* ### Flag configuration
+  * Optional configuration to  turn **logger** on or off to track the actions of users generating recovery codes, email sent, various aspect of the models, etc.
+  * Optional **storage of user email** in the model for auditing purposes.
+* ### Caching
+  * Utilises **caching** (Redis, Memcached, default cache, etc) for
+    * Pagination and page reads
+    * Brute-force rate limiting
+    * Other database-heavy operations
+    * Reduces database hits until cache expires or updates are made.
 
-  * Configurable penalty wait times that increase if a user retries during the wait window.
-* **Brute-force rate limiter** for code generation:
+* ### Email and logging capabilities
+  * **Email sending capabilities** via `EmailSender` library.
+  * **Email logging** via `EmailSenderLogger` library.
 
-  * Prevents spam and imposes a penalty if the user attempts regeneration too soon.
-* Generate **codes that expire** or have no expiry.
-* Allow users to **download or email codes** (one per batch).
-* **Invalidate, delete a single code or an entire batch** easily.
-* Users can **view batch details**, e.g., number of codes generated, emailed, or downloaded.
+* ### Rate limiter
+  * **Maximum login attempt control** with a brute-force rate limiter:  
+    * Configurable penalty wait times that increase if a user retries during the wait window.
+  * **Brute-force rate limiter** for code generation:
+    * Prevents spam and imposes a penalty if the user attempts regeneration too soon.
 
-* **Configurable flags for developer**
-#### Configuration flags settings for the Django Auth Recovery code
-```python
-* DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL
-* DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER
-* DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME
-* DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP
-* DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS
-* DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE
-* DJANGO_AUTH_RECOVERY_CODE_PER_PAGE
-* DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS
-* DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER
-* DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW
-* DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG
-* DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE
-* DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN
-* DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE
-* DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX
-* DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN
-* DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL
-* DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT
-* DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER
-* DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME
-* DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS
-* DJANGO_AUTH_RECOVERY_KEY
+* ### Code generation attribrutes
+  * Generate **codes that expire** or have no expiry.
+  * Allow users to **download or email codes** (one per batch).
+  * **Invalidate, delete a single code or an entire batch** easily.
+  * Users can **view batch details**, e.g., number of codes generated, emailed, or downloaded.
 
-                  
-```
+* ### Configurable flags for developer
+
+     #### Configuration flags settings for the Django Auth Recovery code app
+
+      ```python
+      * DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL
+      * DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER
+      * DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME
+      * DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP
+      * DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS
+      * DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE
+      * DJANGO_AUTH_RECOVERY_CODE_PER_PAGE
+      * DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS
+      * DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER
+      * DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW
+      * DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG
+      * DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE
+      * DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN
+      * DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE
+      * DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX
+      * DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN
+      * DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL
+      * DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT
+      * DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER
+      * DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME
+      * DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS
+      * DJANGO_AUTH_RECOVERY_KEY               
+      ```
 
 
 ## Django 2FA Recovery Code Generator
@@ -230,7 +269,7 @@ Even with a supercomputer that tests codes extremely quickly, brute-forcing a va
 
 ---
 
-
+### Prespective?
 
 ### What this means?
 
@@ -242,12 +281,18 @@ Even with a supercomputer that tests codes extremely quickly, brute-forcing a va
 * This makes guessing a valid code virtually impossible and this is without brute rate limiter, with a rate limiter (which this app uses it is virtually impossible).
 
 > In short: it’s **far stronger than standard encryption like AES-128**. 
+
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/security-strength.png" alt="2FA login form" width="400">
+</div>
+
 > You can trust these recovery codes to keep your account safe even against attackers with enormous computational power.
+
 
 
 ---
 
-#### Developer Appendix 🛠️
+### Developer Appendix
 
 ```python
 import math
@@ -274,7 +319,7 @@ Years to crack: 1.043e+45
 
 ---
 
-#### ✅ Summary
+#### Summary
 
 * **212.8 bits recovery codes** → astronomically secure
 * **≈3.3 × 10^61 combinations** → impossible to brute-force
@@ -439,8 +484,6 @@ Key points:
 In short: the app is **built to use caching by default**, but if no backend is configured it automatically falls back to an in-memory cache. However, because it is an in-memory when the Django sever restarts it **resets the cache**. For production, a persistent backend like Redis is recommended.
 
 
-
-
 ## Using and setting up Django-q
 
 ### What is Django-Q?
@@ -561,7 +604,7 @@ See the [Django-Q scheduling docs](https://django-q.readthedocs.io/en/latest/sch
 
 ---
 
-### How does Django-Q delete codes if the user deletes them from the frontend?
+### How does Django-Q delete codes if the user deletes them from the frontend
 
 `django-2fa-recovery-codes` does **not** immediately delete a code when the user deletes it from the frontend. Instead, it performs a **soft delete**, the code is marked as invalid and can no longer be used. From the user’s perspective, the code is “gone,” but the actual row still exists in the database until the cleanup task runs.
 
@@ -592,9 +635,11 @@ By offloading deletion to Django-Q:
 
 ### Deletion flow
 
-<p align="center">
-  <img src="/docs/images/deletion_flowchart.png" alt="Code deletion flowchart" width="500"/>
-</p>
+<div align="center">
+
+  <img src="django_auth_recovery_codes/docs/images/deletion_flowchart.png" alt="Code deletion flowchart" width="300">
+
+</div>
 ---
 
 ### Batch deletion configuration
@@ -666,7 +711,7 @@ python manage.py qcluster
 
 ---
 
-# Django Auth Recovery Settings
+## Django Auth Recovery flag settings 
 
 These environment variables configure the **Django Auth Recovery** system, controlling email notifications, audit logs, recovery code display, rate limiting, cooldowns, and code management.
 
@@ -687,7 +732,7 @@ These environment variables configure the **Django Auth Recovery** system, contr
 
 ---
 
-### **🔍 Alphabetical Reference (Easy Copy & Paste)**
+### **Alphabetical Reference (Easy Copy & Paste)**
 
 ```
 DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL=
@@ -720,7 +765,7 @@ DJANGO_AUTH_RECOVERY_KEY=
 ---
 
 
-### **🔍 Alphabetical Reference with defaults variables (Easy Copy & Paste) any thing not added is required **
+### **Alphabetical Reference with defaults variables (Easy Copy & Paste) any thing not added is required **
 
 ```
 
@@ -747,7 +792,7 @@ DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS=5
 > Developers can **copy and paste** directly into a `.env` file or environment configuration.
 
 
-## Email & Admin Settings
+## Email & Admin Settings Flags
 
 | Variable                                          | Description                                     |
 | ------------------------------------------------- | ----------------------------------------------- |
@@ -1338,12 +1383,15 @@ You should see:
 
 ---
 
+markdown
 ### Access the Admin
 
 Since we don’t have a login portal yet, log in via the admin:
 
 ```
+
 http://127.0.0.1:8000/admin/
+
 ```
 
 * Enter the superuser credentials you created with `createsuperuser`.
@@ -1355,15 +1403,145 @@ http://127.0.0.1:8000/admin/
 Once logged in, go to the dashboard via:
 
 ```
+
 http://127.0.0.1:8000/auth/recovery-codes/dashboard/
+
 ```
 
+---
+
+### Choose whether the code should have an expiry date
+
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/generate_code_form.png" alt="Generate code form" width="1000">
+</div>
+
+---
+
+### Once the code is generated
+
+* You should see something that looks like this:
+
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/plaintext_generated_code.png" alt="Plaintext generated code" width="1000">
+</div>
+
+* From here, you can regenerate, email, download, or delete the code.
+
+---
 
 
+### Verifying Generated Codes
 
+* Once the codes are generated, you have the option to verify if the setup is correct.  
+* This is a one-time verification test, and the form will remain until it is verified.  
+* Once verified, it will no longer appear, even on a new batch generation.  
+* To use, simply select a code and enter it in the form.
+
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/verify_code.png" alt="Verify code form" width="1000">
+</div>
+
+#### Failed Test
+
+* A failed test will look like this:
+
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/failed_test.png" alt="Failed code verification" width="1000">
+</div>
+
+#### Successful Test
+
+* A successful test will look like this.  
+* Once the test is successful, the form will no longer be visible.
+
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/successful_test.png" alt="Successful code verification" width="1000">
+</div>
+
+---
+
+### Downloaded and Emailed Code
+
+* Once a code is downloaded or emailed, it cannot be used again for the same batch.
+
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/email_and_downloaded_code.png" alt="Downloaded or emailed code" width="1000">
+</div>
+
+---
+
+### Invalidating or Deleting a Code
+
+* The application allows you to invalidate or delete a code.  
+* Once a code has been invalidated or deleted, it cannot be used again.  
+
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/invalidate_or_delete_code.png" alt="Invalidate or delete code" width="1000">
+</div>
+
+---
+
+### Viewing the Code Batch History
+
+* You can view your code history.  
+* It contains information about the generated code batch, such as the number issued and whether the codes were downloaded or emailed.  
+
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/code_batch_history.png" alt="Code batch history" width="1000">
+</div>
+
+---
+
+
+### Logout
+
+Now click the `logout` but before you do make sure to download a copy of the recovery codes, you will need this when you to login.
+Once you logout you be redirect to the login page.
+
+* You will no longer be able to access the dashboard since it is login only
+* You can verify this by going to the home page
+
+```
+http://127.0.0.1:8000
+
+```
+
+---
+
+### Failed Attempts and Rate Limiting
+
+**Login Form**
+
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/login.png" alt="2FA login form" width="1000">
+</div>
+
+**Failed Attempt Example**
+
+* Failed login attempts are limited by the flag `DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS`.  
+* In this example, it has been set to `5`.  
+* This means that after 5 failed attempts, the rate limiter activates.  
+* The cooldown starts at 1 minute and increases with each subsequent failed attempt.  
+* It will not exceed the cooldown threshold period (e.g., if set to `3600`, that is 1 hour).  
+
+
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/incorrect_login_attempts.png" alt="Incorrect login attempt" width="1000">
+</div>
+
+---
+
+### Successful Login
+
+* Enter the email address you used when creating your superuser.  
+* Use one of the valid 2FA recovery codes from your downloaded codes.  
+* Upon success, you will be redirected to the dashboard.  
+* The code you used will automatically be marked as invalid.  
 
 
 ---
+
 
 ### 2. Existing Project Setup
 
