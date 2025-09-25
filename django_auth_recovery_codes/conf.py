@@ -229,4 +229,14 @@ FLAG_VALIDATORS = {
         "error_id": "django_auth_recovery_codes.E023",
         "warning_id": "django_auth_recovery_codes.W023",
     },
+
+    # --- Site name used in recovery emails / Site Settings ---
+    'DJANGO_AUTH_RECOVERY_CODES_SITE_NAME': {
+        "type": str,
+        "warning_if_missing": "DJANGO_AUTH_RECOVERY_CODES_SITE_NAME is not set in settings.py.",
+        "error_if_wrong_type": "DJANGO_AUTH_RECOVERY_CODES_SITE_NAME must be a string.",
+        "error_id": "django_auth_recovery_codes.E024",
+        "warning_id": "django_auth_recovery_codes.W024",
+    },
+
 }

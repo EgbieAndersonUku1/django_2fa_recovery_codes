@@ -49,7 +49,15 @@ The premises of this resuable application, is that it takes any Django applicati
 * [Django Auth Recovery flag settings](#django-auth-recovery-flag-settings)
   * [Alphabetical Reference (Easy Copy & Paste)](#alphabetical-reference-easy-copy--paste)
   * [Alphabetical Reference with defaults variables (Easy Copy & Paste) any thing not added is required](#alphabetical-reference-with-defaults-variables-easy-copy--paste-any-thing-not-added-is-required)
+  * [Recovery Code Display Settings](#recovery-code-display-settings)
+  * [Cooldown Settings Flags](#cooldown-settings-flags)
+  * [Rate Limiting & Caching](#rate-limiting--caching)
+  * [Audit & Logging Setting Flags](#audit--logging-setting-flags)
   * [Email & Admin Settings Flags](#email--admin-settings-flags)
+  * [Code Management & Limits](#code-management--limits)
+  * [Site Settings Flags](#site-settings-flags)
+
+
 
 * [Walkthrough](#walkthrough)
 * [Contributing](#contributing)
@@ -195,7 +203,8 @@ The premises of this resuable application, is that it takes any Django applicati
       * DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER
       * DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME
       * DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS
-      * DJANGO_AUTH_RECOVERY_KEY               
+      * DJANGO_AUTH_RECOVERY_KEY 
+      * DJANGO_AUTH_RECOVERY_CODES_SITE_NAME              
       ```
 
 
@@ -758,6 +767,7 @@ DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME=
 DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT=
 DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS=
 DJANGO_AUTH_RECOVERY_KEY=
+DJANGO_AUTH_RECOVERY_CODES_SITE_NAME=
 ```
 
 > Developers can **copy and paste** directly into a `.env` file or environment configuration.
@@ -787,6 +797,7 @@ DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER=2
 DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME=recovery_codes
 DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT=txt
 DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS=5
+DJANGO_AUTH_RECOVERY_CODES_SITE_NAME="2FA Recovery site"
 ```
 
 > Developers can **copy and paste** directly into a `.env` file or environment configuration.
@@ -794,15 +805,34 @@ DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS=5
 
 ## Email & Admin Settings Flags
 
-| Variable                                          | Description                                     |
-| ------------------------------------------------- | ----------------------------------------------- |
-| `DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL`           | Email address used for sending recovery codes.  |
-| `DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER` | Host email account for sending recovery emails. |
-| `DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME`        | Username associated with the admin account.     |
+These settings control which email and admin accounts are used for recovery code notifications and scheduled operations.
+
+| Variable                                          | Description                                                                 |
+| ------------------------------------------------- | --------------------------------------------------------------------------- |
+| `DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL`           | Admin email address used to receive generated reports after scheduled code deletions. |
+| `DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER` | The email address used by the application to send emails, typically the same as `EMAIL_HOST_USER` in your Django settings. |
+| `DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME`        | Username associated with the admin account.                                  |
+
+### Example Usage
+
+Suppose the settings are:
+
+- `DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL = admin@example.com`  
+- `DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER = noreply@example.com`  
+- `DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME = admin`  
+
+Then the system will:
+
+1. Send generated reports of scheduled recovery code deletions to `admin@example.com`.  
+2. Use `noreply@example.com` as the sender for all automated recovery code emails.  
+3. Associate actions with the admin username for auditing purposes.
+
 
 ---
 
-## Audit & Logging
+## Audit & Logging Setting Flags
+
+These settings control the auditing, logging, and retention of recovery code activity to ensure traceability and compliance.
 
 | Variable                                                      | Description                                 |
 | ------------------------------------------------------------- | ------------------------------------------- |
@@ -811,27 +841,63 @@ DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS=5
 | `DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER` | Log scheduler operations during code purge. |
 | `DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG`                   | Record activity of sent recovery emails.    |
 
+### Example Usage
+
+Suppose the settings are:
+
+- `DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP = True`  
+- `DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS = 90`  
+- `DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER = True`  
+- `DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG = True`  
+
+Then the system will:
+
+1. Automatically remove audit logs older than 90 days.  
+2. Record all recovery email activity in the logs.  
+3. Log any operations performed by the purge scheduler for transparency.  
+
+These flags help maintain a clean audit trail while ensuring important recovery-related actions are tracked.
+
 ---
 
-## Code Display & Pagination
 
 
-| Variable                                  | Description                                          |
-| ----------------------------------------- | ---------------------------------------------------- |
-| `DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE`   | Maximum number of expired batches including the current active batch a user can view in their history section      |
-| `DJANGO_AUTH_RECOVERY_CODE_PER_PAGE`      | Number of recovery codes per page (pagination).      |
-| `DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW` | View users are redirected to after recovery actions. |
+## Recovery Code Display Settings
 
-### Additional explanation for `DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBILE` flag
+These settings control how recovery code batches are displayed in the user interface, including pagination and post-action redirection.
 
-The history section shows up to `DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE` recovery code batches, regardless of how many exist in the database. For example, if a user has 100 codes but `DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE`= 20, only 20 batches will appear (with pagination). To see what a single batch card contails [for what a batch contains see here](#example-a-single-recovery-code-batch-view).
+| Variable                                  | Description                                                                 |
+| ----------------------------------------- | --------------------------------------------------------------------------- |
+| `DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE`   | Maximum number of expired batches, including the current active batch, that a user can view in their history section. |
+| `DJANGO_AUTH_RECOVERY_CODE_PER_PAGE`      | Number of recovery codes per page (pagination).                             |
+| `DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW` | View users are redirected to after recovery actions.                        |
 
+### Additional Explanation for `DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE`
 
+This setting controls how many recovery code batches are displayed to the user, regardless of the total number stored in the database. Each batch contains multiple recovery codes.
+
+#### Example
+
+Suppose the settings are:
+
+- `DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE = 20`  
+- `DJANGO_AUTH_RECOVERY_CODE_PER_PAGE = 5`  
+
+Then:
+
+1. If a user has 100 recovery codes, only 20 batches will be shown in the interface.  
+2. With 5 batches per page, there will be 4 pages of recovery codes.  
+3. Users can navigate through these pages to see all visible batches.  
+
+For details on what a single batch includes, see [example: a single recovery code batch view](#example-a-single-recovery-code-batch-view).
 
 
 ---
+
 
 ## Rate Limiting & Caching
+
+These settings control rate limiting for recovery code requests and how caching is used to improve performance and prevent abuse.  
 
 | Variable                                                 | Description                                         |
 | -------------------------------------------------------- | --------------------------------------------------- |
@@ -840,30 +906,101 @@ The history section shows up to `DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE` recovery
 | `DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN`                   | Minimum cache value for rate limiter.               |
 | `DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL`                   | Cache expiration time (seconds).                    |
 
----
+### Example
 
-## Cooldown Settings
+Suppose the settings are:
+
+- `DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE = True`  
+- `DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN = 1`  
+- `DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX = 5`  
+- `DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL = 60`  
+
+Then the system will:
+
+1. Start counting recovery attempts from `CACHE_MIN = 1`.  
+2. Increment the cached count with each recovery request, up to `CACHE_MAX = 5`.  
+3. Reset the count automatically after `CACHE_TTL = 60` seconds.  
+4. Use the cache to enforce rate limiting, preventing abuse and reducing database load.
+
+
+## Cooldown Settings Flags
+
+These settings control the cooldown period applied when users request recovery codes repeatedly. The cooldown helps prevent abuse by increasing the wait time between requests.
 
 | Variable                                           | Description                                          |
 | -------------------------------------------------- | ---------------------------------------------------- |
-| `DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN`         | Base interval for recovery code cooldown.            |
-| `DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT` | Maximum cooldown threshold.                          |
-| `DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER`   | Multiplier applied to cooldown on repeated attempts. |
+| `DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN`         | Base interval for recovery code cooldown (seconds). |
+| `DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT`| Maximum cooldown threshold (seconds).               |
+| `DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER`  | Multiplier applied to cooldown on repeated attempts.|
+
+### Example
+
+Suppose the settings are:
+
+- `DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN = 30`  
+- `DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER = 2`  
+- `DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT = 300`  
+
+Then the cooldown progression for repeated recovery code requests would be:
+
+1. First attempt: 30 seconds  
+2. Second attempt: 30 × 2 = 60 seconds  
+3. Third attempt: 60 × 2 = 120 seconds  
+4. Fourth attempt: 120 × 2 = 240 seconds  
+5. Fifth attempt: 240 × 2 = 480 seconds → capped at 300 seconds (cutoff)  
+
+This ensures the cooldown grows exponentially but never exceeds the defined maximum threshold.
+
 
 ---
 
 ## Code Management & Limits
 
+These settings control how recovery codes are managed, including deletion, export, usage limits, and validation.
+
 | Variable                                                | Description                                                                   |
 | ------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | `DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS` | Number of days before expired recovery codes are deleted.                     |
-| `DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE`          | Number of codes to delete in a batch operation.                               |
+| `DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE`          | Number of codes to delete in a single batch operation.                        |
 | `DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME`          | Default filename for exported recovery codes.                                 |
 | `DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT`             | Default export format for recovery codes. Options: `'txt'`, `'csv'`, `'pdf'`. |
-| `DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS`         | Maximum allowed login attempts with recovery codes.                           |
+| `DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS`         | Maximum allowed login attempts using recovery codes.                           |
 | `DJANGO_AUTH_RECOVERY_KEY`                              | Secret key used for recovery code validation.                                 |
 
+### Example Usage
+
+Suppose the settings are:
+
+- `DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS = 90`  
+- `DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE = 50`  
+- `DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME = "recovery_codes"`  
+- `DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT = "txt"`  
+- `DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS = 5`  
+
+Then the system will:
+
+1. Delete expired recovery codes older than 90 days, in batches of 50.  
+2. Export recovery codes using the default file name `recovery_codes` and format `txt`.  
+3. Limit users to 5 login attempts using recovery codes before locking or enforcing cooldowns.  
+4. Use `DJANGO_AUTH_RECOVERY_KEY` to validate recovery codes during login or verification.
+
 ---
+
+## Site Settings Flags
+
+| Variable                              | Description                                           |
+| ------------------------------------- | ----------------------------------------------------- |
+| `DJANGO_AUTH_RECOVERY_CODES_SITE_NAME`| The name of the site to use with the application .   |
+
+### Example Usage
+
+Suppose the setting is:
+
+- `DJANGO_AUTH_RECOVERY_CODES_SITE_NAME = "My Awesome Site"`
+
+Then recovery emails and notifications will display the site name "My Awesome Site" to the user, helping them identify the source of the email and also display on the site dashboard and login page.
+
+--- 
 
 ## Example Usage
 
