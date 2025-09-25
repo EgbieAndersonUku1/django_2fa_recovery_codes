@@ -569,13 +569,13 @@ def logout_user(request):
     How it works?:
 
     1. Attempts to redirect to the view defined in the project settings:
-    DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW
+    DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT
 
     2. If the setting is missing or the view does not exist,
     it falls back to the site root ('/') as a universal, safe location.
 
     Notes for developers:
-    - Ensure DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW (in your settings.py)
+    - Ensure DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT (in your settings.py)
     points to a valid URL pattern name if you want custom redirect behaviour.
 
     - Using '/' as the fallback ensures users are never left on an unknown or broken page
@@ -585,7 +585,7 @@ def logout_user(request):
     logout(request)
     request.session.flush()
 
-    redirect_view_name = getattr(settings, "DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW", None)
+    redirect_view_name = getattr(settings, "DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT", None)
 
     if redirect_view_name:
         try:

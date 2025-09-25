@@ -34,10 +34,10 @@
 FLAG_VALIDATORS = {
     
      # ---logout redirect ---
-    "DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW": {
+    "DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT": {
         "type": str,
-        "warning_if_missing": "DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW is not set in settings.py.",
-        "error_if_wrong_type": "DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW must be an string.",
+        "warning_if_missing": "DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT is not set in settings.py.",
+        "error_if_wrong_type": "DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT must be an string.",
         "error_id": "django_auth_recovery_codes.E000",
         "warning_id": "django_auth_recovery_codes.W000",
     },
@@ -237,6 +237,15 @@ FLAG_VALIDATORS = {
         "error_if_wrong_type": "DJANGO_AUTH_RECOVERY_CODES_SITE_NAME must be a string.",
         "error_id": "django_auth_recovery_codes.E024",
         "warning_id": "django_auth_recovery_codes.W024",
+    },
+
+     # --- Cap deletions per scheduler run (None = unlimited) / Cap deletion Settings ---
+    'DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN': {
+        "type": int,
+        "warning_if_missing": "DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN is not set in settings.py.",
+        "error_if_wrong_type": "DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN must be a int or none.",
+        "error_id": "django_auth_recovery_codes.E025",
+        "warning_id": "django_auth_recovery_codes.W025",
     },
 
 }

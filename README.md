@@ -22,6 +22,13 @@ The premises of this resuable application, is that it takes any Django applicati
   * [Email and Logging capabilities](#email-and-logging-capabilities)
   * [Rate limiter](#rate-limiter)
   * [Code generation attribrutes](#code-generation-attribrutes)
+    * [Cleanup Configuration Examples](#cleanup-configuration-examples)
+    * [Large app (millions of codes)](#large-app-millions-of-codes)
+    * [Cleanup Process Visualised](#cleanup-process-visualised)
+    * [Recommended Settings by Scale](#recommended-settings-by-scale)
+    * [How Cleanup Works Internally](#how-cleanup-works-internally)
+    * [FAQ Frequently Asked Questions](#faq--frequently-asked-questions)
+
   * [Configurable flags for developer](#configurable-flags-for-developer)
 * [2FA Recovery Code Generator](#django-2fa-recovery-code-generator)
   * [Security overview](#security-overview)
@@ -104,9 +111,10 @@ The premises of this resuable application, is that it takes any Django applicati
   * [Failed Attempts and Rate Limiting](#failed-attempts-and-rate-limiting)
   * [Successful Login](#successful-login)
   * [Existing Project Setup](#2-existing-project-setup)
-
+  * [Managing Scheduled Deletion via the Admin](#managing-scheduled-deletion-via-the-admin)
 * [Contributing](#contributing)
 * [License](#license)
+* [Support](#support)
 
 
 ---
@@ -263,7 +271,7 @@ The project relies on the `match`-`case` syntax, which provides a more readable 
       * DJANGO_AUTH_RECOVERY_CODE_PER_PAGE
       * DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS
       * DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER
-      * DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW
+      * DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT
       * DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG
       * DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE
       * DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN
@@ -276,7 +284,8 @@ The project relies on the `match`-`case` syntax, which provides a more readable 
       * DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME
       * DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS
       * DJANGO_AUTH_RECOVERY_KEY 
-      * DJANGO_AUTH_RECOVERY_CODES_SITE_NAME              
+      * DJANGO_AUTH_RECOVERY_CODES_SITE_NAME
+      * DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN              
       ```
 
 
@@ -824,7 +833,7 @@ DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE=
 DJANGO_AUTH_RECOVERY_CODE_PER_PAGE=
 DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS=
 DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER=
-DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW=
+DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT=
 DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG=
 DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE=
 DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN=
@@ -839,11 +848,18 @@ DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT=
 DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS=
 DJANGO_AUTH_RECOVERY_KEY=
 DJANGO_AUTH_RECOVERY_CODES_SITE_NAME=
+DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN=
+
 ```
 
-> Developers can **copy and paste** directly into a `.env` file or environment configuration.
+> Developers can **copy and paste** the flags directly into a `settings.py` file.
+<br>
+**Note**
 
----
+Do not place the flags in the `.env` file if their values are not strings. This is because `.env` files cast all values to strings, which is fine for flags that are already strings. However, if a value is meant to be an int, it will raise an error because the system checks expect an integer.
+
+Additionally, there is no need to place these values in an `.env` file since they are not sensitive. Only place sensitive information e.ge `DJANGO_AUTH_RECOVERY_KEY`
+
 
 
 ### **Alphabetical Reference with defaults variables (Easy Copy & Paste) any thing not added is required **
@@ -856,7 +872,7 @@ DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE=20
 DJANGO_AUTH_RECOVERY_CODE_PER_PAGE=5
 DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS=30
 DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER=True
-DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW=recovery_dashboard
+DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT=recovery_dashboard
 DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE=True
 DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN=2
 DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE=400
@@ -869,9 +885,10 @@ DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME=recovery_codes
 DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT=txt
 DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS=5
 DJANGO_AUTH_RECOVERY_CODES_SITE_NAME="2FA Recovery site"
+DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN=0
 ```
 
-> Developers can **copy and paste** directly into a `.env` file or environment configuration.
+> Developers can **copy and paste** directly into their `settings.py` file.
 
 
 ## Email & Admin Settings Flags
@@ -941,7 +958,7 @@ These settings control how recovery code batches are displayed in the user inter
 | ----------------------------------------- | --------------------------------------------------------------------------- |
 | `DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE`   | Maximum number of expired batches, including the current active batch, that a user can view in their history section. |
 | `DJANGO_AUTH_RECOVERY_CODE_PER_PAGE`      | Number of recovery codes per page (pagination).                             |
-| `DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW` | View users are redirected to after recovery actions.                        |
+| `DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT` | View users are redirected to after recovery actions.                        |
 
 ### Additional Explanation for `DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE`
 
@@ -1029,14 +1046,18 @@ This ensures the cooldown grows exponentially but never exceeds the defined maxi
 
 These settings control how recovery codes are managed, including deletion, export, usage limits, and validation.
 
-| Variable                                                | Description                                                                   |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS` | Number of days before expired recovery codes are deleted.                     |
-| `DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE`          | Number of codes to delete in a single batch operation.                        |
-| `DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME`          | Default filename for exported recovery codes.                                 |
-| `DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT`             | Default export format for recovery codes. Options: `'txt'`, `'csv'`, `'pdf'`. |
-| `DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS`         | Maximum allowed login attempts using recovery codes.                           |
-| `DJANGO_AUTH_RECOVERY_KEY`                              | Secret key used for recovery code validation.                                 |
+| Variable                                                       | Description                                                                 |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS`        | Number of days before expired recovery codes are deleted.                    |
+| `DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE`                 | Number of codes to delete in a single batch operation.                       |
+| `DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME`                 | Default filename for exported recovery codes.                                |
+| `DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT`                    | Default export format for recovery codes. Options: `'txt'`, `'csv'`, `'pdf'`.|
+| `DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS`                | Maximum allowed login attempts using recovery codes.                         |
+| `DJANGO_AUTH_RECOVERY_KEY`                                     | Secret key used for recovery code validation.                                |
+| `DJANGO_AUTH_RECOVERY_CODES_PURGE_MAX_DELETIONS_PER_RUN`       | Maximum number of expired codes to delete in a single scheduler run.  If unset (`-1`), deletion is unlimited.  If set to `0`, no codes will be deleted (mainly for testing/debugging purposes). |
+
+
+
 
 ### Example Usage
 
@@ -1054,6 +1075,181 @@ Then the system will:
 2. Export recovery codes using the default file name `recovery_codes` and format `txt`.  
 3. Limit users to 5 login attempts using recovery codes before locking or enforcing cooldowns.  
 4. Use `DJANGO_AUTH_RECOVERY_KEY` to validate recovery codes during login or verification.
+
+
+### Cleanup Configuration Examples
+
+The cleanup behaviour for expired recovery codes can be tuned using:
+
+- `DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE` → controls how many codes are deleted per database operation.
+- `DJANGO_AUTH_RECOVERY_CODES_PURGE_MAX_DELETIONS_PER_RUN` → caps the maximum number of deletions in one scheduler run.
+
+<br>
+
+> **Note:** This setting works together with `DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE`.  
+> The scheduler will delete codes in batches until either the max deletions per run is reached or all expired codes are removed.  
+> `None` means “delete everything in one run,” while an integer enforces a cap per run.
+
+### Example setups
+
+#### Small app / development
+```env
+DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE=100
+DJANGO_AUTH_RECOVERY_CODES_PURGE_MAX_DELETIONS_PER_RUN=
+````
+
+Deletes everything in one run, in small chunks of 100 to avoid heavy queries.
+
+---
+
+#### Medium app
+
+```env
+DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE=500
+DJANGO_AUTH_RECOVERY_CODES_PURGE_MAX_DELETIONS_PER_RUN=5000
+```
+
+Deletes up to 5,000 codes per scheduler run, in batches of 500.
+
+---
+
+#### Large app (millions of codes)
+
+```env
+DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE=1000
+DJANGO_AUTH_RECOVERY_CODES_PURGE_MAX_DELETIONS_PER_RUN=10000
+```
+
+Deletes up to 10,000 codes per run, in batches of 1,000. This spreads load across multiple scheduler runs while keeping each job predictable and efficient.
+
+
+
+### Cleanup Process Visualised
+
+The diagrams below illustrate how expired recovery codes are deleted.
+
+### 1. Loop until finished
+All expired codes are deleted in a single scheduler run, in batches.
+
+```mermaid
+flowchart TD
+    A[Scheduler Run Starts] --> B{Expired codes exist?}
+    B -->|Yes| C[Delete batch (size=N)]
+    C --> D{Expired codes remain?}
+    D -->|Yes| C
+    D -->|No| E[Scheduler Run Ends]
+    B -->|No| E
+````
+
+---
+
+### 2. Hybrid: capped deletions per run
+
+Deletes in batches, but stops once the maximum deletions per run is reached.
+Remaining codes are cleaned in future runs.
+
+```mermaid
+flowchart TD
+    A[Scheduler Run Starts] --> B{Expired codes exist?}
+    B -->|Yes| C[Delete batch (size=N)]
+    C --> D[Increase total deleted count]
+    D --> E{Reached max deletions per run?}
+    E -->|Yes| F[Stop, resume next run]
+    E -->|No| G{Expired codes remain?}
+    G -->|Yes| C
+    G -->|No| H[Scheduler Run Ends]
+    B -->|No| H
+```
+
+
+### Recommended Settings by Scale
+
+| Scale        | `DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE` | `DJANGO_AUTH_RECOVERY_CODES_PURGE_MAX_DELETIONS_PER_RUN` | Notes                                                                 |
+|--------------|-----------------------------------------------|----------------------------------------------------------|-----------------------------------------------------------------------|
+| Small (dev / hobby) | 100 | *-1* | Deletes all expired codes in one run, safe for small datasets. |
+| Medium (tens of thousands) | 500 | 5000 | Balances DB load by capping deletions to 5k per scheduler run. |
+| Large (millions) | 1000 | 10000 | Spreads cleanup across runs, keeps queries efficient and predictable. |
+
+**Tip:** 
+
+Always tune based on your database performance and scheduler frequency.  For example, if your scheduler runs every 5 minutes, lower values keep load smoother.  If it runs nightly, higher values may be better to catch up faster.
+
+### How Cleanup Works Internally
+
+When the scheduler runs, the app looks for expired or invalidated recovery codes and removes them according to your configuration.  
+
+The process is:
+
+1. **Batch deletion**  
+
+   - Codes are deleted in small chunks (`DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE`) instead of all at once.  
+   - This prevents long-running SQL queries and reduces database locks.
+
+2. **Optional cap per run**  
+
+   - If you set `DJANGO_AUTH_RECOVERY_CODES_PURGE_MAX_DELETIONS_PER_RUN`, the scheduler will stop once that many codes have been deleted.  
+   - Any remaining codes will be picked up in the next scheduler run.  
+   - This spreads the load across multiple runs and avoids “big bang” deletes.
+   - If the flag is set to None, it becomes unlimited meaning it will carry on looping until all codes are cleared
+
+3. **Scheduler resumes automatically**  
+
+   - On the next scheduled run, the same process repeats until all expired codes are gone.  
+   - You don’t need to trigger anything manually.
+
+
+
+✅ This design ensures a couple of things in regards to the cleanup is:
+
+- **Safe** → avoids stressing the database.  
+- **Scalable** → works for apps with thousands or millions of codes.  
+- **Automatic** → no manual intervention needed.  
+
+
+### FAQ — Frequently Asked Questions
+
+### Q: What happens if the scheduler crashes during cleanup?  
+
+A: The process is idempotent. If a run is interrupted, any remaining expired codes will be picked up on the next scheduled run.  
+No data loss occurs beyond the intended deletions.
+
+---
+
+### Q: Can I disable automatic cleanup?  
+
+A: Yes. Simply avoid scheduling the purge task in your task runner (e.g., Django-Q).  
+You may then run `purge_expired_codes()` manually when required.  
+This is useful for testing or environments with strict operational controls.
+
+---
+
+### Q: How do I know how many codes were deleted?  
+
+A: Every purge operation is logged through `RecoveryCodeAudit` or inspect the email sent to admin after a schedule deletion has occurred.  
+You can inspect these logs to see the number of codes deleted, who initiated the deletion, and the associated batch metadata.
+
+---
+
+### Q: Will cleanup affect active codes?  
+
+A: No. Only codes that are expired or invalidated (based on retention days and status) are eligible for deletion.  
+Valid codes remain untouched.
+
+---
+
+### Q: What if I have millions of expired codes?  
+
+A: Configure both `DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE` and  
+`DJANGO_AUTH_RECOVERY_CODES_PURGE_MAX_DELETIONS_PER_RUN` appropriately.  
+This ensures cleanup is spread across multiple runs, preventing excessive locking or transaction bloat.
+
+---
+
+### Q: Can I monitor cleanup performance?  
+
+A: Yes, you can monitor through the Django-q admin interface.  
+Because deletions are chunked, monitoring helps you fine-tune batch size and per-run caps for optimal efficiency.
+
 
 ---
 
@@ -1075,9 +1271,9 @@ Then recovery emails and notifications will display the site name "My Awesome Si
 
 ## Example Flag Usage
 
-### .env file
 
-```env
+
+```
 DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL=admin@example.com
 DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER=smtp@example.com
 DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME=admin
@@ -1086,12 +1282,13 @@ DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS=30
 DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE=20
 DJANGO_AUTH_RECOVERY_CODE_PER_PAGE=10
 DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS=90
-DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW=recovery_dashboard
+DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT=recovery_dashboard
 DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE=True
 DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL=3600
 DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN=60
 DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT=txt
 DJANGO_AUTH_RECOVERY_KEY=supersecretkey
+DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN=400
 ```
 
 ### settings.py
@@ -1129,7 +1326,7 @@ SECRET_KEY = os.getenv("DJANGO_AUTH_RECOVERY_KEY")
 | `DJANGO_AUTH_RECOVERY_CODE_PER_PAGE`                          | ❌ No     | `10`                 | Pagination setting for code lists.                                               |
 | `DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS`       | ❌ No     | `90`                 | Days before expired codes are deleted.                                           |
 | `DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER` | ❌ No     | `False`              | Enable scheduler logging for purge operations.                                   |
-| `DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW`                     | ❌ No     | `/`                  | URL to redirect users after code actions.                                        |
+| `DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT`                     | ❌ No     | `/`                  | URL to redirect users after code actions.                                        |
 | `DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG`                   | ❌ No     | `False`              | Log sent recovery emails.                                                        |
 | `DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE`      | ❌ No     | `True`               | Use cache for rate limiting.                                                     |
 | `DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN`                    | ❌ No     | `60`                 | Base cooldown interval in seconds.                                               |
@@ -1143,6 +1340,9 @@ SECRET_KEY = os.getenv("DJANGO_AUTH_RECOVERY_KEY")
 | `DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT`                   | ❌ No     | `txt`                | Default format for exporting recovery codes. Options: `'txt'`, `'csv'`, `'pdf'`. |
 | `DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS`               | ❌ No     |   `5` | Maximum login attempts using recovery codes. |
 | `DJANGO_AUTH_RECOVERY_KEY` | ✅ Yes | – | Secret key for recovery code validation. Must be kept safe. |
+| `DJANGO_AUTH_RECOVERY_CODES_PURGE_MAX_DELETIONS_PER_RUN`               | ❌ No     |   1000 | Caps the maximum number of deletions in one scheduler run. |
+| `DJANGO_AUTH_RECOVERY_KEY` | ✅ Yes | – | Secret key for recovery code validation. Must be kept safe. |
+
 
 ---
 
@@ -1469,6 +1669,7 @@ INSTALLED_APPS = [
 ]
 ```
 
+
 ### 12. Run the development server
 
 ```bash
@@ -1530,7 +1731,7 @@ DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE = 20
 DJANGO_AUTH_RECOVERY_CODE_PER_PAGE = 5
 DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS = 30
 DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER = True
-DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW = "login_user"
+DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT = "login_user"
 DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG = True
 DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE = True
 DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN = 3600
@@ -1543,7 +1744,32 @@ DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER = 2
 DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME = "recovery_codes"
 DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT = "txt"
 DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS = 3
+DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN = -1
 ```
+
+### Add a Q_CLUSTER 
+See ![documentation for more details](https://deepwiki.com/django-q2/django-q2/5-configuration-options)
+
+For now we use the default
+
+```
+
+
+Q_CLUSTER = {
+    'name': 'recovery_codes',
+    'workers': 2,
+    'timeout': 300,   # 5 minutes max per task
+    'retry': 600,     # retry after 10 minutes if task fails (retry must be greater than timeout)
+    'recycle': 500,
+    'compress': True,
+    'cpu_affinity': 1,
+    'save_limit': 250,
+    'queue_limit': 500,
+    'orm': 'default',
+}
+
+```
+
 
 ### 16.Set up the file-based email backend (for testing)
 
@@ -1724,8 +1950,8 @@ http://127.0.0.1:8000/auth/recovery-codes/dashboard/
 
 ### Logout of the application
 
-Now click the `logout` but before you do make sure to download a copy of the recovery codes, you will need this when you to login.
-Once you logout you be redirect to the login page.
+Now click the `logout` but before you do make sure to download a copy of the recovery codes, you will need this to login.
+Once you logout you be redirect to the default login page, see the flag settings to see how to redirect to another page .
 
 * You will no longer be able to access the dashboard since it is login only
 * You can verify this by going to the home page
@@ -1817,7 +2043,7 @@ If you already have a Django project running, integration is simple:
    python manage.py migrate
    ```
 
-   > ⚠️ You don’t need to run `makemigrations` for this package — it already ships with its own migrations.
+   > ⚠️ You don’t need to run `makemigrations` for this package because it already ships with its own migrations.
    > Just running `migrate` will apply them.
 
 6. **Start services**
@@ -1831,23 +2057,241 @@ If you already have a Django project running, integration is simple:
    ```
 
 ---
+## Scheduling a Code Removal Using Django-Q
 
+In this section, we walk you through how to safely remove recovery codes using Django-Q. You will learn how to generate codes and schedule their deletion, ensuring they are managed automatically and securely. Make sure this running in a separate window
 
+```
+  python manage.py qcluster
 
+```
+
+### Generate and Delete Codes
+
+1. Generate your recovery codes.
+2. Click the **Delete Codes** button and confirm the action.
+
+> Once confirmed, Django-Q will schedule the codes for deletion. This means the codes will be automatically removed according to the scheduled task, rather than immediately, providing a safe and managed cleanup process.
+
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/delete_codes.png" alt="Delete codes form" width="1000">
+</div>
 
 ---
 
+### Managing Scheduled Deletion via the Admin
 
+Since we are logged in through the admin, we already have administrator access.
 
+1. Open a new tab and navigate to:
 
-## Contributing
+   ```
+   http://127.0.0.1:8000/admin/
+   ```
 
+2. Once there, click on the **Recovery codes** link.
 
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/admin.png" alt="Admin" width="1000">
+</div>
+
+You will then see the following view:
+
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/admin-delete-codes.png" alt="Admin delete codes" width="1000">
+</div>
+
+Select **Recovery code cleanup schedulers**:
+
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/admin-schedule-link.png" alt="Admin schedule link" width="300">
+</div>
 
 ---
+
+### Scheduling a Delete
+
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/admin-schedule-delete.png" alt="Admin schedule delete" width="700">
+</div>
+
+#### Quick Explanation
+
+* **Retention days**: The number of days an expired or invalid code remains in the database before being deleted. For example, if set to 30, a code will be deleted 30 days after it expires. The default is controlled via a settings flag but can be overridden in the admin interface.
+
+  * For testing, set this to `0` to remove codes immediately.
+
+* **Run at**: The time the scheduler should run.
+
+* **Schedule type**: How frequently the scheduler should run (`Once`, `Hourly`, `Daily`, `Weekly`, `Monthly`, `Quarterly`, `Yearly`).
+
+* **Use with logger**: Records the scheduled deletion in a log file.
+
+* **Delete empty batch**: When set to `True`, the parent batch (model) is removed if no active codes remain. When `False`, the batch will be kept.
+
+* **Name**: A descriptive name for the scheduler.
+
+* **Next run**: The next time the scheduler should run. This must not be earlier than the **Run at** value. It can also be left blank.
+
+  * Note: The scheduler is idempotent. Once configured, it will follow the set rules without needing to be triggered manually. The **Next run** option simply allows you to run an additional execution if required.
+
+
+Save the scheduler
+
+
+### View tasks
+
+Once Django-q is running you can view failed, queued, tasks via this section
+
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/view_tasks.png" alt="view taske" width="300">
+</div>
+
+
+### Summary
+
+## Scheduling a Code Removal Using Django-Q
+
+In this section, we walk you through how to safely remove recovery codes using Django-Q. You will learn how to generate codes and schedule their deletion, ensuring they are managed automatically and securely.  
+
+---
+
+### Generate and Delete Codes
+
+1. Generate your recovery codes.  
+2. Click the **Delete Codes** button and confirm the action.  
+
+> Once confirmed, Django-Q will schedule the codes for deletion. This means the codes will be automatically removed according to the scheduled task, rather than immediately, providing a safe and managed cleanup process.  
+
+<div align="center">
+  <img src="django_auth_recovery_codes/docs/images/delete_codes.png" alt="Delete codes form" width="1000">
+</div>
+
+---
+
+### Managing Scheduled Deletion via the Admin
+
+Since we are logged in through the admin, we already have administrator access.  
+
+1. Open a new tab and navigate to:  
+
+```
+
+[http://127.0.0.1:8000/admin/](http://127.0.0.1:8000/admin/)
+
+```
+
+2. Once there, click on the **Recovery codes** link.  
+
+<div align="center">
+<img src="django_auth_recovery_codes/docs/images/admin.png" alt="Admin" width="1000">
+</div>
+
+You will then see the following view:  
+
+<div align="center">
+<img src="django_auth_recovery_codes/docs/images/admin-delete-codes.png" alt="Admin delete codes" width="1000">
+</div>
+
+Select **Recovery code cleanup schedulers**:  
+
+<div align="center">
+<img src="django_auth_recovery_codes/docs/images/admin-schedule-link.png" alt="Admin schedule link" width="300">
+</div>
+
+---
+
+### Scheduling a Delete  
+
+<div align="center">
+<img src="django_auth_recovery_codes/docs/images/admin-schedule-delete.png" alt="Admin schedule delete" width="700">
+</div>
+
+#### Quick Explanation  
+
+- **Retention days**: The number of days an expired or invalid code remains in the database before being deleted.  
+- Example: If set to 30, a code will be deleted 30 days after it expires.  
+- Default is set in your Django settings but can be overridden in the admin interface.  
+- For testing, set this to `0` to remove codes immediately.  
+
+- **Run at**: The time the scheduler should run.  
+
+- **Schedule type**: How frequently the scheduler should run (`Once`, `Hourly`, `Daily`, `Weekly`, `Monthly`, `Quarterly`, `Yearly`).  
+
+- **Use with logger**: Records the scheduled deletion in a log file.  
+
+- **Delete empty batch**:  
+- `True`: Removes the parent batch if no active codes remain.  
+- `False`: Keeps the batch even if it is empty.  
+
+- **Name**: A descriptive name for the scheduler.  
+
+- **Next run**: The next time the scheduler should run. This must not be earlier than **Run at**, but can be left blank.  
+- Note: The scheduler is idempotent. Once configured, it will follow the set rules without needing to be triggered manually. The **Next run** option simply allows for an additional one-off execution.  
+
+---
+
+## Summary
+
+
+1. Generate your recovery codes.  
+2. Click **Delete Codes** → Django-Q schedules the deletion.  
+3. In the **Admin**, open **Recovery code cleanup schedulers**.  
+4. Configure:  
+- **Retention days** → how long codes stay before deletion (set `0` for immediate removal).  
+- **Schedule type** → how often deletion runs.  
+- **Run at / Next run** → when to start.  
+- **Delete empty batch** → remove batch if no codes remain.  
+
+✅ That’s it. Django-Q will handle the cleanup automatically. Tasks are added to a queue and picked up by workers, so in most cases the cleanup will happen very quickly. Depending on your worker setup and workload, there may be a short delay, but it will always be processed.
+
+---
+
+### Visual Flow
+
+```
+
+Generate recovery codes
+│
+▼
+Click **Delete Codes**
+│
+▼
+Django-Q schedules deletion
+│
+▼
+Go to **Admin → Recovery code cleanup schedulers**
+│
+▼
+Configure scheduler:
+• Retention days
+• Run at / Next run
+• Schedule type
+• Delete empty batch
+│
+▼
+✅ Codes are cleaned up automatically
+
+```
+
+You can also run a scheduler to remove the audit reports for `Recovery Code` by using `Recovery code audit schedulers`. The audits are store in the `Recovery code Audit` model. The steps are same as the above steps.
+
+
 
 ## License
+ - This package is licensed under the MIT License. See the LICENSE file for details.
 
+## Credits
+ -This library was created and maintained by Egbie Uku a.k.a EgbieAndersonUku1.
+
+
+---
+
+
+## Support
+If you find this project helpful, you can support it:  
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-☕-ff813f?style=for-the-badge)](https://buymeacoffee.com/egbieu)
 
 
 ---

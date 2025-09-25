@@ -61,7 +61,7 @@ class RecoveryCodeCleanupSchedulerAdmin(admin.ModelAdmin):
     help_texts = {
             'schedule': 'Choose the frequency for this task (admin-only help text).'
         }
-    
+    readonly_fields = ["status", "bulk_delete"]
     def save_form(self, request, form, change):
         return super().save_form(request, form, change)
    

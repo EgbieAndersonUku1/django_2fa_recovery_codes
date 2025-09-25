@@ -1,0 +1,15 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),  
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [1.0.0] - To be added
+
+### Added
+- Introduced initial public release of `django_auth_recovery_codes`.
+- Is a Django app that extends any Django application and provides a robust system for generating, storing, and managing **2FA recovery codes**
+- Allows users to login using their 2FA Recovery backup code
