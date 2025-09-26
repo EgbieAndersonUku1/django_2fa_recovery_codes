@@ -28,7 +28,6 @@ The premises of this resuable application, is that it takes any Django applicati
     * [Recommended Settings by Scale](#recommended-settings-by-scale)
     * [How Cleanup Works Internally](#how-cleanup-works-internally)
     * [FAQ Frequently Asked Questions](#faq--frequently-asked-questions)
-
   * [Configurable flags for developer](#configurable-flags-for-developer)
 * [2FA Recovery Code Generator](#django-2fa-recovery-code-generator)
   * [Security overview](#security-overview)
