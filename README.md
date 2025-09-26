@@ -133,8 +133,8 @@ The project relies on the `match`-`case` syntax, which provides a more readable 
 
 ## Key Technologies and Libraries Used
 
-- **EmailSender**: a lightweight, powerful library for sending chainable rich emails with templates.  
-- **EmailSenderLogger**: a lightweight, powerful library for logging emails sent by EmailSender.  
+- **EmailSender**: a lightweight but powerful library for sending chainable rich emails with templates. [Find out more](https://github.com/EgbieAndersonUku1/django-email-sender)
+- **EmailSenderLogger**: a lightweight but powerful library for logging, emails sent by EmailSender. [Find out more](https://github.com/EgbieAndersonUku1/django-email-sender)
 - **Django-q**: an asynchronous task manager used for processing background tasks, including using EmailSender to send emails.  
 - **JavaScript (JS)**: for interactivity and fetch requests.  
 - **HTML**: for structuring content.  
