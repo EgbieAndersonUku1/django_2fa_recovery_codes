@@ -110,7 +110,7 @@ The premises of this resuable application, is that it takes any Django applicati
   * [Failed Attempts and Rate Limiting](#failed-attempts-and-rate-limiting)
   * [Successful Login](#successful-login)
   * [Existing Project Setup](#2-existing-project-setup)
-  * [Managing Scheduled Deletion via the Admin](#managing-scheduled-deletion-via-the-admin)
+  * [Scheduling a Code Removal Using Django-Q](#scheduling-a-code-removal-using-django-q)
 * [Contributing](#contributing)
 * [License](#license)
 * [Support](#support)
@@ -786,7 +786,7 @@ Q_CLUSTER = {
 }
 ```
 
-For more configuration options, see the [official Django-Q documentation](https://django-q.readthedocs.io/en/latest/configure.html).
+For more configuration options, see the [official Django-Q documentation](https://django-q.readthedocs.io/en/latest/configure.html)
 
 ---
 
