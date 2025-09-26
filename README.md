@@ -82,7 +82,7 @@ The premises of this resuable application, is that it takes any Django applicati
   * [How downloads work](#how-downloads-work)
   * [Important security notes](#important-security-notes)
   * [Example usage](#example-usage)
-* [Walkthrough](#walkthrough)
+* [Quickstart and Walkthrough](#quickstart-and-walkthrough)
   * [Setup](#setup)
   * [Installation (with Virtual Environment)](#installation-with-virtual-environment)
   * [3. Upgrade pip (optional but recommended)](#3-upgrade-pip-optional-but-recommended)
@@ -110,7 +110,7 @@ The premises of this resuable application, is that it takes any Django applicati
   * [Failed Attempts and Rate Limiting](#failed-attempts-and-rate-limiting)
   * [Successful Login](#successful-login)
   * [Existing Project Setup](#2-existing-project-setup)
-  * [Managing Scheduled Deletion via the Admin](#managing-scheduled-deletion-via-the-admin)
+  * [Scheduling a Code Removal Using Django-Q](#scheduling-a-code-removal-using-django-q)
 * [Contributing](#contributing)
 * [License](#license)
 * [Support](#support)
@@ -786,7 +786,7 @@ Q_CLUSTER = {
 }
 ```
 
-For more configuration options, see the [official Django-Q documentation](https://django-q.readthedocs.io/en/latest/configure.html).
+For more configuration options, see the [official Django-Q documentation](https://django-q.readthedocs.io/en/latest/configure.html)
 
 ---
 
@@ -1552,7 +1552,7 @@ Both options use the same temporary storage mechanism, which ensures your plain 
 ---
 
 
-## Walkthrough
+## Quickstart and Walkthrough
 
 ### Setup
 ---
