@@ -29,7 +29,7 @@ def schedule_recovery_code_cleanup():
                             next_run=scheduler.run_at,
                             retention_days=scheduler.retention_days,
                             bulk_delete=scheduler.bulk_delete,
-                            log_per_code=scheduler.log_per_code,
+                     
                             delete_empty_batch=scheduler.delete_empty_batch,
                             name=unique_task_name,
                         )

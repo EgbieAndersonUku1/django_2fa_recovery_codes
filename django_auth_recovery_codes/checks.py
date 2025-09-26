@@ -30,8 +30,12 @@ def check_app_settings(
     """
     errors: List[CheckMessage] = []
 
+    # Fl
+    flags_to_skip = ["DJANGO_AUTH_RECOVERY_CODES_PURGE_MAX_DELETIONS_PER_RUN"]
+
     for flag_name, config in FLAG_VALIDATORS.items():
-        _check_flag(flag_name, config, errors)
+        if flag_name not in flags_to_skip:
+            _check_flag(flag_name, config, errors)
 
     return errors
 
@@ -59,7 +63,7 @@ def check_app_format_setting(app_configs: Optional[List[AppConfig]], **kwargs: A
     """
     errors: List[CheckMessage] = []
     
-    value: Optional[str] = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT", None)
+    value: Optional[str] = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT")
     if value:
         ext = value.strip()
         if ext not in ("txt", "pdf", "csv"):
@@ -72,6 +76,28 @@ def check_app_format_setting(app_configs: Optional[List[AppConfig]], **kwargs: A
     return errors
 
 
+@register()
+def check_app_max_deletions_per_run(app_configs: Optional[List[Any]] = None, **kwargs: Any) -> List[CheckMessage]:
+    """
+    Checks if the `DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN` in the settings is valid.
+
+    A valid value is either an int or None.
+    """
+    errors: List[CheckMessage] = []
+
+    raw = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN")
+
+    if not isinstance(raw, int):
+   
+        errors.append(
+            Warning(
+                f"`DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN` must be an int or None. got type {type(raw).__name__}",
+                hint="Set it to a positive integer or 0 for unlimited deletions.",
+                id="django_auth_recovery_codes.W001",
+            )
+        )
+
+    return errors
 
 
 @register
@@ -135,4 +161,5 @@ def _check_flag(flag_name: str, config: Dict[str, Any], errors: List[CheckMessag
 
     if not isinstance(value, expected_type):
         errors.append(Error(config["error_if_wrong_type"], id=config["error_id"]))
+
 

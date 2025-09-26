@@ -57,14 +57,13 @@ def purge_all_expired_batches(*args, **kwargs):
     retention_days = kwargs.get("retention_days", settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS)
 
     bulk_delete        = kwargs.get("bulk_delete", True)
-    log_per_code       = kwargs.get("log_per_code", False)
     use_with_logger    = kwargs.get("use_with_logger", settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER)
     delete_empty_batch = kwargs.get("delete_empty_batch", True)
     schedule_name      = kwargs.get("schedule_name")
 
     purge_code_logger.info(
         f"[RecoveryCodes] Starting purge job | retention_days={retention_days}, bulk_delete={bulk_delete}, "
-        f"log_per_code={log_per_code}, delete_empty_batch={delete_empty_batch}, use_with_logger={use_with_logger}s, started_at={timezone.now()}",
+        f"delete_empty_batch={delete_empty_batch}, use_with_logger={use_with_logger}s, started_at={timezone.now()}",
     )
 
     total_batches = 0
@@ -77,8 +76,7 @@ def purge_all_expired_batches(*args, **kwargs):
 
     for batch in batches:
         purged_count, is_empty = batch.purge_expired_codes(
-            bulk_delete=bulk_delete,
-            log_per_code=log_per_code,
+
             retention_days=retention_days,
             delete_empty_batch=delete_empty_batch,
         )

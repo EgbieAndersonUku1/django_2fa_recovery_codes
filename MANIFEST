@@ -1,0 +1,18 @@
+include README.md
+include LICENSE
+include requirements.txt
+include setup.py
+include CHANGELOG.md
+
+recursive-include django_auth_recovery_codesr *.py
+recursive-include docs *
+recursive-include locale *
+recursive-include tests *.py
+
+# Include any egg-info metadata
+recursive-include django_auth_recovery_codesr.egg-info *
+
+# Include all text and markdown files in the root
+include *.txt
+include *.md
+include CHANGELOG.md

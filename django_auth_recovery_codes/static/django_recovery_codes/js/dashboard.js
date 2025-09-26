@@ -58,14 +58,6 @@ const hamburgerOpenIcon = document.getElementById("open-hamburger-nav-icon");
 const closeXIcon = document.getElementById("close-nav-icon");
 
 
-// Stats display board
-const statsTotalCodesIssuedBoard = document.getElementById("stat__total_codes_issued")
-const statsTotalCodesDownloadedBoard = document.getElementById("stat__total-codes-downloaded");
-const statsTotalCodesEmailedBoard = document.getElementById("stat__total-codes-emailed");
-const statsBatchCodesRemovedBoard = document.getElementById("stat__total-batch-codes-removed");
-const statsCodesDeactivatedBoard = document.getElementById("stat__total-codes-deactivated");
-const statsTotalCodesRemovedBoard = document.getElementById("stat__total-codes-removed")
-
 
 
 // constants

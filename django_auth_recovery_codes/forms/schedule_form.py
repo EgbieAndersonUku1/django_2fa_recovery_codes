@@ -22,17 +22,7 @@ class RecoveryCodeCleanUpSchedulerForm(forms.ModelForm):
             raise forms.ValidationError("The next run cannot be less than run at")
         return next_run
     
-    def clean_log_per_code(self):
-        """"""
-        cleaned_data = super().clean()
-
-        log_per_code = cleaned_data.get("log_per_code")
-        bulk_delete  = cleaned_data.get("bulk_delete")
-
-        if log_per_code and bulk_delete:
-            raise forms.ValidationError("You cannot set both log_per_code and bulk_delete flag. Only one or the other")
-        return log_per_code
-
+   
 
     
 
