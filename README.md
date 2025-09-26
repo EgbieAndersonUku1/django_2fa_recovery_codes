@@ -82,7 +82,7 @@ The premises of this resuable application, is that it takes any Django applicati
   * [How downloads work](#how-downloads-work)
   * [Important security notes](#important-security-notes)
   * [Example usage](#example-usage)
-* [Quickstart and walkhrough](#quickstart-and-walkthrough)
+* [Quickstart and Walkthrough](#quickstart-and-walkthrough)
   * [Setup](#setup)
   * [Installation (with Virtual Environment)](#installation-with-virtual-environment)
   * [3. Upgrade pip (optional but recommended)](#3-upgrade-pip-optional-but-recommended)
@@ -2073,9 +2073,8 @@ In this section, we walk you through how to safely remove recovery codes using D
 > Once confirmed, Django-Q will schedule the codes for deletion. This means the codes will be automatically removed according to the scheduled task, rather than immediately, providing a safe and managed cleanup process.
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/EgbieAndersonUku1/django_2fa_recovery_codes/main/django_auth_recovery_codes/docs/images/delete_codes.png" alt="Delete codes form" width="1000">
+  <img src="django_auth_recovery_codes/docs/images/delete_codes.png" alt="Delete codes form" width="1000">
 </div>
-
 
 ---
 
@@ -2092,21 +2091,19 @@ Since we are logged in through the admin, we already have administrator access.
 2. Once there, click on the **Recovery codes** link.
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/EgbieAndersonUku1/django_2fa_recovery_codes/main/django_auth_recovery_codes/docs/images/delete_codes.png" alt="Delete codes form" width="1000">
+  <img src="django_auth_recovery_codes/docs/images/admin.png" alt="Admin" width="1000">
 </div>
-
 
 You will then see the following view:
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/EgbieAndersonUku1/django_2fa_recovery_codes/main/django_auth_recovery_codes/docs/images/admin-delete-codes.png" alt="Admin delete codes" width="1000">
+  <img src="django_auth_recovery_codes/docs/images/admin-delete-codes.png" alt="Admin delete codes" width="1000">
 </div>
-
 
 Select **Recovery code cleanup schedulers**:
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/EgbieAndersonUku1/django_2fa_recovery_codes/main/django_auth_recovery_codes/docs/images/admin-schedule-link.png" alt="Admin schedule link" width="300">
+  <img src="django_auth_recovery_codes/docs/images/admin-schedule-link.png" alt="Admin schedule link" width="300">
 </div>
 
 ---
@@ -2114,7 +2111,7 @@ Select **Recovery code cleanup schedulers**:
 ### Scheduling a Delete
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/EgbieAndersonUku1/django_2fa_recovery_codes/main/django_auth_recovery_codes/docs/images/admin-schedule-delete.png" alt="Admin schedule delete" width="700">
+  <img src="django_auth_recovery_codes/docs/images/admin-schedule-delete.png" alt="Admin schedule delete" width="700">
 </div>
 
 #### Quick Explanation
@@ -2146,9 +2143,8 @@ Save the scheduler
 Once Django-q is running you can view failed, queued, tasks via this section
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/EgbieAndersonUku1/django_2fa_recovery_codes/main/django_auth_recovery_codes/docs/images/view_tasks.png" alt="view tasks" width="300">
+  <img src="django_auth_recovery_codes/docs/images/view_tasks.png" alt="view taske" width="300">
 </div>
-
 
 
 ### Summary
@@ -2167,9 +2163,8 @@ In this section, we walk you through how to safely remove recovery codes using D
 > Once confirmed, Django-Q will schedule the codes for deletion. This means the codes will be automatically removed according to the scheduled task, rather than immediately, providing a safe and managed cleanup process.  
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/EgbieAndersonUku1/django_2fa_recovery_codes/main/django_auth_recovery_codes/docs/images/delete_codes.png" alt="Delete codes form" width="1000">
+  <img src="django_auth_recovery_codes/docs/images/delete_codes.png" alt="Delete codes form" width="1000">
 </div>
-
 
 ---
 
@@ -2184,33 +2179,32 @@ Since we are logged in through the admin, we already have administrator access.
 [http://127.0.0.1:8000/admin/](http://127.0.0.1:8000/admin/)
 
 ```
+
 2. Once there, click on the **Recovery codes** link.  
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/EgbieAndersonUku1/django_2fa_recovery_codes/main/django_auth_recovery_codes/docs/images/admin.png" alt="Admin" width="1000">
+<img src="django_auth_recovery_codes/docs/images/admin.png" alt="Admin" width="1000">
 </div>
 
 You will then see the following view:  
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/EgbieAndersonUku1/django_2fa_recovery_codes/main/django_auth_recovery_codes/docs/images/admin-delete-codes.png" alt="Admin delete codes" width="1000">
+<img src="django_auth_recovery_codes/docs/images/admin-delete-codes.png" alt="Admin delete codes" width="1000">
 </div>
 
 Select **Recovery code cleanup schedulers**:  
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/EgbieAndersonUku1/django_2fa_recovery_codes/main/django_auth_recovery_codes/docs/images/admin-schedule-link.png" alt="Admin schedule link" width="300">
+<img src="django_auth_recovery_codes/docs/images/admin-schedule-link.png" alt="Admin schedule link" width="300">
 </div>
-
 
 ---
 
 ### Scheduling a Delete  
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/EgbieAndersonUku1/django_2fa_recovery_codes/main/django_auth_recovery_codes/docs/images/admin-schedule-delete.png" alt="Admin schedule delete" width="700">
+<img src="django_auth_recovery_codes/docs/images/admin-schedule-delete.png" alt="Admin schedule delete" width="700">
 </div>
-
 
 #### Quick Explanation  
 
