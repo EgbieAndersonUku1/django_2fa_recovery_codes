@@ -1,8 +1,73 @@
-import { toggleSpinner, toggleButtonDisabled, toggleElement } from "../utils.js";
+/**
+ * @summary Performs a one-time validation of static DOM elements via `oneTimeElementCheck`.
+ *
+ * @note This ensures required elements exist before the app starts and avoids repeated
+ *       `if (element)` checks. Dynamic elements are excluded since they may not exist
+ *       at initial load and must be checked at runtime.
+ *
+ * === One-Time DOM Element Check ===
+ *
+ * 1. Purpose
+ *    - Ensure all required elements are valid before the app starts.
+ *    - Reduce repeated `if (element)` checks in functions.
+ *
+ * --- Example without `oneTimeElementCheck` ---
+ * const form = document.getElementById("form")
+ * function someCallingFunction() {
+ *     if (form) {
+ *         // do something
+ *     }
+ * }
+ *
+ * --- Example with `oneTimeElementCheck` ---
+ * function someCallingFunction() {
+ *     form.appendChild(...)
+ * }
+ *
+ * 2. Dynamic Elements
+ *    - Elements not included in `oneTimeElementCheck` are excluded deliberately,
+ *      because they are rendered only under certain conditions.
+ *
+ *    Example:
+ *    const emailButtonElement = document.getElementById("email")
+ *
+ *    This button may be hidden by a Jinja `if` statement and only rendered
+ *    when a condition is met (e.g. after generating a code). Until then,
+ *    it does not exist in the DOM, so `emailButtonElement` will be `null`.
+ *
+ * 3. SPA Considerations
+ *    - In an SPA, parts of the page update without a full refresh.
+ *    - Dynamic elements must therefore be checked when they are used,
+ *      not during the initial load.
+ *
+ * 4. Error Handling
+ *    - Attempting to validate dynamic elements in `oneTimeElementCheck`
+ *      would cause errors, as they do not exist until after the user action
+ *      (and possible refresh) that renders them.
+ */
+
+
+import { toggleSpinner, toggleButtonDisabled, checkIfHTMLElement} from "../utils.js";
 import { logError } from "../logger.js";
 import { AlertUtils } from "../alerts.js";
 
 const processingMessage = document.getElementById("process-message");
+
+
+/**
+ * Performs a one-time validation for static elements to ensure they exist in the DOM.
+ * 
+ * By validating elements once, we can safely use them in other functions without 
+ * repeating `if` checks throughout the code.
+ * 
+ * Note: This is intended for static elements only. Dynamic elements 
+ * (created or fetched at runtime) should be validated when they are used.
+ */
+function oneTimeElementsCheck() {
+    checkIfHTMLElement(processingMessage, "Dynamic test form area", true);
+}
+
+oneTimeElementsCheck();
 
 /**
  * Handles a button click event by showing a confirmation alert with spinner and button state toggling.
@@ -89,6 +154,11 @@ export async function handleButtonAlertClickHelper(e, buttonElementID, buttonSpi
 }
 
 
+/**
+ * Toggles the visibility of the processing message element.
+ *
+ * @param {boolean} [show=true] - Whether to show (true) or hide (false) the message.
+ */
 export function toggleProcessMessage(show=true) {
     show ? processingMessage.classList.add("show") : processingMessage.classList.remove("show")
 }

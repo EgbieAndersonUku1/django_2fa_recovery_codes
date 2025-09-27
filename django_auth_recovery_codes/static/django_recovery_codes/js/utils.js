@@ -1,7 +1,6 @@
 
 import { logError, warnError } from "./logger.js";
-import { specialChars } from "./specialChars.js";
-import { showTemporaryMessage } from "./messages/message.js";
+import { specialChars }        from "./specialChars.js";
 
 
 /**
@@ -109,13 +108,28 @@ export function checkIfInputHTMLElement(inputElement) {
 }
 
 
-function checkIfCorrectHTMLElementHelper(element, htmlElement, msg) {
+function checkIfCorrectHTMLElementHelper(element, htmlElement, msg, throwError = false) {
     if (!(element instanceof htmlElement)) {
         console.error(msg);
+        if (throwError) {
+            throw new Error(msg);
+        }
+
         return false;
     }
     return true;
 }
+
+
+/**
+ * Performs a one-time validation for static elements to ensure they exist in the DOM.
+ * 
+ * By validating elements once, we can safely use them in other functions without 
+ * repeating `if` checks throughout the code.
+ * 
+ * Note: This function is intended for static elements only. Dynamic elements 
+ * (created or fetched at runtime) should be validated when they are used.
+ */
 
 
 
@@ -264,6 +278,18 @@ export function sanitizeText(text, onlyNumbers = false, onlyChars = false, inclu
 }
 
 
+
+
+/**
+ * Enables or disables a button element.
+ *
+ * @param {HTMLButtonElement} buttonElement - The button element to enable or disable.
+ * @param {boolean} [disable=true] - Whether to disable the button (true) or enable it (false).
+ *
+ * Notes:
+ * - If the provided element is null, undefined, or not a <button>, the function does nothing.
+ * - This is a simple utility for toggling button interactivity.
+ */
 export function toggleButtonDisabled(buttonElement, disable = true) {
     if (!buttonElement || buttonElement.tagName !== "BUTTON") return; 
     
@@ -272,11 +298,18 @@ export function toggleButtonDisabled(buttonElement, disable = true) {
 
 
 
-
-
-
-
-
+/**
+ * Converts a string to title case (capitalises the first character and lowercases the rest).
+ *
+ * @param {string} text - The string to convert.
+ * @returns {string} The converted string with the first character capitalised.
+ *
+ * @throws {Error} If the provided value is not a string.
+ *
+ * Example:
+ *   toTitle("hello")    // returns "Hello"
+ *   toTitle("WORLD")    // returns "World"
+ */
 export function toTitle(text) {
     if (typeof text != "string") {
         throw new Error(`Expected a string but got text with type ${text} `);
@@ -287,12 +320,42 @@ export function toTitle(text) {
 }
 
 
+
+
+/**
+ * Pauses execution for a specified duration.
+ *
+ * @param {number} ms - The duration to sleep in milliseconds.
+ * @returns {Promise<void>} A promise that resolves after the specified time.
+ *
+ * Example usage:
+ *   await sleep(1000); // pauses execution for 1 second
+ *
+ * Notes:
+ * - This function is useful in async functions to create delays without blocking the main thread.
+ */
 export function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 
 
+/**
+ * Prepends a new child element to a parent element.
+ *
+ * @param {HTMLElement} parent - The parent element to which the new child will be added.
+ * @param {HTMLElement} newChild - The element to prepend to the parent.
+ *
+ * Notes:
+ * - Uses the modern `prepend()` method if available.
+ * - Falls back to `insertBefore()` for older browsers that do not support `prepend()`.
+ * - Ensures the new child is added as the first child of the parent element.
+ *
+ * Example usage:
+ *   const parent = document.getElementById("container");
+ *   const newDiv = document.createElement("div");
+ *   prependChild(parent, newDiv);
+ */
 export function prependChild(parent, newChild) {
 
   
@@ -452,7 +515,20 @@ export function addChildWithPaginatorLimit(parentElement, elementToAdd, pageLimi
 
 
 
-
+/**
+ * Shows or hides a DOM element by toggling the "d-none" CSS class.
+ *
+ * @param {HTMLElement} element - The element to show or hide.
+ * @param {boolean} [hide=true] - If true, hides the element; if false, shows it.
+ *
+ * Notes:
+ * - If the element is null, undefined, or not provided, the function logs a message and does nothing.
+ * - Uses the "d-none" class to control visibility, which should be defined in your CSS.
+ *
+ * Example usage:
+ *   toggleElement(myDiv);        // hides myDiv
+ *   toggleElement(myDiv, false); // shows myDiv
+ */
 export function toggleElement(element, hide = true) {
 
     if (!element || element === undefined || element === null) {
@@ -491,6 +567,19 @@ export const doNothing = () => {};
 
 
 
+/**
+ * Clears all child content of a given DOM element.
+ *
+ * @param {HTMLElement} element - The element to clear.
+ *
+ * Notes:
+ * - Uses a helper function `checkIfHTMLElement` to validate the element before clearing.
+ * - Sets `innerHTML` to an empty string, effectively removing all child nodes.
+ *
+ * Example usage:
+ *   const container = document.getElementById("container");
+ *   clearElement(container); // removes all children from container
+ */
 export function clearElement(element) {
     if (!checkIfHTMLElement(element, element.tagName)) {
         return;

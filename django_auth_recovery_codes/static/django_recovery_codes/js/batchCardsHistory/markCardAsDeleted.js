@@ -1,17 +1,30 @@
+import { checkIfHTMLElement } from "../utils.js";
+import { getCardFieldElements } from "./batchCardUtils.js";
+import { markCardFieldHelper } from "./updateBatchHistorySection.js";
+
+
+/**
+ * Marks a card element as deleted by updating its status text and style.
+ * Sets the status text to "Deleted", removes the "text-green" class, 
+ * and adds "text-red" and "bold" classes to highlight the deletion.
+ *
+ * @param {HTMLElement|null} cardElement - The card element whose status should be updated.
+ *                                         If null, the function does nothing.
+ */
 export function markCardAsDeleted(cardElement) {
 
     if (cardElement === null) return;
 
-    const statusElements = cardElement.querySelectorAll('.card-head .info-box .value p');
-    if (!statusElements.length) return;
+    checkIfHTMLElement(cardElement, "card element", true);
+
+    const fieldElements = getCardFieldElements(cardElement);
+
+    if (!fieldElements.length) return;
+
+    markCardFieldHelper("status", "Deleted", "text-red");
 
 
-    for (const pElement of statusElements) {
-        if (pElement.classList.contains('status')) {
-            pElement.textContent = "Deleted";
-            pElement.classList.remove("text-green");
-            pElement.classList.add("text-red", "bold");
-            break;
-        }
-    }
 }
+
+
+

@@ -1,13 +1,25 @@
 import { handleButtonAlertClickHelper } from "./handleButtonAlertClicker.js";
 import { handleFormSubmissionHelper } from "./formUtils.js";
+import { toggleProcessMessage } from "./handleButtonAlertClicker.js";
 
 
+/**
+ * Handles the click event for verifying the test code setup.
+ *
+ * - Submits the test setup form.
+ * - Prompts the user with an alert before verifying with the backend.
+ * - Sends the verification request and processes the results.
+ * - Updates UI elements, including spinners, messages, and form visibility.
+ *
+ * @param {Event} e - The click event from the verification button.
+ * @param {HTMLFormElement} testSetupFormElement - The form element containing the verification code.
+ */
 export async function handleTestCodeVerificationSetupClick(e, testSetupFormElement) {
 
     const formData = await handleTestSetupFormSubmission(e, testSetupFormElement)
 
     if (!formData) return;
-    
+
     const code = formData.verifyCode;
 
     const alertAttributes = {
@@ -25,66 +37,70 @@ export async function handleTestCodeVerificationSetupClick(e, testSetupFormEleme
                 `,
         confirmButtonText: "Yes, validate setup",
         denyButtonText: "No, don't validate setup"
-        };
+    };
 
-        const handleTestSetupFetchAPI = async () => {
-            const data = await fetchData({
-                url: "/auth/recovery-codes/verify-setup/",
-                csrfToken: getCsrfToken(),
-                method: "POST",
-                body: { code: code },
-                throwOnError: false,
-            });
+    const handleTestSetupFetchAPI = async () => {
+        const data = await fetchData({
+            url: "/auth/recovery-codes/verify-setup/",
+            csrfToken: getCsrfToken(),
+            method: "POST",
+            body: { code: code },
+            throwOnError: false,
+        });
 
-            return data;
-        
-        };
+        return data;
 
-        const data = await handleButtonAlertClickHelper(e,
-                                                        VERIFY_SETUP_BUTTON,
-                                                        testVerifySpinnerElement,
-                                                        alertAttributes,
-                                                        handleTestSetupFetchAPI,
-                                                );
-     
-     
-        if (data) {
+    };
 
-             try {
-                
-                clearTestResultContainer();
-                const isComplete = await displayResults(data);
-                
-                if (!data.FAILURE) {
+    const data = await handleButtonAlertClickHelper(e,
+        VERIFY_SETUP_BUTTON,
+        testVerifySpinnerElement,
+        alertAttributes,
+        handleTestSetupFetchAPI,
+    );
 
-                    toggleElement(dynamicTestFormSetupElement);
 
-                    try {
-                        // Removes the form after a successful test.
-                        //
-                        // The form is hidden via Jinja until the page refreshes, so it may not exist
-                        // in the DOM yet. Attempting to remove it while hidden would raise an error.
-                        toggleElement(testSetupFormElement);
-                    } catch (error) {
-                        doNothing(); 
-                    }
+    if (data) {
 
+        try {
+
+            const isComplete = await displayResults(data);
+
+            if (!data.FAILURE) {
+
+                toggleElement(dynamicTestFormSetupElement);
+
+                try {
+                    // Removes the form after a successful test.
+                    //
+                    // The form is hidden via Jinja until the page refreshes, so it may not exist
+                    // in the DOM yet. Attempting to remove it while hidden would raise an error.
+                    toggleElement(testSetupFormElement);
+                    toggleProcessMessage(false);
+                } catch (error) {
+                    doNothing();
+                    toggleProcessMessage(false);
                 }
-                testFormSectionElement.reset();
 
-               if (isComplete) {
-                 verificationTestComplete();
-               }
-             
-            
-                
-            } catch (error) {
-                doNothing();
-              
-            }  
+            }
+            testFormSectionElement.reset();
+
+            if (isComplete) {
+                verificationTestComplete();
+                toggleProcessMessage(false);
+            }
+
+
+
+        } catch (error) {
+            doNothing();
+            toggleProcessMessage(false);
         }
-       
-    
+    }
+
+    toggleProcessMessage(false);
+
+
 }
 
 

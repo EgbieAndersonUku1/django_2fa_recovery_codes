@@ -1,24 +1,95 @@
-import { handleRecoveryCodeAlert } from "./handleCodeGeneration.js";
-import { handleFormSubmissionHelper } from "./formUtils.js";
+/**
+ * @summary Performs a one-time validation of static DOM elements via `oneTimeElementCheck`.
+ *
+ * @note This ensures required elements exist before the app starts and avoids repeated
+ *       `if (element)` checks. Dynamic elements are excluded since they may not exist
+ *       at initial load and must be checked at runtime.
+ *
+ * === One-Time DOM Element Check ===
+ *
+ * 1. Purpose
+ *    - Ensure all required elements are valid before the app starts.
+ *    - Reduce repeated `if (element)` checks in functions.
+ *
+ * --- Example without `oneTimeElementCheck` ---
+ * const form = document.getElementById("form")
+ * function someCallingFunction() {
+ *     if (form) {
+ *         // do something
+ *     }
+ * }
+ *
+ * --- Example with `oneTimeElementCheck` ---
+ * function someCallingFunction() {
+ *     form.appendChild(...)
+ * }
+ *
+ * 2. Dynamic Elements
+ *    - Elements not included in `oneTimeElementCheck` are excluded deliberately,
+ *      because they are rendered only under certain conditions.
+ *
+ *    Example:
+ *    const emailButtonElement = document.getElementById("email")
+ *
+ *    This button may be hidden by a Jinja `if` statement and only rendered
+ *    when a condition is met (e.g. after generating a code). Until then,
+ *    it does not exist in the DOM, so `emailButtonElement` will be `null`.
+ *
+ * 3. SPA Considerations
+ *    - In an SPA, parts of the page update without a full refresh.
+ *    - Dynamic elements must therefore be checked when they are used,
+ *      not during the initial load.
+ *
+ * 4. Error Handling
+ *    - Attempting to validate dynamic elements in `oneTimeElementCheck`
+ *      would cause errors, as they do not exist until after the user action
+ *      (and possible refresh) that renders them.
+ */
+
+
+import { handleRecoveryCodeAlert }      from "./handleCodeGeneration.js";
+import { handleFormSubmissionHelper }   from "./formUtils.js";
 import { handleButtonAlertClickHelper } from "./handleButtonAlertClicker.js";
-import fetchData from "../fetch.js";
-import { getCsrfToken } from "../security/csrf.js";
-import { checkIfHTMLElement } from "../utils.js";
-import { toggleElement } from "../utils.js";
-import { AlertUtils } from "../alerts.js";
-import { doNothing } from "../utils.js";
-import { toggleProcessMessage } from "./handleButtonAlertClicker.js";
-import { markCardAsDeleted } from "../batchCardsHistory/markCardAsDeleted.js";
-import { getCurrentCard } from "../batchCardsHistory/updateBatchHistorySection.js";
+import fetchData                        from "../fetch.js";
+import { getCsrfToken }                 from "../security/csrf.js";
+import { checkIfHTMLElement }           from "../utils.js";
+import { toggleElement }                from "../utils.js";
+import { AlertUtils }                   from "../alerts.js";
+import { doNothing }                    from "../utils.js";
+import { toggleProcessMessage }         from "./handleButtonAlertClicker.js";
+import { markCardAsDeleted }            from "../batchCardsHistory/markCardAsDeleted.js";
+import { getCurrentCard }               from "../batchCardsHistory/updateBatchHistorySection.js";
 
 
 
 export const deleteInputFieldElement      = document.getElementById("delete-code-input");
-const testSetupFormContainerElement       = document.getElementById("dynamic-verify-form-container");
 
+const testSetupFormContainerElement       = document.getElementById("dynamic-verify-form-container");
 const deleteAllCodeButtonSpinnerElement   = document.getElementById("delete-all-code-loader");
 const deleteCodeButtonSpinnerElement      = document.getElementById("delete-current-code-loader");
 const deleteFormElement                   = document.getElementById("delete-form");
+
+
+
+/**
+ * Performs a one-time validation for static elements to ensure they exist in the DOM.
+ * 
+ * By validating elements once, we can safely use them in other functions without 
+ * repeating `if` checks throughout the code.
+ * 
+ * Note: This is intended for static elements only. Dynamic elements 
+ * (created or fetched at runtime) should be validated when they are used.
+ * One-time validation for delete-related static elements.
+ */
+export function oneTimeElementsCheck() {
+    checkIfHTMLElement(deleteInputFieldElement,        "Delete input field",        true);
+    checkIfHTMLElement(testSetupFormContainerElement,  "Test setup form container", true);
+    checkIfHTMLElement(deleteCodeButtonSpinnerElement, "Delete code button spinner",true);
+    checkIfHTMLElement(deleteFormElement,              "Delete form",               true);
+}
+
+// call immediately
+oneTimeElementsCheck();
 
 
 deleteFormElement.addEventListener("submit", handleDeleteFormSubmission);
@@ -30,11 +101,16 @@ export default deleteFormElement;
 
 
 
-function toggleCodeUIElementsOff(codeActionButtons, tableCodes) {
-    toggleElement(codeActionButtons);
-    toggleElement(tableCodes);
+/**
+ * Toggles off (hides) multiple UI elements related to code actions.
+ *
+ * @param {...HTMLElement} elements - One or more DOM elements to toggle.
+ */
+function toggleCodeUIElementsOff(...elements) {
+    elements.forEach(el => {
+        if (el) toggleElement(el, false); 
+    });
 }
-
 
 
 
@@ -55,6 +131,14 @@ export function handleDeleteFormSubmission(e) {
 }
 
 
+
+/**
+ * Returns the dynamic UI elements related to code actions.
+ *
+ * @returns {Object} An object containing references to the code action buttons and table elements.
+ * @property {HTMLElement|null} codeActionButtons - The element for code action buttons, or null if not found.
+ * @property {HTMLElement|null} tableCodes - The element for the code table, or null if not found.
+ */
 function getDynamicCodeUIElements() {
     return {
         codeActionButtons: document.getElementById("code-actions"),
@@ -73,6 +157,11 @@ function showSuccessDeleteAlert() {
 }
 
 
+/**
+ * Toggles visibility of multiple elements.
+ *
+ * @param  {...HTMLElement} elements - The elements to toggle.
+ */
 function toggleAlertAndFormElements(alertMessage) {
 
     const SUCCESS_ALERT_SELECTOR = ".alert-message";
@@ -145,8 +234,6 @@ export async function handleDeleteCodeeButtonClick(e, deleteButtonID) {
 
 
 
-
-
 /**
  * Handles the click event for the "delete all code" button.
  * 
@@ -187,8 +274,13 @@ export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID,
                         alertAttributes,
                         handleDeleteAllCodesApiRequest,
                     )
+    
+    if (!resp) {
+        toggleProcessMessage(false);
+        return;
+    }
 
-    if (resp && resp.SUCCESS) {
+    if (resp.SUCCESS) {
 
         const {codeActionButtons, tableCodes} = getDynamicCodeUIElements();
         toggleProcessMessage(false);
@@ -207,13 +299,12 @@ export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID,
             toggleElement(testSetupFormElement)
         } catch (error) {
             doNothing();
-            toggleProcessMessage(false);
             }
 
         }  else {
              toggleProcessMessage(false);
-        }
+     }
 
-}
+} 
 
 

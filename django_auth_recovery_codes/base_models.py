@@ -267,13 +267,13 @@ def flush_cache_and_write_attempts_to_db(instance, field_name, cache_key: str, l
             logger.info(f"Persisted attempts: object_id={instance.id}, attempts={attempts}")
         else:
             logger.debug("No attempts to flush: object_id=%s, key=%s", getattr(instance, "id", None), cache_key)
-
+            instance.save(update_fields=["last_attempt"])
             delete_cache_with_retry(cache_key)
-
-            logger.debug("Cleared cache after flush: object_id=%s, key=%s", getattr(instance, "id", None), cache_key)
+            logger.debug("Cleared cache: object_id=%s, key=%s, data=%s", getattr(instance, "id", None), cache_key, data)
 
     except Exception as e:
         logger.exception("Failed in do_something")
+        delete_cache_with_retry(cache_key)
         raise RuntimeError("Error while performing risky operation") from e
     
 

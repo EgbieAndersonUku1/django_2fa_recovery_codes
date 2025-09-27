@@ -92,7 +92,7 @@ class RecoveryCodeAuditAdmin(admin.ModelAdmin):
 
 
 class RecoveryCodesBatchAdmin(admin.ModelAdmin):
-    list_display          = ["id", "user", "number_issued", "status", "number_removed", "created_at", "modified_at"]
+    list_display          = ["id", "user", "number_issued", "last_attempt", "status", "number_removed", "created_at", "modified_at"]
     list_display_links    = ["id", "user"]
     list_per_page         = 25
     readonly_fields       = ["id", "created_at", "modified_at", "number_removed", 
@@ -106,6 +106,7 @@ class RecoveryCodesBatchAdmin(admin.ModelAdmin):
                              "deleted_at",
                              "deleted_by",
                              "status",
+                             "last_attempt",
                              ]
     list_filter           = ["status", "automatic_removal", ]
     search_fields         = ["id", "user__username", "user__email"]
@@ -119,9 +120,10 @@ class RecoveryCodesBatchAdmin(admin.ModelAdmin):
         ("Batch details", {
             "fields": ( "automatic_removal",
                         "number_issued", 
-                       "number_removed", 
+                        "number_removed", 
                         "number_used",
-                       "requested_attempt",
+                        "requested_attempt",
+                        "last_attempt",
                       
                          "expiry_date", "viewed", "downloaded", "emailed", "generated",
                           "cooldown_seconds",

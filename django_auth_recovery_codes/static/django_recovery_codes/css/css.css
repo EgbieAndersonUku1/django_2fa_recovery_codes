@@ -788,7 +788,7 @@ section {
 }
 
 .small-title {
-    font-size: 0.95rem;
+    font-size: 0.85rem;
 }
 
 
@@ -818,6 +818,14 @@ section {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     margin-bottom: 1rem;
+}
+
+
+
+.table-wrapper table {
+    width: 100%;
+    border-collapse: collapse;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
 /* Table base styles */
@@ -923,7 +931,7 @@ td {
     padding-bottom: 40px;
     margin: auto;
     margin-top: var(--xxl-spacing);
-    margin-bottom: var(--xxxl-spacing);
+    margin-bottom: var(--xxl-spacing);
     box-shadow: var(--box-shadow-primary);
 }
 
@@ -1174,7 +1182,7 @@ button {
 
 
 #login-messages {
-    font-size: 0.85rem;
+    font-size: 0.89rem;
 }
 
 /* Keyframes for continuous rotation */
@@ -1201,7 +1209,7 @@ button {
     background: #28a745;
     color: white;
     border: 1px solid black;
-    border-radius: 4px;
+    border-radius: 2px;
     font-size: 0.85rem;
     font-weight: 400;
     text-align: left;
@@ -1219,7 +1227,7 @@ button {
 
 /* Content wrapper inside the message box */
 .message-container {
-    padding: var(--md-spacing);
+    padding: 12px;
    
     background: #2b2b2b; 
     border-left: 4px solid #ef4444; 
@@ -1302,8 +1310,8 @@ button {
 
 .fa-check {
     color: green;
-    padding: var(--md-spacing);
-    font-size: 1.1rem;
+    padding: 2px;
+    font-size: 0.95rem;
 }
 
 .sidebar-close-icon {
@@ -1332,8 +1340,35 @@ button {
    0px – 575px
    ======================= */
 @media (max-width: 575px) {
+    #login-messages {
+    font-size: 0.80rem;
+    }
+     #login-user{
+        width: 100%;
+       
+        padding: var(--md-spacing);
+        margin: auto;
+        margin-top: 0;
+        margin-bottom: var(--xxxl-spacing);
+        box-shadow: none;
+    }   
+
+    #login-navigation  {
+ 
+    display: grid;
+    grid-template-columns: repeat(1, 1fr);
+    text-align: center;
+    row-gap: 8px;
+    }
+
+    .login-form-container input {
+        font-size: 1rem;
+    }
 
 
+    #process-message {
+        width: 95%;
+    }
 
     #sidebar {
         /* display: none; */
@@ -1448,6 +1483,11 @@ button {
         border: 1px solid black;
     }
 
+     #buttons-container {
+        grid-template-columns: repeat(1, 1fr);
+      
+    }
+
 }
 
 
@@ -1459,6 +1499,28 @@ button {
    optimizing layout and UI elements for this screen size range 
 */
 @media (min-width: 576px) and (max-width: 767px) {
+
+      #login-user{
+        width: 90%;
+       
+        padding: var(--md-spacing);
+        margin: auto;
+        margin-top: 0;
+        margin-bottom: var(--xxxl-spacing);
+        box-shadow: none;
+    }   
+
+    #login-navigation  {
+ 
+        display: grid;
+        grid-template-columns: repeat(1, 1fr);
+        text-align: center;
+        row-gap: 8px;
+    }
+
+    #process-message {
+        width: 80%;
+    }
 
     #sidebar {
         /* display: none; */
@@ -1482,13 +1544,15 @@ button {
    
     #buttons-container,
  
-#buttons-container {
-    row-gap: 12px;
+    #buttons-container {
+        row-gap: 12px;
+         grid-template-columns: repeat(1, 1fr);
     }
 
+   
 
 
-.form-container {
+    .form-container {
         display: grid;
         grid-template-columns: repeat(1, 1fr);
         grid-template-rows: auto;
@@ -1537,6 +1601,25 @@ button {
    ======================= 
 */
 @media (min-width: 768px) and (max-width: 991px) {
+
+      #login-user{
+        width: 95%;
+       
+        padding: var(--lg-spacing);
+        margin: auto;
+        margin-top: var(--xxl-spacing);
+        margin-bottom: var(--xxl-spacing);
+        box-shadow: none;
+    }   
+
+    #login-navigation  {
+ 
+        display: grid;
+        grid-template-columns: repeat(1, 1fr);
+        text-align: center;
+        row-gap: 8px;
+    }
+
     .hamburger {
         display: block;
     }
@@ -1571,7 +1654,6 @@ button {
    
     .dashboard-links {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
         grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
         grid-template-rows: auto;
         column-gap: var(--sm-spacing);
@@ -1633,6 +1715,10 @@ button {
         grid-template-rows: auto;
     }
 
+    #invalidate-form-container {
+        grid-template-columns: repeat(1, 1fr);
+        grid-template-rows: auto;
+    }
 
     #buttons-container {
         display: grid;
@@ -1653,6 +1739,7 @@ button {
    #invalidate-form-container {
         display: grid;
         grid-template-columns: repeat(1, 1fr);
+        grid-template-rows: auto;
     }
 
     .sidebar-link {
@@ -1682,12 +1769,14 @@ button {
     }
 
  
-
-    
     #recovery-code-dashboard .container .value {
         font-size: 2.5rem;
     }
 
+    #codes-actions {
+       grid-template-columns: repeat(3, 1fr);
+        grid-template-rows: auto;
+    }
     #buttons-container {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -1730,6 +1819,8 @@ button {
     .table-wrapper {
         overflow-x: hidden;
     }
+   
+
 }
 
 

@@ -1,22 +1,76 @@
+/**
+ * @summary Performs a one-time validation of static DOM elements via `oneTimeElementCheck`.
+ *
+ * @note This ensures required elements exist before the app starts and avoids repeated
+ *       `if (element)` checks. Dynamic elements are excluded since they may not exist
+ *       at initial load and must be checked at runtime.
+ *
+ * === One-Time DOM Element Check ===
+ *
+ * 1. Purpose
+ *    - Ensure all required elements are valid before the app starts.
+ *    - Reduce repeated `if (element)` checks in functions.
+ *
+ * --- Example without `oneTimeElementCheck` ---
+ * const form = document.getElementById("form")
+ * function someCallingFunction() {
+ *     if (form) {
+ *         // do something
+ *     }
+ * }
+ *
+ * --- Example with `oneTimeElementCheck` ---
+ * function someCallingFunction() {
+ *     form.appendChild(...)
+ * }
+ *
+ * 2. Dynamic Elements
+ *    - Elements not included in `oneTimeElementCheck` are excluded deliberately,
+ *      because they are rendered only under certain conditions.
+ *
+ *    Example:
+ *    const emailButtonElement = document.getElementById("email")
+ *
+ *    This button may be hidden by a Jinja `if` statement and only rendered
+ *    when a condition is met (e.g. after generating a code). Until then,
+ *    it does not exist in the DOM, so `emailButtonElement` will be `null`.
+ *
+ * 3. SPA Considerations
+ *    - In an SPA, parts of the page update without a full refresh.
+ *    - Dynamic elements must therefore be checked when they are used,
+ *      not during the initial load.
+ *
+ * 4. Error Handling
+ *    - Attempting to validate dynamic elements in `oneTimeElementCheck`
+ *      would cause errors, as they do not exist until after the user action
+ *      (and possible refresh) that renders them.
+ */
 
 
 import { showTemporaryMessage }                from "../messages/message.js";
 import { toggleSpinner, toggleButtonDisabled } from "../utils.js";
 import { updateButtonFromConfig }              from "../generateCodeActionButtons.js";
 import messageContainerElement                 from "./appMessages.js";
-import { messagePTag }                         from "./appMessages.js";
 import { handleButtonAlertClickHelper }        from "./handleButtonAlertClicker.js";
 import fetchData                               from "../fetch.js";
 import { getCsrfToken }                        from "../security/csrf.js";
 import { buttonStates }                        from "../generateCodeActionButtons.js";
 import { logError, warnError }                 from "../logger.js";
 import { toggleProcessMessage }                from "./handleButtonAlertClicker.js";
-
+import { markCurrentCardBatchAsDownload }      from "../batchCardsHistory/updateBatchHistorySection.js";
 
 
 const downloadCodeButtonElementSpinner = document.getElementById("download-code-loader");
 
 
+/**
+ * Extracts the Content-Disposition header and filename from a Headers object.
+ *
+ * @param {Headers|Object} headers - The headers object from a fetch response.
+ * @returns {Object} An object containing:
+ *  - disposition {string|null} - The Content-Disposition header value, or null if not found.
+ *  - filename {string|null} - The filename extracted from the header, or null if not present.
+ */
 function extractDispositionFromHeaders(headers) {
 
     if (typeof headers !== "object") {
@@ -28,6 +82,12 @@ function extractDispositionFromHeaders(headers) {
 }
 
 
+/**
+ * Extracts the filename from a Content-Disposition header.
+ *
+ * @param {string|null} disposition - The Content-Disposition header value.
+ * @returns {string} The extracted filename, or a default "downloaded_file" if not found.
+ */
 function getFilenameFromDisposition(disposition) {
     let filename = "downloaded_file";
    
@@ -38,8 +98,19 @@ function getFilenameFromDisposition(disposition) {
     return filename;
 }
 
-async function triggerDownload(fetchResponse) {
 
+
+/**
+ * Triggers a file download from a fetch response.
+ *
+ * Extracts the filename from the Content-Disposition header and downloads
+ * the file using a temporary <a> element. Also returns a success flag from headers.
+ *
+ * @param {Response} fetchResponse - The fetch Response object.
+ * @returns {Promise<{success: boolean, filename: string}>} Object containing the success flag and downloaded filename.
+ * @throws {Error} Throws if reading the response blob fails.
+ */
+async function triggerDownload(fetchResponse) {
   
     const disposition = extractDispositionFromHeaders(fetchResponse.headers);
 
@@ -71,7 +142,16 @@ async function triggerDownload(fetchResponse) {
 
 
 
-
+/**
+ * Handles the UI updates after a successful recovery code download.
+ *
+ * - Hides the download spinner.
+ * - Shows a temporary success message.
+ * - Updates the download button state and re-enables it.
+ * - Marks the current recovery code batch as downloaded.
+ *
+ * @param {Event} e - The click event from the download button.
+ */
 function handleDownloadSuccessMessageUI(e) {
 
     toggleSpinner(downloadCodeButtonElementSpinner, false)
@@ -82,9 +162,19 @@ function handleDownloadSuccessMessageUI(e) {
     updateButtonFromConfig(btn, buttonStates.downloaded, "You have already downloaded this code");
     toggleButtonDisabled(btn)
 
+    markCurrentCardBatchAsDownload();
+
 }
 
-function handleDownloadFailureMessageUI(resp) {
+
+/**
+ * Handles the UI updates when a recovery code download fails.
+ *
+ * - Logs a warning.
+ * - Hides the download spinner.
+ * - Shows a temporary failure message to the user.
+ */
+function handleDownloadFailureMessageUI() {
     
     warnError("handleDownloadButtonClick", "The button container element wasn't found");
     toggleSpinner(downloadCodeButtonElementSpinner, false)
@@ -128,6 +218,16 @@ export async function downloadFromResponse(resp) {
 }
 
 
+/**
+ * Checks if a fetch response contains JSON and processes it.
+ *
+ * - Hides the download spinner.
+ * - Attempts to parse the response as JSON.
+ * - If successful, shows a temporary message from the JSON data.
+ *
+ * @param {Response} resp - The fetch Response object.
+ * @returns {Promise<boolean>} Returns true if the response was JSON and processed successfully, otherwise false.
+ */
 async function ifJsonResponseAndProcess(resp) {
     toggleSpinner(downloadCodeButtonElementSpinner, false);
 
@@ -192,12 +292,12 @@ export async function handleDownloadButtonClick(e, downloadButtonID) {
     }
 
     const respData = await downloadFromResponse(resp);
-    // console.log(respData)
    
     setTimeout(() => {
          toggleProcessMessage(false)
         if (respData && respData.success) {
             handleDownloadSuccessMessageUI(e);
+            
             return;
         } 
         
@@ -206,3 +306,5 @@ export async function handleDownloadButtonClick(e, downloadButtonID) {
     }, MILLI_SECONDS)
 
 }
+
+

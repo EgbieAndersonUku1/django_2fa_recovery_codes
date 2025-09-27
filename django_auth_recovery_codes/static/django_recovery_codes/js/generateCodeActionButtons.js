@@ -82,14 +82,23 @@ export const buttons = {
 
 
 
+/**
+ * Generates a container <div> with all code action buttons.
+ * 
+ * @returns {HTMLDivElement} The container div element with buttons appended.
+ *
+ * Notes:
+ * - Uses a global `buttons` object mapping identifiers to button configuration objects.
+ */
 export function generateCodeActionAButtons() {
   const divElement = document.createElement("div");
   divElement.id = "code-actions";
   divElement.classList.add("buttons", "flex-grid", "fourth-column-grid", "margin-top-lg")
 
   for (let button in buttons) {
-    const btnCode = buttons[button];
+    const btnCode       = buttons[button];
     const buttonElement = createCodeActionButton(btnCode);
+    
     divElement.appendChild(buttonElement);
 
   }
@@ -98,11 +107,26 @@ export function generateCodeActionAButtons() {
 }
 
 
+
+/**
+ * Creates a single code action button with loader and text/icon.
+ *
+ * @param {Object} buttonObject - Configuration object for the button.
+ * @returns {HTMLButtonElement} The complete button element.
+ *
+ * Notes:
+ * - Expected `buttonObject` structure:
+ *   {
+ *     button: { id: string, buttonClassList: string[] },
+ *     loader: { id: string, class: string },
+ *     iconSpan: { id: string, fontAwesomIElement: string[], textContent: string }
+ *   }
+ */
 export function createCodeActionButton(buttonObject) {
 
   const buttonElement = createButton(buttonObject)
   const loaderElement = createLoader(buttonObject);
-  const spanElement = createSpanText(buttonObject);
+  const spanElement   = createSpanText(buttonObject);
 
   buttonElement.appendChild(loaderElement);
   buttonElement.appendChild(spanElement);
@@ -110,21 +134,54 @@ export function createCodeActionButton(buttonObject) {
 }
 
 
+
+/**
+ * Creates a basic button element with the specified ID and classes.
+ *
+ * @param {Object} buttonObject - Configuration object containing button id and class list.
+ * @returns {HTMLButtonElement} The created button element.
+ *
+ * Notes:
+ * - Expected structure: { button: { id: string, buttonClassList: string[] } }
+ */
 export function createButton(buttonObject) {
   const buttonElement = document.createElement("button");
-  buttonElement.id = buttonObject.button.id;
+  buttonElement.id    = buttonObject.button.id;
+
   addClassesToElement(buttonElement, buttonObject.button.buttonClassList);
   return buttonElement
 
 }
 
+
+/**
+ * Creates a loader <span> element for a button.
+ *
+ * @param {Object} buttonObject - Configuration object containing loader id and class.
+ * @returns {HTMLSpanElement} The loader span element.
+ *
+ * Notes:
+ * - Expected structure: { loader: { id: string, class: string } }
+ */
 function createLoader(buttonObject) {
-  const loaderElement = document.createElement("span");
-  loaderElement.id = buttonObject.loader.id
+  const loaderElement     = document.createElement("span");
+  loaderElement.id        = buttonObject.loader.id
   loaderElement.className = buttonObject.loader.class;
   return loaderElement
 }
 
+
+
+/**
+ * Creates a <span> element containing an icon and text for a button.
+ *
+ * @param {Object} buttonObject - Configuration object containing icon and text details.
+ * @returns {HTMLSpanElement} The span element with icon and text.
+ *
+ * Notes:
+ * - Expected structure: 
+ *   { iconSpan: { id: string, fontAwesomIElement: string[], textContent: string } }
+ */
 export function createSpanText(buttonObject) {
   const spanElement = document.createElement("span");
   const fontAwesomIElement = document.createElement("i");
@@ -139,6 +196,16 @@ export function createSpanText(buttonObject) {
 }
 
 
+
+/**
+ * Adds multiple CSS classes to a given DOM element.
+ *
+ * @param {HTMLElement} element - The element to which classes will be added.
+ * @param {string[]} selectorList - Array of class names to add.
+ *
+ * Notes:
+ * - Validates that `element` is not null/undefined and that `selectorList` is an array.
+ */
 function addClassesToElement(element, selectorList) {
   if (!element) {
     warnError("addClassesToElement: The element provided is null or undefined.");

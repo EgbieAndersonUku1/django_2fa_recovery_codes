@@ -1,42 +1,70 @@
 /**
- * `generateCodeActionButton.js` dynamically creates four buttons:
- * "Regenerate Code", "Email Code", "Delete Code", and "Download Code". 
- * These buttons are loaded into the DOM after the user generates their recovery codes.
- * 
- * Why this is needed:
- * The application behaves like a SPA (Single Page Application). This means 
- * parts of the page can update, change, or be removed without a full page refresh.
- * 
- * How it affects this page:
- * On initial load, the "generate code" form exists in the DOM. 
- * It allows the user to generate a recovery code with an expiry date. 
- * The four buttons above are hidden by Jinja template logic (if-statements), 
- * ensuring the user can only generate codes from the designated area.
- * 
- * After generating a code, the form is removed from the DOM. 
- * The buttons are also hidden via Jinja logic and displayed on page refresh. 
- * To show the button the page would need to be refreshed right after the codes have
- * been generate. However, this would normally break SPA behaviour, 
- * since refreshing the page defeats the SPA’s purpose.
- * 
- * To solve this, `generateCodeActionButton.js` dynamically generates the buttons 
- * after the code is generated. The dynamically created buttons behave identically 
- * to the Jinja template buttons. Users can't even tell and can  interact with them normally, 
- * and when the page is refreshed, the dynamic buttons are removed, 
- * allowing the Jinja template buttons to take over seamlessly.
- * 
- * Key points:
- * - Ensures SPA behaviour is maintained.
- * - Buttons mirror Jinja template buttons in functionality and style.
- * - Provides a smooth user experience without forcing a page refresh.
+ * @summary Performs a one-time validation of static DOM elements via `oneTimeElementCheck`.
+ *
+ * @note This ensures required elements exist before the app starts and avoids repeated
+ *       `if (element)` checks. Dynamic elements are excluded since they may not exist
+ *       at initial load and must be checked at runtime.
+ *
+ * === One-Time DOM Element Check ===
+ *
+ * 1. Purpose
+ *    - Ensure all required elements are valid before the app starts.
+ *    - Reduce repeated `if (element)` checks in functions.
+ *
+ * --- Example without `oneTimeElementCheck` ---
+ * const form = document.getElementById("form")
+ * function someCallingFunction() {
+ *     if (form) {
+ *         // do something
+ *     }
+ * }
+ *
+ * --- Example with `oneTimeElementCheck` ---
+ * function someCallingFunction() {
+ *     form.appendChild(...)
+ * }
+ *
+ * 2. Dynamic Elements
+ *    - Elements not included in `oneTimeElementCheck` are excluded deliberately,
+ *      because they are rendered only under certain conditions.
+ *
+ *    Example:
+ *    const emailButtonElement = document.getElementById("email")
+ *
+ *    This button may be hidden by a Jinja `if` statement and only rendered
+ *    when a condition is met (e.g. after generating a code). Until then,
+ *    it does not exist in the DOM, so `emailButtonElement` will be `null`.
+ *
+ * 3. SPA Considerations
+ *    - In an SPA, parts of the page update without a full refresh.
+ *    - Dynamic elements must therefore be checked when they are used,
+ *      not during the initial load.
+ *
+ * 4. Error Handling
+ *    - Attempting to validate dynamic elements in `oneTimeElementCheck`
+ *      would cause errors, as they do not exist until after the user action
+ *      (and possible refresh) that renders them.
  */
-
 
 
 import { warnError } from "../logger.js";
 
 
-// Factory function to create button config
+
+/**
+ * Factory function to create a configuration object for a button with its loader and icon.
+ *
+ * @param {Object} options - Configuration options for the button.
+ * @param {string} options.idPrefix - Prefix for the button and related element IDs.
+ * @param {string} options.color - Color name to apply as a background class (e.g., 'blue').
+ * @param {string} options.icon - Font Awesome icon class name (without the 'fa-' prefix).
+ * @param {string} options.text - Text content for the icon span element.
+ *
+ * @returns {Object} A configuration object containing:
+ *   - button: { buttonClassList: string[], id: string }
+ *   - loader: { id: string, class: string }
+ *   - iconSpan: { fontAwesomeClassSelector: string[], id: string, textContent: string }
+ */
 export function createButtonConfig({ idPrefix, color, icon, text }) {
   return {
     button: {
@@ -53,7 +81,16 @@ export function createButtonConfig({ idPrefix, color, icon, text }) {
 }
 
 
-// Define all buttons// Define all buttons
+
+
+/**
+ * Defines all button configurations used in the test verification interface.
+ *
+ * Each button configuration is created using `createButtonConfig` and includes:
+ *   - A button element with classes and a unique ID.
+ *   - A loader element with a unique ID and CSS class.
+ *   - An icon span element with Font Awesome classes, ID, and text content.
+ */
 export const buttons = {
   regenerateCode: createButtonConfig({
     idPrefix: "regenerate-code",
@@ -83,6 +120,11 @@ export const buttons = {
 
 
 
+
+/**
+ * Generates a container div with all action buttons for code management. *
+ * @returns {HTMLDivElement} The container `div` element containing all action buttons.
+ */
 export function generateCodeActionAButtons() {
   const divElement = document.createElement("div");
   divElement.id = "code-actions";
@@ -99,6 +141,19 @@ export function generateCodeActionAButtons() {
 }
 
 
+
+/**
+ * Creates a complete action button element with its loader and text span.
+ *
+ * This function:
+ *   1. Creates a button element using `createButton`.
+ *   2. Creates a loader element using `createLoader`.
+ *   3. Creates a text span element using `createSpanText`.
+ *   4. Appends the loader and text span to the button element.
+ *
+ * @param {Object} buttonObject - The configuration object for the button (from `createButtonConfig`).
+ * @returns {HTMLButtonElement} The fully constructed button element ready to be added to the DOM.
+ */
 export function createCodeActionButton(buttonObject) {
 
   const buttonElement = createButton(buttonObject)
@@ -111,6 +166,18 @@ export function createCodeActionButton(buttonObject) {
 }
 
 
+
+
+/**
+ * Creates a button element with specified properties.
+ *
+ * @param {Object} options - Options for the button.
+ * @param {string} options.id - The ID of the button.
+ * @param {string[]} [options.classes] - Array of CSS classes to add.
+ * @param {string} [options.text] - Text content of the button.
+ * @param {Function} [options.onClick] - Click event handler.
+ * @returns {HTMLButtonElement} The created button element.
+ */
 export function createButton(buttonObject) {
   const buttonElement = document.createElement("button");
   buttonElement.id = buttonObject.button.id;
@@ -119,6 +186,19 @@ export function createButton(buttonObject) {
 
 }
 
+
+
+
+
+/**
+ * Creates a loader element (span) with specified properties.
+ *
+ * @param {Object} options - Options for the loader.
+ * @param {string} options.id - The ID of the loader.
+ * @param {string} [options.className] - CSS class(es) for the loader.
+ * @param {string} [options.text] - Optional text content for the loader.
+ * @returns {HTMLSpanElement} The created loader element.
+ */
 function createLoader(buttonObject) {
   const loaderElement = document.createElement("span");
   loaderElement.id = buttonObject.loader.id
@@ -126,6 +206,18 @@ function createLoader(buttonObject) {
   return loaderElement
 }
 
+
+
+
+/**
+ * Creates a span element with an icon and text.
+ *
+ * @param {Object} options - Options for the span element.
+ * @param {string} options.id - The ID of the span.
+ * @param {string[]} options.iconClasses - Array of classes for the <i> icon element.
+ * @param {string} options.text - Text content for the span.
+ * @returns {HTMLSpanElement} The created span element.
+ */
 export function createSpanText(buttonObject) {
   const spanElement = document.createElement("span");
   const fontAwesomIElement = document.createElement("i");
@@ -140,6 +232,13 @@ export function createSpanText(buttonObject) {
 }
 
 
+
+/**
+ * Adds an array of classes to a DOM element.
+ *
+ * @param {HTMLElement} element - The element to which classes will be added.
+ * @param {string[]} selectorList - Array of class names to add.
+ */
 function addClassesToElement(element, selectorList) {
   if (!element) {
     warnError("addClassesToElement: The element provided is null or undefined.");
@@ -159,7 +258,9 @@ function addClassesToElement(element, selectorList) {
 
 
 
-
+/**
+ * Predefined button states with configuration for id, color, icon, and text.
+ */
 export const buttonStates = {
   emailed: createButtonConfig({
     idPrefix: "email-code",
@@ -184,6 +285,14 @@ export const buttonStates = {
 };
 
 
+
+/**
+ * Updates a button element using a config object.
+ *
+ * @param {HTMLButtonElement} btn - The button element to update.
+ * @param {Object} config - Configuration object for the button.
+ * @param {string} btnTitleMsg - Tooltip/title text for the button.
+ */
 export function updateButtonFromConfig(btn, config, btnTitleMsg) {
 
   btn.className = ""; // reset old classes

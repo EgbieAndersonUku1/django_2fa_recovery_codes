@@ -1,14 +1,89 @@
+/**
+ * @summary Performs a one-time validation of static DOM elements via `oneTimeElementCheck`.
+ *
+ * @note This ensures required elements exist before the app starts and avoids repeated
+ *       `if (element)` checks. Dynamic elements are excluded since they may not exist
+ *       at initial load and must be checked at runtime.
+ *
+ * === One-Time DOM Element Check ===
+ *
+ * 1. Purpose
+ *    - Ensure all required elements are valid before the app starts.
+ *    - Reduce repeated `if (element)` checks in functions.
+ *
+ * --- Example without `oneTimeElementCheck` ---
+ * const form = document.getElementById("form")
+ * function someCallingFunction() {
+ *     if (form) {
+ *         // do something
+ *     }
+ * }
+ *
+ * --- Example with `oneTimeElementCheck` ---
+ * function someCallingFunction() {
+ *     form.appendChild(...)
+ * }
+ *
+ * 2. Dynamic Elements
+ *    - Elements not included in `oneTimeElementCheck` are excluded deliberately,
+ *      because they are rendered only under certain conditions.
+ *
+ *    Example:
+ *    const emailButtonElement = document.getElementById("email")
+ *
+ *    This button may be hidden by a Jinja `if` statement and only rendered
+ *    when a condition is met (e.g. after generating a code). Until then,
+ *    it does not exist in the DOM, so `emailButtonElement` will be `null`.
+ *
+ * 3. SPA Considerations
+ *    - In an SPA, parts of the page update without a full refresh.
+ *    - Dynamic elements must therefore be checked when they are used,
+ *      not during the initial load.
+ *
+ * 4. Error Handling
+ *    - Attempting to validate dynamic elements in `oneTimeElementCheck`
+ *      would cause errors, as they do not exist until after the user action
+ *      (and possible refresh) that renders them.
+ */
+
+
+
 import { handleRecoveryCodeAlert } from "./handleCodeGeneration.js";
 import { handleButtonAlertClickHelper } from "./handleButtonAlertClicker.js";
 import { handleFormSubmissionHelper } from "./formUtils.js";
 import fetchData from "../fetch.js";
 import { getCsrfToken } from "../security/csrf.js";
+import { checkIfHTMLElement } from "../utils.js";
+import { toggleProcessMessage } from "./handleButtonAlertClicker.js";
 
 
 const invalidateSpinnerElement            = document.getElementById("invalidate-code-loader");
 export const invalidateInputFieldElement  = document.getElementById('invalidate-code-input');
 const invalidateFormElement               = document.getElementById("invalidate-form");
 const INVALIDATE_CODE_BTN_ID              = "invalidate-code-btn";
+
+
+
+/**
+ * Performs a one-time validation for static elements to ensure they exist in the DOM.
+ * 
+ * By validating elements once, we can safely use them in other functions without 
+ * repeating `if` checks throughout the code.
+ * 
+ * Note: This is intended for static elements only. Dynamic elements 
+ * (created or fetched at runtime) should be validated when they are used.
+ */
+function oneTimeElementsCheck() {
+    checkIfHTMLElement(invalidateSpinnerElement,   "Invalidate code spinner", true);
+    checkIfHTMLElement(invalidateInputFieldElement,"Invalidate input field",  true);
+    checkIfHTMLElement(invalidateFormElement,      "Invalidate form",         true);
+}
+
+
+// Call it immediately
+oneTimeElementsCheck();
+
+
 
 invalidateFormElement.addEventListener("submit", handleInvalidationFormSubmission);
 invalidateFormElement.addEventListener("input", handleInvalidationFormSubmission);
@@ -56,7 +131,7 @@ export async function handleInvalidateButtonClick(e) {
 
         return data;
     };
-    // console.log(data)
+
     const data = await handleButtonAlertClickHelper(
         e,
         INVALIDATE_CODE_BTN_ID,
@@ -69,6 +144,7 @@ export async function handleInvalidateButtonClick(e) {
     handleRecoveryCodeAlert(data, "Code successfully deactivated", "invalidate");
 
     invalidateFormElement.reset();
+    toggleProcessMessage(false);
 }
 
 

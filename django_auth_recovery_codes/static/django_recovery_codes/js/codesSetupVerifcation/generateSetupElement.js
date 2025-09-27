@@ -1,16 +1,93 @@
-import { toggleSpinner } from "../utils.js";
+/**
+ * @summary Performs a one-time validation of static DOM elements via `oneTimeElementCheck`.
+ *
+ * @note This ensures required elements exist before the app starts and avoids repeated
+ *       `if (element)` checks. Dynamic elements are excluded since they may not exist
+ *       at initial load and must be checked at runtime.
+ *
+ * === One-Time DOM Element Check ===
+ *
+ * 1. Purpose
+ *    - Ensure all required elements are valid before the app starts.
+ *    - Reduce repeated `if (element)` checks in functions.
+ *
+ * --- Example without `oneTimeElementCheck` ---
+ * const form = document.getElementById("form")
+ * function someCallingFunction() {
+ *     if (form) {
+ *         // do something
+ *     }
+ * }
+ *
+ * --- Example with `oneTimeElementCheck` ---
+ * function someCallingFunction() {
+ *     form.appendChild(...)
+ * }
+ *
+ * 2. Dynamic Elements
+ *    - Elements not included in `oneTimeElementCheck` are excluded deliberately,
+ *      because they are rendered only under certain conditions.
+ *
+ *    Example:
+ *    const emailButtonElement = document.getElementById("email")
+ *
+ *    This button may be hidden by a Jinja `if` statement and only rendered
+ *    when a condition is met (e.g. after generating a code). Until then,
+ *    it does not exist in the DOM, so `emailButtonElement` will be `null`.
+ *
+ * 3. SPA Considerations
+ *    - In an SPA, parts of the page update without a full refresh.
+ *    - Dynamic elements must therefore be checked when they are used,
+ *      not during the initial load.
+ *
+ * 4. Error Handling
+ *    - Attempting to validate dynamic elements in `oneTimeElementCheck`
+ *      would cause errors, as they do not exist until after the user action
+ *      (and possible refresh) that renders them.
+ */
+
+
+import { toggleSpinner, checkIfHTMLElement } from "../utils.js";
 
 const resultContainer = document.getElementById("dynamic-verify-form-container");
 
-
 const MILLI_SECONDS = 1000;
 
+/**
+ * Performs a one-time validation for static elements to ensure they exist in the DOM.
+ * 
+ * By validating elements once, we can safely use them in other functions without 
+ * repeating `if` checks throughout the code.
+ * 
+ * Note: This is intended for static elements only. Dynamic elements 
+ * (created or fetched at runtime) should be validated when they are used.
+ */
+function oneTimeElementsCheck() {
+    checkIfHTMLElement(resultContainer, "result container", true);
+}
 
+
+// run right away
+oneTimeElementsCheck();
+
+
+/**
+ * Clears all content from the test result container.
+ */
 export function clearTestResultContainer() {
     resultContainer.innerHTML = "";
 }
 
 
+
+/**
+ * Displays test results received inside the result container with a title and
+ * individual result messages. Results are shown sequentially with
+ * a delay between each for better readability. Success messages
+ * appear in green and failure messages in red.
+ *
+ * @param {Object} results - Key-value pairs of test outcomes.
+ */
 export async function displayResults(results) {
     const divTestResultContainer     = document.createElement("div");
     const MILLI_SECONDS              = 1000;
@@ -50,11 +127,27 @@ export async function displayResults(results) {
 }
 
 
+/**
+ * Creates a title element for the test results.
+ *
+ * @param {string} [title="Test setup result"] - Text content of the title.
+ * @param {string} [className="bold"] - CSS class applied to the title.
+ * @returns {HTMLElement} The created title element.
+ */
 function createTitle(title = "Test setup result",  className = "bold") {
     return createResultDiv(title, className);
 }
 
 
+/**
+ * Creates a styled result div containing a spinner and a message.
+ * The spinner is shown initially and removed after a delay, 
+ * while the message is appended to the result container.
+ *
+ * @param {string} message - Text content of the result message.
+ * @param {string|null} [className=null] - Optional CSS class to style the message.
+ * @returns {HTMLElement} The constructed result container element.
+ */
 function createResultDiv(message, className = null) {
 
     const divContainer = document.createElement("div");

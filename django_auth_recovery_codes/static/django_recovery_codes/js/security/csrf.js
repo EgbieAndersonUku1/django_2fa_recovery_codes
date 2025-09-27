@@ -1,3 +1,9 @@
+/**
+ * Retrieves the CSRF token from the HTML document.
+ *
+ * @throws {Error} Throws if the CSRF token element is not found.
+ * @returns {string} The content of the CSRF token.
+ */
 export function getCsrfToken() {
     const csrfToken = document.getElementById("csrf_token");
 

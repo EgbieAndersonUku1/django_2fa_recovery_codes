@@ -40,6 +40,10 @@ export const appStateManager = {
       
     },
 
+    isRequestCodeGenerationActive() {
+        return config.REGENERATE_CODE_REQUEST;
+    },
+
     setLengthPerDashInputField(length = 6) {
         if (!Number.isInteger(length)) {
             console.error(`The length per dash on the inputfield must be an int. Expected an int got ${length}`);
