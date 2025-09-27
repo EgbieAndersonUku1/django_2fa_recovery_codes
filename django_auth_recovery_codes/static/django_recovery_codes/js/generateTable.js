@@ -224,4 +224,5 @@ return tBodyElement;
 // const tableHeader  = ["status", "code"]
 // const rowsDataList = [["used", "123456789"], ["used", "234567899"], ["used", "9785575215"]]
 // const table        = HTMLTableBuilder(tableHeader, rowsDataList)
+// console.log(table)
 

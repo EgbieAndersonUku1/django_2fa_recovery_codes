@@ -1,51 +1,51 @@
 from __future__ import annotations 
 
-
-import uuid
 import logging
-from django.db import models, connections
-from django.db.models.query import QuerySet
-from typing import Tuple
-from django.db.models import F
-from django.db import transaction
-from django.utils import timezone
-from datetime import timedelta
-from django.contrib.auth import get_user_model
-from django.contrib.auth.hashers import make_password, check_password
-from django_email_sender.models import EmailBaseLog
+import uuid
 
-from django.conf import settings
+from datetime                    import datetime
+from datetime                    import timedelta
+from django.contrib.auth         import get_user_model
+from django.contrib.auth.hashers import check_password, make_password
+from django.db                   import connections, models, transaction
+from django.db.models            import F
+from django.db.models.query      import QuerySet
+from django.conf                 import settings
+from django.utils                import timezone
+from django_email_sender.models  import EmailBaseLog
+from typing                      import Tuple
 
-from django_auth_recovery_codes.base_models import AbstractBaseModel
-from django_auth_recovery_codes.base_models import flush_cache_and_write_attempts_to_db
+from django_auth_recovery_codes.app_settings import default_max_login_attempts
+from django_auth_recovery_codes.base_models import (
+    AbstractBaseModel,
+    AbstractCleanUpScheduler,
+    AbstractCooldownPeriod,
+    flush_cache_and_write_attempts_to_db,
+)
+from django_auth_recovery_codes.enums import (
+    BackendConfigStatus,
+    CreatedStatus,
+    SetupCompleteStatus,
+    TestSetupStatus,
+    UsageStatus,
+    ValidityStatus,
+)
+from django_auth_recovery_codes.loggers.loggers import default_logger, purge_code_logger
+from django_auth_recovery_codes.utils.cache.safe_cache import (
+    delete_cache_with_retry,
+    get_cache_with_retry,
+    set_cache_with_retry,
+)
 from django_auth_recovery_codes.utils.cooldown_period import RecoveryCooldownManager
-from django_auth_recovery_codes.loggers.loggers import purge_code_logger, default_logger
-from django_auth_recovery_codes.base_models import AbstractCleanUpScheduler, AbstractCooldownPeriod
-from django_auth_recovery_codes.utils.converter import SecondsToTime
 from django_auth_recovery_codes.utils.security.generator import generate_2fa_secure_recovery_code
 from django_auth_recovery_codes.utils.security.hash import is_already_hashed, make_lookup_hash
-from django_auth_recovery_codes.utils.utils import (schedule_future_date, 
-                                                    create_json_from_attrs, 
-                                                    create_unique_string,
-                                                   
-                                                    )
+from django_auth_recovery_codes.utils.utils import (
+    create_json_from_attrs,
+    create_unique_string,
+    schedule_future_date,
+)
+
 from .utils.attempt_guard import AttemptGuard
-from django_auth_recovery_codes.app_settings import default_max_login_attempts
-from django_auth_recovery_codes.utils.cache.safe_cache import (delete_cache_with_retry,
-                                                               get_cache_with_retry,
-                                                               set_cache_with_retry,
-                                                               get_cache_or_set,
-                                                               )
-from django_auth_recovery_codes.enums import (CreatedStatus, 
-                                              BackendConfigStatus, 
-                                              SetupCompleteStatus, 
-                                              ValidityStatus,
-                                              TestSetupStatus,
-                                              UsageStatus,
-                                              )
-
-
-from django_auth_recovery_codes.app_settings import default_cooldown_seconds
 
 User   = get_user_model()
 logger = logging.getLogger("auth_recovery_codes")
@@ -107,6 +107,15 @@ class RecoveryCodeSetup(AbstractBaseModel):
 
 
 class RecoveryCodeAudit(models.Model):
+    """
+    Audit log for tracking actions performed on recovery codes.
+
+    This model records every significant action taken on recovery codes, 
+    including deletions, invalidations, and batch operations. Each entry 
+    captures who performed the action, who the action was performed on, 
+    and contextual information such as batch references, counts, and reasons.
+
+    """
     class Action(models.TextChoices):
         DELETED                   = "deleted", "Deleted"
         INVALIDATED               = "invalidated", "Invalidated"
@@ -136,10 +145,34 @@ class RecoveryCodeAudit(models.Model):
         ordering = ["-timestamp"]
 
     def __str__(self):
+        """Render a string representation of the model"""
         return f"{self.get_action_display()} for {self.user_issued_to or 'Unknown User'} at {self.timestamp:%Y-%m-%d %H:%M:%S}"
 
     @classmethod
     def log_action(cls, user_issued_to=None, action=None, deleted_by=None, batch=None, number_deleted=0, number_issued=0, reason=None):
+        """
+        Create a new RecoveryCodeAudit entry to log an action performed on recovery codes.
+
+        This method validates input parameters and records a new audit log entry,
+        including the action type, the user affected, the user performing the action,
+        any related batch, and optional counts and reason.
+
+        Args:
+            user_issued_to (User, optional): The user to whom the recovery code was issued.
+            action (RecoveryCodeAudit.Action): The action performed. Must be one of the RecoveryCodeAudit.Action choices.
+            deleted_by (User, optional): The user who performed the action. Can be None if the action was automatic.
+            batch (RecoveryCodesBatch, optional): The batch related to the action, if any.
+            number_deleted (int, optional): Number of recovery codes deleted. Defaults to 0.
+            number_issued (int, optional): Number of recovery codes issued. Defaults to 0.
+            reason (str, optional): Optional explanation or context for the action.
+
+        Raises:
+            ValueError: If `action` is not provided or not a valid RecoveryCodeAudit.Action.
+            TypeError: If `user_issued_to`, `deleted_by`, or `batch` are not model instances or None.
+
+        Returns:
+            RecoveryCodeAudit: The newly created audit log entry.
+        """
     
         if action is None:
             raise ValueError("Action is required.")
@@ -189,6 +222,8 @@ class RecoveryCodeAudit(models.Model):
 
 
 class RecoveryCodePurgeHistory(models.Model):
+    """Audit log for actions performed on recovery codes."""
+
     name                 = models.CharField(max_length=128, default="Recovery code purged history log")
     timestamp            = models.DateTimeField(auto_now_add=True)
     total_codes_purged   = models.PositiveIntegerField(default=0)
@@ -200,16 +235,21 @@ class RecoveryCodePurgeHistory(models.Model):
         verbose_name_plural  = "RecoveryCodePurgeHistories"
 
     def __str__(self):
+        """Creates a string representation of the model"""
         return f"Purge on {self.timestamp}: {self.total_codes_purged} codes from {self.total_batches_purged} batches"
     
 
 class Status(models.TextChoices):
+    """Choices representing the status of a recovery code."""
+
     ACTIVE         = "a", "Active"
     INVALIDATE     = "i", "Invalidate"
     PENDING_DELETE = "p", "Pending Delete"
 
 
 class RecoveryCodeCleanUpScheduler(AbstractCleanUpScheduler):
+    """Schedules cleanup tasks for expired recovery codes, including bulk deletion and empty batch removal."""
+
     name               = models.CharField(max_length=180, default=create_unique_string("Purge Expired Recovery Codes"), unique=True)
     bulk_delete        = models.BooleanField(default=True)
     delete_empty_batch = models.BooleanField(default=True)
@@ -223,7 +263,9 @@ class RecoveryCodeAuditScheduler(AbstractCleanUpScheduler):
 
 
 class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
-    CACHE_KEYS = ["generated", "downloaded", "emailed", "viewed"]
+    """Schedules cleanup tasks for recovery code audit logs."""
+
+    CACHE_KEYS = ["generated", "downloaded", "emailed", "viewed", "number_used"]
     JSON_KEYS  = ["id", "number_issued", "number_removed", "number_invalidated", "number_used", "created_at",
                   "modified_at", "expiry_date", "deleted_at", "deleted_by", "viewed", "downloaded",
                   "emailed", "generated", 
@@ -271,6 +313,8 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         verbose_name_plural  = "RecoveryCodeBatches"
 
     def __str__(self):
+        """A string representation of the model"""
+
         return f"Batch {self.id} for {self.user or 'Deleted User'}"
        
     @classmethod
@@ -320,7 +364,6 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         attempt_guard = AttemptGuard[RecoveryCodesBatch](instance=cls, instance_attempt_field_name=cls.REQUEST_ATTEMPT_FIELD)
         return attempt_guard.can_proceed(user=user, action="recovery_code")
     
-
     def _get_expired_recovery_codes_qs(self, retention_days: int = None) -> QuerySet[RecoveryCode]:
         """
         Return a queryset of recovery codes eligible for automatic removal with two extra conditions.
@@ -495,7 +538,21 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         return deleted_count, is_empty
 
     @staticmethod
-    def get_expiry_threshold(days=30):
+    def get_expiry_threshold(days: int = 30) -> datetime:
+        """
+        Uses a days as a parameteer to calculate the datetime representing the 
+        expiry threshold `days` ago from now.
+
+        Args:
+            days (int): Uses the days to calcuate the expiry threshold (days ago from now)
+
+        Raises:
+            Raises a valueError if days is not an int
+        
+        """
+        if not (days, int):
+            raise ValueError(f"Days must be an int. Expected an int got {type(int).__name__}")
+        
         return timezone.now() - timedelta(days=days) 
     
     @staticmethod
@@ -733,8 +790,9 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         """
         json_cache = create_json_from_attrs(self, keys=self.JSON_KEYS, capitalise_keys=True)
         if json_cache:
-            json_cache["STATUS"]    = self.frontend_status
-            json_cache["USERNAME"]  = self.user.username
+            json_cache["STATUS"]           = self.frontend_status
+            json_cache["USERNAME"]         = self.user.username
+
             return json_cache
         return {}
     
@@ -746,18 +804,66 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
             setattr(self, key, False)
 
     def mark_as_viewed(self, save : bool = True):
+        """
+        Mark the object as viewed and optionally save it.
+        
+        Takes a bool value of true which can be used to defer
+        the save or to save it right away.
+
+        Args:
+           save (bool): Saves the value straight away if true or 
+                         defers it for later
+        Raises:
+            TypeError if the save is not a boolean
+        """
         self.viewed = True
         return self._update_field_helper(fields_list=[self.VIEWED_FLAG, self.MODIFIED_AT_FIELD], save=save)
 
     def mark_as_downloaded(self, save : bool = True):
+        """
+        Mark the object as downloaded and optionally save it.
+        
+        Takes a bool value of true which can be used to defer
+        the save or to save it right away.
+
+        Args:
+           save (bool): Saves the value straight away if true or 
+                         defers it for later
+        Raises:
+            TypeError if the save is not a boolean
+        """
         self.downloaded = True
         return self._update_field_helper(fields_list=[self.DOWNLOADED_FLAG, self.MODIFIED_AT_FIELD], save=save)
 
     def mark_as_emailed(self, save: bool = True):
+        """
+         Mark the object as emailed and optionally save it.
+        
+        Takes a bool value of true which can be used to defer
+        the save or to save it right away.
+
+        Args:
+           save (bool): Saves the value straight away if true or 
+                         defers it for later
+        Raises:
+            TypeError if the save is not a boolean
+        """
         self.emailed = True
         return self._update_field_helper(fields_list=[self.EMAILED_FLAG, self.MODIFIED_AT_FIELD], save=save)
     
     def mark_as_generated(self, save: bool = True):
+        """
+        Mark the object as generated and optionally save it.
+        
+        Takes a bool value of true which can be used to defer
+        the save or to save it right away.
+
+        Args:
+           save (bool): Saves the value straight away if true or 
+                         defers it for later
+        Raises:
+            TypeError if the save is not a boolean
+        """
         self.generated = True
         self._update_field_helper(fields_list=[self.GENERATED_FLAG, self.MODIFIED_AT_FIELD], save=save)
     
@@ -774,7 +880,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         return False
     
     @classmethod
-    def _if_async_supported_async_bulk_create_or_use_sync_bulk_crate(cls, batch: list):
+    def _if_async_supported_async_bulk_create_or_use_sync_bulk_create(cls, batch: list):
         async_supported = getattr(connections['default'], 'supports_async', False)
         if async_supported:
             import asyncio
@@ -844,12 +950,12 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
                 batch.append(recovery_code)
 
                 if len(batch) >= CHUNK_SIZE:
-                    cls._if_async_supported_async_bulk_create_or_use_sync_bulk_crate(batch)
+                    cls._if_async_supported_async_bulk_create_or_use_sync_bulk_create(batch)
                     batch.clear()
 
             # Insert any remaining codes
             if batch:
-                cls._if_async_supported_async_bulk_create_or_use_sync_bulk_crate(batch)
+                cls._if_async_supported_async_bulk_create_or_use_sync_bulk_create(batch)
 
             return raw_codes, batch_instance
     
@@ -1408,7 +1514,7 @@ class LoginRateLimiter(AbstractCooldownPeriod, AbstractBaseModel):
     modified_at              = models.DateTimeField(auto_now=True)
     last_login_attempt       = models.DateTimeField(auto_now=True)
 
-    # fields
+    # constant fields
     LOGIN_ATTEMPT_FIELD      = "login_attempts"
     MODIFIED_AT_FIELD        = "modified_at"
     LAST_ATTEMPT_FIELD       = "last_attempt"
@@ -1532,6 +1638,7 @@ class LoginRateLimiter(AbstractCooldownPeriod, AbstractBaseModel):
         login_rate_limiter = LoginRateLimiter.get_by_user(user)
         LoginRateLimterAudit.create_record_login_audit(user=user, login_attempts=login_rate_limiter.login_attempts)    
         login_rate_limiter.reset_attempts()
+        delete_cache_with_retry(cache_key)
 
         return is_not_locked_out, wait_time        
 

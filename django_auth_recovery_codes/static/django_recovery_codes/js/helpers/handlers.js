@@ -1,5 +1,5 @@
 import appStateManager from "../state/appStateManager.js";
-import { applyDashToInput, sanitizeText, checkIfHTMLElement } from "../utils.js";
+import { applyDashToInput, sanitizeText } from "../utils.js";
 
 /**
  * A Helper function that processes input events for a text field by validating its length,
@@ -43,6 +43,3 @@ export function handleInputFieldHelper(e) {
 
 
 
-function wireFormElement(formElement) {
-
-}

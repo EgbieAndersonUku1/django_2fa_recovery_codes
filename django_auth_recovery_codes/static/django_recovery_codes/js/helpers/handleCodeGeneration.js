@@ -1,45 +1,90 @@
-import appStateManager from "../state/appStateManager.js";
-import { showSpinnerFor, toggleSpinner, toggleElement } from "../utils.js";
-import { showTemporaryMessage } from "../messages/message.js";
-import { getCsrfToken } from "../security/csrf.js";
-import { sendPostFetchWithoutBody } from "../fetch.js";
-import { handleFormSubmissionHelper } from "./formUtils.js";
-import { loadTestVerificationElements } from "../codesSetupVerifcation/handleTestSetup.js";
-import { toggleProcessMessage } from "./handleButtonAlertClicker.js";
+/**
+ * @summary Performs a one-time validation of static DOM elements via `oneTimeElementCheck`.
+ *
+ * @note This ensures required elements exist before the app starts and avoids repeated
+ *       `if (element)` checks. Dynamic elements are excluded since they may not exist
+ *       at initial load and must be checked at runtime.
+ *
+ * === One-Time DOM Element Check ===
+ *
+ * 1. Purpose
+ *    - Ensure all required elements are valid before the app starts.
+ *    - Reduce repeated `if (element)` checks in functions.
+ *
+ * --- Example without `oneTimeElementCheck` ---
+ * const form = document.getElementById("form")
+ * function someCallingFunction() {
+ *     if (form) {
+ *         // do something
+ *     }
+ * }
+ *
+ * --- Example with `oneTimeElementCheck` ---
+ * function someCallingFunction() {
+ *     form.appendChild(...)
+ * }
+ *
+ * 2. Dynamic Elements
+ *    - Elements not included in `oneTimeElementCheck` are excluded deliberately,
+ *      because they are rendered only under certain conditions.
+ *
+ *    Example:
+ *    const emailButtonElement = document.getElementById("email")
+ *
+ *    This button may be hidden by a Jinja `if` statement and only rendered
+ *    when a condition is met (e.g. after generating a code). Until then,
+ *    it does not exist in the DOM, so `emailButtonElement` will be `null`.
+ *
+ * 3. SPA Considerations
+ *    - In an SPA, parts of the page update without a full refresh.
+ *    - Dynamic elements must therefore be checked when they are used,
+ *      not during the initial load.
+ *
+ * 4. Error Handling
+ *    - Attempting to validate dynamic elements in `oneTimeElementCheck`
+ *      would cause errors, as they do not exist until after the user action
+ *      (and possible refresh) that renders them.
+ */
 
-import { handleButtonAlertClickHelper } from "./handleButtonAlertClicker.js";
+
+
+// App-level imports
+import { AlertUtils } from "../alerts.js";
 import { updateBatchHistorySection } from "../batchCardsHistory/updateBatchHistorySection.js";
 import { updateCurrentRecoveryCodeBatchCard } from "../batchCardsHistory/updateBatchHistorySection.js";
-import { populateTableWithUserCodes } from "./tableUtils.js";
-import messageContainerElement from "./appMessages.js";
-
-import { AlertUtils } from "../alerts.js";
+import { loadTestVerificationElements } from "../codesSetupVerifcation/handleTestSetup.js";
+import { sendPostFetchWithoutBody } from "../fetch.js";
 import fetchData from "../fetch.js";
+import { showTemporaryMessage } from "../messages/message.js";
+import { getCsrfToken } from "../security/csrf.js";
+import appStateManager from "../state/appStateManager.js";
+import { showSpinnerFor, toggleSpinner, toggleElement } from "../utils.js";
 
+// Local imports
+import messageContainerElement from "./appMessages.js";
+import { handleButtonAlertClickHelper } from "./handleButtonAlertClicker.js";
+import { toggleProcessMessage } from "./handleButtonAlertClicker.js";
+import { handleFormSubmissionHelper } from "./formUtils.js";
+import { populateTableWithUserCodes } from "./tableUtils.js";
+import { generaterecoveryBatchSectionElement, recoveryBatchSectionElement } from "../batchCardsHistory/batchCardElements.js";
 
-
-// Elements
-const daysToExpiryGroupWrapperElement = document.getElementById("days-to-expiry-group");
-const generaterecoveryBatchSectionElement = document.getElementById("generate-code-section");
-const recoveryBatchSectionElement = document.getElementById("static-batch-cards-history");
-const codeActionButtons           = document.getElementById("code-actions");   
+// The elemnts are not checked
+const daysToExpiryGroupWrapperElement  = document.getElementById("days-to-expiry-group");
+const codeActionButtons                = document.getElementById("code-actions");   
 
 // spinner elements
-const generateCodeWithExirySpinnerElement = document.getElementById("generate-code-loader");
+const generateCodeWithExirySpinnerElement    = document.getElementById("generate-code-loader");
 const generateCodeWithNoExpirySpinnerElement = document.getElementById("generate-code-without-expiry-loader");
-const excludeSpinnerLoaderElement = document.getElementById("exclude-expiry-loader");
-const tableCoderSpinnerElement = document.getElementById("table-loader");
+const excludeSpinnerLoaderElement            = document.getElementById("exclude-expiry-loader");
+const tableCoderSpinnerElement               = document.getElementById("table-loader");
 
 // button elements
 const generateButtonElement = document.getElementById("generate-code-button-wrapper");
 
-
 // forms elements
 const generateCodeWithExpiryFormElement = document.getElementById("generate-form-code-with-expiry");
-const dynamicTestFormSetupElement = document.getElementById("dynamic-form-setup")
-
-
-
+const dynamicTestFormSetupElement       = document.getElementById("dynamic-form-setup");
+const verifyTestFormContainer           = document.getElementById("verify-form-container");
 
 
 
@@ -164,8 +209,11 @@ export async function handleRegenerateCodeButtonClick(e, regenerateButtonID, ale
         denyButtonText: "No, keep my existing codes"
     }
 
-    toggleElement(alertMessage)
+    if (!alertMessage) {
+         toggleElement(alertMessage);
 
+    }
+   
     handleRecoveryCodesAction({
         e: e,
         generateCodeBtn: regenerateButtonID,
@@ -234,17 +282,29 @@ function handleGenerateCodeWithExpiryFormSubmission(e) {
 }
 
 
+
+/**
+ * Handles the UI updates after successfully generating recovery codes.
+ *
+ * This function performs the following steps:
+ * 1. Toggles the generate recovery batch section visibility.
+ * 2. Populates the user codes table and exits early if there are no codes.
+ * 3. Marks the generated codes as viewed on the backend.
+ * 4. Updates the batch history section with the latest batch information.
+ * 5. Hides code action buttons and updates the app state to indicate code generation is complete.
+ * 6. Optionally shows the verification form if the user has not completed setup.
+ * 7. Hides the process message after a predefined delay.
+ */
 function handleCanGenerateCodeSuccessUI(resp) {
+
     toggleElement(generaterecoveryBatchSectionElement);
 
-    const isPopulated = populateTableWithUserCodes(resp.CODES);
+    const isPopulated   = populateTableWithUserCodes(resp.CODES);
+    const MILLI_SECONDS = 5000;
 
     if (isPopulated) {
 
-        sendPostFetchWithoutBody("/auth/recovery-codes/viewed/",
-            "Failed to mark code as viewed "
-        );
-
+        sendPostFetchWithoutBody("/auth/recovery-codes/viewed/", "Failed to mark code as viewed ");
         updateBatchHistorySection(recoveryBatchSectionElement, resp.BATCH, resp.ITEM_PER_PAGE);
         toggleElement(codeActionButtons, false);
 
@@ -253,34 +313,74 @@ function handleCanGenerateCodeSuccessUI(resp) {
         // show the optional verification form
         // toggleElement(testSetupFormContainerElement, false);
         if (!resp.HAS_COMPLETED_SETUP) {
-            toggleElement(dynamicTestFormSetupElement, false);
+
+            if (!verifyTestFormContainer) {
+                console.log("The static verify form is hidden due to django if-statement, display dynamic one instead")
+                toggleElement(dynamicTestFormSetupElement, false);
+            }
+          
             loadTestVerificationElements();
         }
 
     }
 
-
+      setTimeout(() => {
+                toggleProcessMessage(false);
+            }, MILLI_SECONDS)
     return true;
 }
 
 
-
+/**
+ * Handles the UI response when code generation fails.
+ *
+ * Displays an error message to the user for a specified duration.
+ *
+ * @param {number} [milliseconds=5000] - Duration to show the error message in milliseconds.
+ * @param {string} [message="Oops, something went wrong and your request wasn't processed"] - Error message to display.
+ */
 function handleCannotGenerateCodeError(milliseconds = 5000, message  = "OOps, something went wrong and your request wasn't processed") {
     handleGenerateBaseMessage(message, milliseconds);
 }
 
 
+/**
+ * Handles the UI response when code generation fails, using a backend response object.
+ *
+ * Displays an error message from the server for a specified duration.
+ *
+ * @param {Object} resp - Response object from the backend.
+ * @param {string} resp.MESSAGE - Error message returned from the server.
+ * @param {number} [milliseconds=5000] - Duration to show the error message in milliseconds.
+ */
 function handleCannotGenerateCodeUI(resp, milliseconds = 5000) {
     handleGenerateBaseMessage(resp.MESSAGE, milliseconds);
 }
 
 
+
+
+/**
+ * Handles the UI response when a code generation action is cancelled by the user.
+ *
+ * Displays a cancellation message using the base message handler.
+ *
+ * @param {string} [message="No, codes were generated, since the action was cancelled"] - Message to display to the user.
+ */
 function handleCancelMessage(message = "No, codes were generated, since the action was cancelled") {
     handleGenerateBaseMessage(message = message);
 }
 
 
 
+/**
+ * Displays a temporary message to the user and updates UI elements accordingly.
+ *
+ * Hides the table spinner, toggles its visibility, and resets the app state after a delay.
+ *
+ * @param {string} message - The message to display.
+ * @param {number} [milliseconds=5000] - Duration in milliseconds to display the message.
+ */
 function handleGenerateBaseMessage(message, milliseconds = 5000) {
     showTemporaryMessage(messageContainerElement, message);
 
@@ -335,7 +435,7 @@ async function handleRecoveryCodesAction({ e,
     url,
     daysToExpiry = null
 }) {
-
+    const MILLI_SECONDS = 5000;
     const body = {};
 
     if (daysToExpiry !== null && typeof daysToExpiry === "number") {
@@ -373,6 +473,7 @@ async function handleRecoveryCodesAction({ e,
     if (!resp) {
         handleCancelMessage();
         toggleElement(codeActionButtons, false);
+        toggleProcessMessage(false);
        return;
     }
 
@@ -381,25 +482,37 @@ async function handleRecoveryCodesAction({ e,
         if (resp.CAN_GENERATE) {
 
             handleCanGenerateCodeSuccessUI(resp);
-            toggleProcessMessage(false);
         
         } else {
             handleCannotGenerateCodeUI(resp);
-            toggleProcessMessage(false);
         
         }
        
     } else {
         handleCannotGenerateCodeError();
-        toggleProcessMessage(false);
+   
     }
 
     toggleElement(codeActionButtons, false);
     appStateManager.setCodeGeneration(false);
 
+    setTimeout(() => {
+        toggleProcessMessage(false);
+    }, MILLI_SECONDS);
 }
 
 
+
+/**
+ * Displays a success or informational alert based on the response data
+ * and updates the relevant recovery code batch field if the operation was successful.
+ *
+ * @param {Object} data - Response object from the backend.
+ * @param {string} data.ALERT_TEXT - The alert title text from the server.
+ * @param {string} data.MESSAGE - The alert message content from the server.
+ * @param {string} successCompareMessage - The string to compare against ALERT_TEXT to determine a success.
+ * @param {string} fieldName - The field name in the recovery code batch card to update on success.
+ */
 function handleSuccessOperationAlertAndUpdate(data, successCompareMessage, fieldName) {
     const icon = data.ALERT_TEXT === successCompareMessage ? "success" : "info";
 
@@ -416,6 +529,17 @@ function handleSuccessOperationAlertAndUpdate(data, successCompareMessage, field
 }
 
 
+
+
+/**
+ * Displays an error alert when a code operation fails.
+ *
+ * Uses the backend response data if available, otherwise defaults to a generic message.
+ *
+ * @param {Object} [data] - Optional response object from the backend.
+ * @param {string} [data.ALERT_TEXT] - Alert title text from the server.
+ * @param {string} [data.MESSAGE] - Alert message content from the server.
+ */
 function handleFailureOperationAlertAndUpdate() {
     AlertUtils.showAlert({
         title: data.ALERT_TEXT || "Code not valid",
@@ -427,6 +551,12 @@ function handleFailureOperationAlertAndUpdate() {
 }
 
 
+
+/**
+ * Displays an error alert when an invalid code is detected.
+ *
+ * This is used for general validation errors where the code entered is not recognized.
+ */
 function handleErrorOperationAlertAndUpdate() {
      AlertUtils.showAlert({
         title: "The code is invalid",

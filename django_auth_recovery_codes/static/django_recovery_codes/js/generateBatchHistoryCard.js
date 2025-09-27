@@ -62,10 +62,9 @@ export function generateRecoveryCodesSummaryCard(batch) {
         throw new Error(`The batch should be an array. Expected array but got an object with type ${typeof batch}`)
     }
   
-    const cardElement     = document.createElement("div");
-    const cardHeadElement = document.createElement("div");
-
-    cardElement.className = "card";
+    const cardElement         = document.createElement("div");
+    const cardHeadElement     = document.createElement("div");
+    cardElement.className     = "card";
     cardHeadElement.className = "card-head";
 
     for (let fieldName in batch) {
@@ -197,4 +196,6 @@ function markCodeWithExpiryDateIfApplicableOrMarkAsDoesNotExpiry(fieldName, valu
 
     return value
 }
+
+
 

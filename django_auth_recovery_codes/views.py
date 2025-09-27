@@ -23,7 +23,12 @@ from typing import Tuple
 from .forms.login_form import LoginForm
 from django_auth_recovery_codes.utils.converter import SecondsToTime
 from .models import RecoveryCodesBatch, RecoveryCode, RecoveryCodeSetup, LoginRateLimiter
-from .views_helper import  generate_recovery_code_fetch_helper, recovery_code_operation_helper, get_recovery_batches_context
+from django_auth_recovery_codes.utils.cache.safe_cache import delete_cache_with_retry
+from .views_helper import  (generate_recovery_code_fetch_helper, 
+                            recovery_code_operation_helper,
+                            get_recovery_batches_context, 
+                            set_setup_flag_if_missing_and_add_to_cache
+                            )
 from .utils.cache.safe_cache import (get_cache_or_set, set_cache, 
                                      get_cache_with_retry, 
                                      set_cache_with_retry, 
@@ -56,9 +61,22 @@ User   = get_user_model()
 @login_required
 def recovery_codes_regenerate(request):
     """
-    When called by the fetch api it issues the user a new set of codes and invalidates their previous codes
+    Regenerates the authenticated user's recovery codes and invalidates previous codes.
+
+    This view only accepts POST requests and is protected by CSRF and login 
+    requirements. When called (e.g., via the Fetch API), it issues a new set of 
+    recovery codes for the user and invalidates any existing codes to prevent reuse.
+
+    Args:
+        request (HttpRequest): The HTTP request object.
+
+    Returns:
+        JsonResponse: A JSON response indicating the success or failure of the 
+        regeneration operation. Typically includes updated recovery code state 
+        for the frontend
+    
     """
-    return generate_recovery_code_fetch_helper(request, CACHE_KEY)
+    return generate_recovery_code_fetch_helper(request, CACHE_KEY, regenerate_code = True)
    
 
 
@@ -70,6 +88,9 @@ def recovery_codes_regenerate(request):
 def delete_recovery_code(request):
     """
     Deletes a recovery code for the currently logged-in user.
+
+    This view only accepts POST requests and is protected by CSRF and login 
+    requirements which means only a logged can access the function. 
 
     This view expects a POST request containing a JSON body with a 'code' key.
     It uses a generic helper (`recovery_code_operation_helper`) to handle the
@@ -112,6 +133,7 @@ def delete_recovery_code(request):
         recovery_code_batch = recovery_code.batch
         recovery_code_batch.update_delete_code_count(save=True)
 
+        
         response_data = {
             "SUCCESS": True,
             "OPERATION_SUCCESS": True,
@@ -119,6 +141,9 @@ def delete_recovery_code(request):
             "MESSAGE": "The code has been successfully deleted.",
             "ALERT_TEXT": "Code successfully deleted"
         }
+
+        cache_key = f"attempts:recovery_code:{request.user.id}"
+        delete_cache_with_retry(cache_key)
 
         return response_data
         
@@ -133,6 +158,9 @@ def delete_recovery_code(request):
 def invalidate_user_code(request):
     """
     Deactivate a recovery code for the currently logged-in user.
+
+    This view only accepts POST requests and is protected by CSRF and login 
+    requirements which means only a logged can access the function. 
 
     This view expects a POST request containing a JSON body with a 'code' key.
     It uses a generic helper (`recovery_code_operation_helper`) to handle the
@@ -186,9 +214,26 @@ def invalidate_user_code(request):
 @login_required
 def download_code(request):
     """
+    Allows the authenticated user to download their recovery codes as a file.
+
+    This view only accepts POST requests and is protected by CSRF and login 
+    requirements which means only a logged can access the function. 
+
     Return the user recovery codes as a downloadable file (TXT, CSV, or PDF).
     The filename is set dynamically based on backend logic, so the frontend
     can extract it from the Content-Disposition header.
+
+    Returns:
+        HttpResponse or JsonResponse:
+        - HttpResponse: File download response with the appropriate content type and 
+          Content-Disposition header.
+        - JsonResponse: Returned if the user has already downloaded the codes or if 
+          no codes are available, indicating failure.
+
+    Notes:
+        - Only allows one download per batch; subsequent attempts return a JSON message.
+        - Assumes the user has a valid RecoveryCodesBatch; otherwise JSON response is returned.
+
     """
     user = request.user
 
@@ -262,6 +307,32 @@ def download_code(request):
 @csrf_protect
 @login_required
 def mark_all_recovery_codes_as_pending_delete(request):
+    """
+    Marks all recovery codes for the authenticated user as pending deletion.
+
+    This view only accepts POST requests and is protected by CSRF and login 
+    requirements, meaning that only authenticated users can perform this action.
+
+    The view uses `soft delete` to delete the user's current recovery codes batch and
+    resets session values, and updates the cache to prevent further 
+    access to the codes (e.g., downloading  or emailing them).
+
+    Args:
+        request (HttpRequest): The HTTP request object.
+
+    Returns:
+        JsonResponse: A JSON response indicating the success or failure of the 
+        operation.
+        - SUCCESS: True if recovery codes were successfully marked for deletion; False otherwise.
+        - MESSAGE: A descriptive message about the result.
+
+    Notes:
+        - Resets session values: "is_emailed" is set to False, "force_update" to True.
+        - Removes raw codes from the session to prevent reuse on the frontend.
+        - Updates the cache with reset values for security.
+        - Returns status code 201 on success, 400 on failure.
+        - Assumes that the user has existing recovery codes; otherwise returns failure.
+    """
     
     recovery_batch  = RecoveryCodesBatch.delete_recovery_batch(request.user)
     status          = None
@@ -300,6 +371,26 @@ def mark_all_recovery_codes_as_pending_delete(request):
 @csrf_protect
 @login_required
 def email_recovery_codes(request):
+    """
+    Sends recovery codes to the authenticated user's email.
+
+    This view only accepts POST requests and is protected by CSRF and login 
+    requirements, ensuring that only authenticated users can trigger the email action.
+
+    Args:
+        request (HttpRequest): The HTTP request object containing POST data.
+
+    Returns:
+        JsonResponse: A JSON response indicating the success or failure of the 
+        email sending operation.
+
+    Notes:
+        - Only allows one email per batch.
+        - Does not validate whether the user's email address is real.
+        - Returns "not sent" if the email is invalid or fails to send.
+        - This reusable app assumes that the user of the app has already verified that the email address is valid.
+
+    """ 
    
     user       = request.user
     raw_codes  =  request.session.get("recovery_codes_state", {}).get("codes", None)
@@ -360,6 +451,17 @@ def marked_code_as_viewed(request):
     """
     Marks the code as viewed. This enables the frontend to hide
     the code after the user refreshes the page.
+
+
+    This view is protected by CSRF and login requirements,mwhich ensures that only
+    authenticated users can access the dashboard. 
+    
+    Args:
+        request (HttpRequest): The HTTP request object.
+
+    Returns:
+        JsonResponse: Returns a json response to fetch object indicating if
+        successful or not along with any error messages.
     """
     user           = request.user
     recovery_batch = RecoveryCodesBatch.get_by_user(user)
@@ -388,6 +490,16 @@ def marked_code_as_viewed(request):
 def generate_recovery_code_with_expiry(request):
     """
     Generate a batch of recovery codes for the logged-in user with an expiry.
+
+    This view is protected by CSRF and login requirements,mwhich ensures that only
+    authenticated users can access the dashboard. 
+    
+    Args:
+        request (HttpRequest): The HTTP request object.
+
+    Returns:
+        JsonResponse: Returns a json response to fetch object, and amongs other things
+         including the plain code.
     """
     return generate_recovery_code_fetch_helper(request, CACHE_KEY, generate_with_expiry_date=True)
    
@@ -398,6 +510,16 @@ def generate_recovery_code_with_expiry(request):
 def generate_recovery_code_without_expiry(request):
     """
     Generate a batch of recovery codes for the logged-in user for an indefine period.
+
+    This view is protected by CSRF and login requirements,mwhich ensures that only
+    authenticated users can access the dashboard. 
+    
+    Args:
+        request (HttpRequest): The HTTP request object.
+
+    Returns:
+        JsonResponse: Returns a json response to fetch object, and amongs other things
+         including the plain code.
     """
     return generate_recovery_code_fetch_helper(request, CACHE_KEY)
 
@@ -455,13 +577,26 @@ def verify_test_code_setup(request):
 @csrf_protect
 @login_required
 def recovery_dashboard(request):
+    """
+    Renders the recovery dashboard for authenticated users.
+
+    This view is protected by CSRF and login requirements,mwhich ensures that only
+    authenticated users can access the dashboard. 
+
+    Args:
+        request (HttpRequest): The HTTP request object.
+
+    Returns:
+        HttpResponse: The rendered recovery dashboard page.
+    """
     
     user                   = request.user
     cache_key              = CACHE_KEY.format(user.id)
     user_data              =  get_cache_with_retry(cache_key)
     context                = {}
     recovery_batch_context = get_recovery_batches_context(request)
-    
+    HAS_USER_SET_UP_KEY    = "user_has_done_setup"
+      
     if user_data is None:
 
         view_logger.debug("The cache has expired. Pulling data from db and rewriting to the cache")
@@ -472,11 +607,12 @@ def recovery_dashboard(request):
 
         if recovery_batch:
             user_data                        = recovery_batch.get_cache_values()
-            user_data["user_has_done_setup"] = RecoveryCodeSetup.has_first_time_setup_occurred(user)
+            user_data[HAS_USER_SET_UP_KEY]   = RecoveryCodeSetup.has_first_time_setup_occurred(user)
 
             view_logger.debug("Data retrieved are: is_generated=%s, is_email=%s, is_viewed=%s, is_downloaded=%s, user_has_done_setup=%s",
                                user_data.get("generated"), user_data.get("emailed"), user_data.get("viewed"),
-                               user_data.get("downloaded"), user_data.get("user_has_done_setup")
+                               user_data.get("downloaded"), user_data.get("user_has_done_setup"),
+                               user_data.get("number_used")
                     )
 
             set_cache_with_retry(cache_key, user_data)
@@ -486,9 +622,8 @@ def recovery_dashboard(request):
    
     if user_data:
 
-        request.session["is_emailed"]    = user_data.get("emailed")
-        request.session["is_viewed"]     = user_data.get("viewed")
-        request.session["is_downloaded"] = user_data.get("downloaded")
+        if set_setup_flag_if_missing_and_add_to_cache(user_data, request.user, HAS_USER_SET_UP_KEY):
+            set_cache_with_retry(cache_key, user_data)
 
         context.update({
                 "is_generated": user_data.get("generated"),
@@ -496,6 +631,8 @@ def recovery_dashboard(request):
                 "is_viewed": user_data.get("viewed"),
                 "is_downloaded": user_data.get("downloaded"),
                 "user_has_done_setup": user_data.get("user_has_done_setup"),
+                "number_used": user_data.get("number_used"),
+               
             })
         
     
@@ -508,7 +645,8 @@ def recovery_dashboard(request):
 
 
 def login_user(request):
-    """"""
+    """Logs the user into the given application"""
+
     form    = LoginForm()
     context = {}
 
@@ -546,12 +684,12 @@ def login_user(request):
                         messages.add_message(request, messages.ERROR, "The code and email is invalid")
                     
                 else:
-                    message_ban       =  f"You have already exceed the maximum number of login attempts"
-                    message_wait_time =  f"You have to wait {SecondsToTime(wait_time).format_to_human_readable()} before you can attempt to login in"
-
-                    messages.add_message(request, messages.ERROR, message_ban)
-                    messages.add_message(request, messages.ERROR, message_wait_time)
-                
+                    wait_text = SecondsToTime(wait_time).format_to_human_readable()
+                    
+                    messages.error(request, "You have already exceeded the maximum number of login attempts.")
+                    messages.error(request, f"You must wait {wait_text} before you can attempt to log in again.")
+                    messages.warning(request, "Further attempts during this period will increase the penalty.")
+                                    
     context["form"] = form
     return render(request, "django_auth_recovery_codes/login.html", context)
 

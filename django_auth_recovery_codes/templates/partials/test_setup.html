@@ -27,15 +27,16 @@
         {% if not user_has_done_setup %}
             <div class="form-container margin-top-xlg" id="verify-form-container" aria-labelledby="verify-form-label">
                 {% include "partials/partial_forms/test_setup_form.html" %}
+        
             </div>
         {% endif %}
     {% endif %}
 
-  
+    
     <div class="form-container margin-top-xlg d-none"  id="dynamic-form-setup" aria-labelledby="verify-form-label">
         {% include "partials/partial_forms/test_setup_form.html" %}
     </div> 
-    <div class="results" id="dynamic-verify-form-container">
+    <div class="results padding-top-md" id="dynamic-verify-form-container">
           <!-- Dynamic result area (hidden initially) -->
     </div>
 

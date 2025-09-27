@@ -1,30 +1,94 @@
+/**
+ * @summary Performs a one-time validation of static DOM elements via `oneTimeElementCheck`.
+ *
+ * @note This ensures required elements exist before the app starts and avoids repeated
+ *       `if (element)` checks. Dynamic elements are excluded since they may not exist
+ *       at initial load and must be checked at runtime.
+ *
+ * === One-Time DOM Element Check ===
+ *
+ * 1. Purpose
+ *    - Ensure all required elements are valid before the app starts.
+ *    - Reduce repeated `if (element)` checks in functions.
+ *
+ * --- Example without `oneTimeElementCheck` ---
+ * const form = document.getElementById("form")
+ * function someCallingFunction() {
+ *     if (form) {
+ *         // do something
+ *     }
+ * }
+ *
+ * --- Example with `oneTimeElementCheck` ---
+ * function someCallingFunction() {
+ *     form.appendChild(...)
+ * }
+ *
+ * 2. Dynamic Elements
+ *    - Elements not included in `oneTimeElementCheck` are excluded deliberately,
+ *      because they are rendered only under certain conditions.
+ *
+ *    Example:
+ *    const emailButtonElement = document.getElementById("email")
+ *
+ *    This button may be hidden by a Jinja `if` statement and only rendered
+ *    when a condition is met (e.g. after generating a code). Until then,
+ *    it does not exist in the DOM, so `emailButtonElement` will be `null`.
+ *
+ * 3. SPA Considerations
+ *    - In an SPA, parts of the page update without a full refresh.
+ *    - Dynamic elements must therefore be checked when they are used,
+ *      not during the initial load.
+ *
+ * 4. Error Handling
+ *    - Attempting to validate dynamic elements in `oneTimeElementCheck`
+ *      would cause errors, as they do not exist until after the user action
+ *      (and possible refresh) that renders them.
+ */
+
+
+// App state & utilities
 import appStateManager from "./state/appStateManager.js";
-import {toggleElement,} from "./utils.js";
+import { toggleElement,checkIfHTMLElement } from "./utils.js";
+
+// Messages & notifications
 import EnqueuedMessages from "./messages/enqueueMessages.js";
-import { handleDeleteAllCodeButtonClick, handleDeleteCodeeButtonClick } from "./helpers/handleCodeDelete.js";
-import { handleEmailCodeeButtonClick,  } from "./helpers/handleEmail.js";
-import { handleGenerateCodeWithNoExpiryClick, handleIncludeExpiryDateCheckMark } from "./helpers/handleCodeGeneration.js";
-import { handleTestCodeVerificationSetupClick } from "./codesSetupVerifcation/handleTestSetup.js";
-import { handleRegenerateCodeButtonClick } from "./helpers/handleCodeGeneration.js";
-import { handleInvalidateButtonClick } from "./helpers/handleInvalidation.js";
 import { notify_user } from "./notify.js";
-import { handleGenerateCodeWithExpiryClick } from "./helpers/handleCodeGeneration.js";
-import { loadTestVerificationElements } from "./codesSetupVerifcation/handleTestSetup.js";
-import { handleDownloadButtonClick } from "./helpers/handleDownload.js";
-import invalidateFormElement from "./helpers/handleInvalidation.js";
-import { handleInputFieldHelper } from "./helpers/handlers.js";
-import { invalidateInputFieldElement } from "./helpers/handleInvalidation.js";
-import { deleteInputFieldElement } from "./helpers/handleCodeDelete.js";
+
+// Code setup & test verification
+import { handleTestCodeVerificationSetupClick, loadTestVerificationElements } from "./codesSetupVerifcation/handleTestSetup.js";
 import testSetupInputFieldElement from "./codesSetupVerifcation/handleTestSetup.js";
+
+// Helpers
+import { handleDeleteAllCodeButtonClick, 
+       handleDeleteCodeeButtonClick, 
+       deleteInputFieldElement } from "./helpers/handleCodeDelete.js";
+import { handleDownloadButtonClick } from "./helpers/handleDownload.js";
+import { handleEmailCodeeButtonClick } from "./helpers/handleEmail.js";
+import { handleGenerateCodeWithNoExpiryClick, 
+         handleGenerateCodeWithExpiryClick, 
+         handleIncludeExpiryDateCheckMark,
+         handleRegenerateCodeButtonClick } from "./helpers/handleCodeGeneration.js";
+import { handleInvalidateButtonClick } from "./helpers/handleInvalidation.js";
+import invalidateFormElement, { invalidateInputFieldElement } from "./helpers/handleInvalidation.js";
+import { handleInputFieldHelper } from "./helpers/handlers.js";
+
 
 
 // Elements
-const recovryDashboardElement = document.getElementById("recovery-dashboard");
+const recovryDashboardElement        = document.getElementById("recovery-dashboard");
 const navigationIconContainerElement = document.getElementById("navigation-icon-elements");
 
 
+function oneTimeElementsCheck() {
+    // === Dashboard & Navigation Containers ===
+    checkIfHTMLElement(recovryDashboardElement,       "Recovery dashboard",         true);
+    checkIfHTMLElement(navigationIconContainerElement,"Navigation icons container", true);
+}
 
-// event handlers
+
+oneTimeElementsCheck();
+
 
 
 // input
@@ -37,19 +101,11 @@ if (testSetupInputFieldElement) {
 }
 
 // clicking
-
 recovryDashboardElement.addEventListener("click", handleEventDelegation);
 
 
 // invalidate code form elements
-
-
 invalidateFormElement.addEventListener("click", handleInvalidateButtonClick);
-
-
-
-
-// messages elements
 
 
 
@@ -58,21 +114,18 @@ const hamburgerOpenIcon = document.getElementById("open-hamburger-nav-icon");
 const closeXIcon = document.getElementById("close-nav-icon");
 
 
-
-
 // constants
-const REGENERATE_BUTTON_ID = "regenerate-code-btn";
-const DOWNLOAD_CODE_BTN_ID = "download-code-btn";
+const REGENERATE_BUTTON_ID                = "regenerate-code-btn";
+const DOWNLOAD_CODE_BTN_ID                = "download-code-btn";
 const GENERATE_CODE_WITH_EXPIRY_BUTTON_ID = "form-generate-code-btn";
-const GENERATE_CODE_WITH_NO_EXPIRY = "generate-code-with-no-expiry-btn";
-const CLOSE_NAV_BAR_ICON = "close-nav-icon";
-
-const VERIFY_SETUP_BUTTON = "verify-code-btn";
-const EMAIL_BUTTON_ID = "email-code-btn";
-const DELETE_CURRENT_CODE_BUTTON_ID = "delete-current-code-btn";
-const DELETE_ALL_CODES_BUTTON_ID = "delete-all-code-btn"
-const OPEN_NAV_BAR_HAMBURGERR_ICON = "open-hamburger-nav-icon";
-const EXCLUDE_EXPIRY_CHECKBOX_ID = "exclude_expiry"
+const GENERATE_CODE_WITH_NO_EXPIRY        = "generate-code-with-no-expiry-btn";
+const CLOSE_NAV_BAR_ICON                  = "close-nav-icon";
+const VERIFY_SETUP_BUTTON                 = "verify-code-btn";
+const EMAIL_BUTTON_ID                     = "email-code-btn";
+const DELETE_CURRENT_CODE_BUTTON_ID       = "delete-current-code-btn";
+const DELETE_ALL_CODES_BUTTON_ID          = "delete-all-code-btn"
+const OPEN_NAV_BAR_HAMBURGERR_ICON        = "open-hamburger-nav-icon";
+const EXCLUDE_EXPIRY_CHECKBOX_ID          = "exclude_expiry"
 
 
 const enqueuedMessages = new EnqueuedMessages();
@@ -85,8 +138,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 let alertMessage;
-
-
 
 window.addEventListener("resize", handleResetDashboardState);
 
@@ -105,7 +156,11 @@ window.addEventListener("beforeunload", function (event) {
 
 
 
-
+/**
+ * Handles event delegation for button, input, and navigation icon elements.
+ * @param {Event} e - The click event object.
+ * @returns 
+ */
 function handleEventDelegation(e) {
     const buttonElement = e.target.closest("button");
     const inputElement = e.target.closest("input");
@@ -173,7 +228,6 @@ function handleEventDelegation(e) {
         case OPEN_NAV_BAR_HAMBURGERR_ICON:
             toggleSideBarIcon(navigationIconElement)
             break;
-
         case CLOSE_NAV_BAR_ICON:
             toggleSideBarIcon(navigationIconElement);
             break;
@@ -208,9 +262,18 @@ function handleResetDashboardState() {
 
 
 
-
+/**
+ * Toggles the sidebar navigation icons and the sidebar state.
+ *
+ * This function handles the opening and closing animations of the navigation bar icons,
+ * switches the display between the hamburger and close icons,
+ *
+ * @param {HTMLElement} navIconElement - The navigation icon element that was clicked.
+ *                                        Must be either the open hamburger icon or the close icon.
+ */
 function toggleSideBarIcon(navIconElement) {
 
+    const MILLI_SECONDS = 500;
     if (navIconElement.id !== OPEN_NAV_BAR_HAMBURGERR_ICON && navIconElement.id !== CLOSE_NAV_BAR_ICON) {
         return;
     }
@@ -252,9 +315,8 @@ function toggleSideBarIcon(navIconElement) {
         }
 
 
-    }, 500);
+    }, MILLI_SECONDS);
 }
-
 
 
 

@@ -4,6 +4,9 @@ import { warnError } from "../logger.js";
 import { checkIfHTMLElement } from "../utils.js";
 
 
+/**
+ * Class to manage a queue of messages that are displayed sequentially in the UI.
+ */
 export default class EnqueuedMessages {
 
     constructor( ){

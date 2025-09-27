@@ -48,9 +48,28 @@ class ResponseDict(TypedDict):
 
 
 def _can_codes_be_generated_yet(user):
+    """
+    Determines whether a given user is allowed to generate a new set of recovery codes.
+
+    The function calls `RecoveryCodesBatch.can_generate_new_code` to check if enough time has 
+    passed since the last generation. 
+
+    Args:
+        user (User): The user object for which to check code generation eligibility.
+
+    Returns:
+        tuple:
+            - can_generate_code (bool): True if the user can generate new codes, False otherwise.
+            - wait_time (int): Time in seconds the user must wait before generating new codes.
+
+    Notes:
+        - If `RecoveryCodesBatch.can_generate_new_code` raises a ValueError, the function
+          defaults to allowing code generation with zero wait time.
+        - Logs both successful checks (debug) and handled exceptions (warning) for audit purposes.
+    """
     try:
         can_generate_code, wait_time = RecoveryCodesBatch.can_generate_new_code(user)
-        view_logger.debug(f"[RecoveryCodes] User={user.id} can_generate={can_generate_code}, wait_time={wait_time}")
+        view_logger.debug(f"[RecoveryCodes] User={user.id} can_generate={can_generate_code}, wait_time={SecondsToTime(wait_time).format_to_human_readable()}")
     except ValueError:
         can_generate_code, wait_time = True, 0
         view_logger.warning(f"[RecoveryCodes] ValueError handled for user={user.id}, defaulting can_generate=True")
@@ -117,8 +136,35 @@ def _generate_code_batch(request, generate_with_expiry_date):
     return raw_codes, batch_instance
 
 
+def set_setup_flag_if_missing_and_add_to_cache(cache_data, user, flag_name):
+    """
+    Ensures the HAS_SET_UP_FLAG is present in cache_data.
+    If missing, computes its value and updates the cache.
+    """
+    
+    if not isinstance(user, User):
+        raise ValueError(f"Expected a user instance but got {type(user).__name__}")
+    
+    if not isinstance(flag_name, str):
+        raise ValueError(f"Expected a string instance but got {type(flag_name).__name__}")
+    
+    try:
+        if flag_name not in cache_data:
+            view_logger.debug(
+                f"Flag not found in cache, setting '{flag_name}' to the cache"
+            )
+            cache_data[flag_name] = (
+                RecoveryCodeSetup.has_first_time_setup_occurred(user) or False
+            )
+            return True
+           
+    except Exception as e:
+        view_logger.debug(str(e))
+        raise 
+    return False
 
-def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  generate_with_expiry_date: bool = False):
+
+def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  generate_with_expiry_date: bool = False, regenerate_code = False):
     """
     Generate recovery codes for a user, optionally with an expiry date.
 
@@ -152,16 +198,15 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
             f"Expected the cache parameter to be a string but got object with type {type(cache_key).__name__} "
         )
 
-    cache_data       = get_cache_with_retry(CACHE_KEY.format(request.user.id), default={})    
-    HAS_SET_UP_FLAG  = 'user_has_done_setup'
-
+    cache_key   = CACHE_KEY.format(request.user.id)
+    cache_data  = get_cache_with_retry(cache_key, default={})    
+   
     view_logger.debug(f"Retrieving the cache in order to check if the user has already run test setup. Cache data: {cache_data}")
 
-    if HAS_SET_UP_FLAG not in cache_data:
+    HAS_SET_UP_FLAG = "user_has_done_setup"
 
-        view_logger.debug(f"Flag not found in cache, setting '{HAS_SET_UP_FLAG}' to the cache")
-        cache_data[HAS_SET_UP_FLAG] = RecoveryCodeSetup.has_first_time_setup_occurred(request.user) or False
-        set_cache_with_retry(CACHE_KEY, cache_data)
+    set_setup_flag_if_missing_and_add_to_cache(cache_data, request.user, HAS_SET_UP_FLAG)
+    set_cache_with_retry(cache_key, cache_data)
 
     resp = {
             "TOTAL_ISSUED": 0,
@@ -174,10 +219,14 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
             }
 
     try:
-        user                         = request.user
-        raw_codes                    = []
-        can_generate_code, wait_time = _can_codes_be_generated_yet(user)
-   
+        user       = request.user
+        raw_codes  = []
+
+        if not regenerate_code:
+             can_generate_code, wait_time = True, 0
+        else:
+             can_generate_code, wait_time = _can_codes_be_generated_yet(user)
+            
         time_to_wait = SecondsToTime(wait_time).format_to_human_readable() or None
         purge_code_logger.debug(f"[GENERATE NEW CODE] Can generate code = {can_generate_code}, wait_time = {time_to_wait}")
 
@@ -187,7 +236,7 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
 
             resp.update(
                 {
-                    "TOTAL_ISSUED": 1,
+
                     "SUCCESS": True,
                     "CODES": raw_codes,
                     "BATCH": batch_instance.get_json_values(),
@@ -198,22 +247,20 @@ def generate_recovery_code_fetch_helper(request: HttpRequest, cache_key: str,  g
             )
             view_logger.info(f"[RecoveryCodes] Generated new codes for user={user.id}, batch_id={batch_instance.id}")
 
-        elif time_to_wait is not None:
-        
+        elif wait_time:
+     
             resp.update(
                 {
-                    "MESSAGE": f"You have to wait {time_to_wait} seconds before you can request a new code",
+                    "MESSAGE": f"You have to wait {time_to_wait} before you can request a new code",
                     "SUCCESS": True,
                     "CAN_GENERATE": False,
                 }
             )
-            view_logger.info(f"[RecoveryCodes] User={user.id} must wait {wait_time}s before generating a new code")
+            view_logger.info(f"[RecoveryCodes] User={user.id} must wait {time_to_wait} before generating a new code")
     
         # session state
         request.session["recovery_codes_state"] = {"codes": raw_codes}
-        request.session["is_emailed"]           = False
-        request.session["is_downloaded"]        = False
-
+     
         # update the cache
         values_to_save_in_cache = {
             "generated": True,

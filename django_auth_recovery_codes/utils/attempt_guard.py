@@ -97,7 +97,7 @@ class AttemptGuard(Generic[T]):
         except Exception as e:
             raise Exception(f"Failed to increment attempts: {e}")
 
-    def _start_recovery_cooldown(self, remaining_seconds: int, user_instance: T) -> tuple[bool, int]:
+    def _process_recovery_cooldown_period(self, remaining_seconds: int, user_instance: T) -> tuple[bool, int]:
         """
         Start the cooldown period for the user.
 
@@ -111,8 +111,12 @@ class AttemptGuard(Generic[T]):
             Tuple[bool, int]: (allowed, remaining cooldown seconds)
         """
         self._increment_attempts(user_instance)
-        cooldown_manager.cache_key = self._cache_key
-        cooldown_manager.first_ttl = remaining_seconds
+
+        if cooldown_manager.cache_key:
+            cooldown_manager.cache_key = self._cache_key
+
+        cooldown_manager.initial_ttl = remaining_seconds
+
         return cooldown_manager.start()
 
     def _build_cache_key(self, action: str, user: User) -> str:
@@ -157,7 +161,7 @@ class AttemptGuard(Generic[T]):
         data                       = get_cache_with_retry(cache_key, default={})
         attempts                   = data.get("attempts", 0)
         next_allowed_time          = data.get("remaining_seconds", 0)
-
+        
         # Cached cooldown check
         if attempts > 0 and next_allowed_time > 0:
 
@@ -175,11 +179,13 @@ class AttemptGuard(Generic[T]):
             raise TypeError(f"{user_instance.__class__.__name__} must implement get_remaining_time_till_next_attempt()")
         
         remaining_time = user_instance.get_remaining_time_till_next_attempt()
-      
+    
         if remaining_time > 0:
+
             wait_time = SecondsToTime(remaining_time).format_to_human_readable()
+
             attempt_guard_logger.debug(f"[DB RETRIEVAL] User {user.id} cooldown period to wait: {wait_time} left")
-            return self._start_recovery_cooldown(user_instance=user_instance, remaining_seconds=remaining_time)
+            return self._process_recovery_cooldown_period(user_instance=user_instance, remaining_seconds=remaining_time)
 
         attempt_guard_logger.info(f"User {user} is now allowed to attempt another login attempt.")
 
