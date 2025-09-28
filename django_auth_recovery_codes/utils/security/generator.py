@@ -2,9 +2,12 @@ import secrets
 
 
 from django.conf import settings
+from string import punctuation
 
 
 SAFE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijklmnopqrstuvwzyz23456789"
+SAFE_TOKEN    = SAFE_ALPHABET + punctuation
+
 
 def generate_2fa_secure_recovery_code(code_length: int = 6, group_size: int = 6, separator: str = "-") -> str:
     """
@@ -51,6 +54,51 @@ def generate_2fa_secure_recovery_code(code_length: int = 6, group_size: int = 6,
         >>> generate_secure_recovery_code(code_length=4, group_size=3, separator=":")
         '4G7H:9M2P:AB3D'
     """
+ 
+    return _generate_secure_string_from_characters_helper(SAFE_ALPHABET, code_length, group_size, separator)
+ 
+
+
+def generate_secure_token(code_length: int = 10):
+    """
+    Generates a cryptographically secure token using a predefined set of characters.
+    
+    The token consists of multiple segments separated by a specified character, 
+    and is generated using `_generate_secure_string_from_characters_helper` 
+    to ensure cryptographic randomness.
+
+    Args:
+        code_length (int): The length of the code
+    Returns:
+        str: A cryptographically secure token.
+    """
+    prefix = "django_auth_recovery_2fa_token__"
+    token = _generate_secure_string_from_characters_helper(
+        SAFE_TOKEN, code_length=code_length, group_size=10, separator=""
+    )
+    return f"{prefix}{token}"
+
+
+def _generate_secure_string_from_characters_helper(characters: str, code_length: int = 6, group_size: int = 6, separator: str = "-"):
+    """
+    Generates a cryptographically secure string from a given set of characters.
+    Utilises `secrets.choice` to ensure cryptographic randomness.
+
+    Args:
+        characters (str): A string containing the characters to be used for 
+                          generating the secure string.
+        code_length (int, optional): The length of each generated segment. Defaults to 6.
+        group_size (int, optional): The number of segments to generate. Defaults to 6.
+        separator (str, optional): The string used to separate each segment. Defaults to "-".
+
+    Returns:
+        str: A cryptographically secure string composed of the specified characters.
+    """
+    MINIMUM_SECURE_LENGTH = 6
+
+    if not isinstance(characters, str):
+        raise TypeError(f"Expected a string from the characters but got object with type {type(characters)}")
+    
     if not isinstance(separator, str):
         raise TypeError(f"Expected a string from the seperator but got object with type {type(separator)}")
     
@@ -60,10 +108,15 @@ def generate_2fa_secure_recovery_code(code_length: int = 6, group_size: int = 6,
     if not isinstance(group_size, int):
         raise TypeError(f"Expected an integer for the group size but got object with type {type(group_size)}")
     
+    if code_length == 0 or code_length < MINIMUM_SECURE_LENGTH:
+        raise ValueError(f"The key is not secure enough. code_length must be {MINIMUM_SECURE_LENGTH} or greater")
+    
     secure_code = [
-        "".join(secrets.choice(SAFE_ALPHABET) for _ in range(code_length))
+        "".join(secrets.choice(characters) for _ in range(code_length))
         for _ in range(group_size)
     ]
 
     return separator.join(secure_code)
+    
 
+ 

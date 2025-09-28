@@ -7,9 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [1.0.0] - To be added
+## [1.0.0] - 28/09/2025
 
 ### Added
-- Introduced initial public release of `django_auth_recovery_codes`.
-- Is a Django app that extends any Django application and provides a robust system for generating, storing, and managing **2FA recovery codes**
-- Allows users to login using their 2FA Recovery backup code
+- Initial public release of `django_auth_recovery_codes`.
+- Lightweight Django app for generating, storing, and managing **2FA recovery codes**.
+- Provides a secure fallback login option if 2FA access is lost.
+- Supports fine-grained control and asynchronous management for better performance and UX.
+- Integrates easily into any Django project without requiring a full 2FA system.
