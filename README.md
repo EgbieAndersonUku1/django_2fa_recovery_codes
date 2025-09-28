@@ -43,6 +43,7 @@ The premises of this resuable application, is that it takes any Django applicati
 * [How to Use 2FA Recovery Codes](#how-to-use-2fa-recovery-codes)
   * [Setting up the Cache or using the default cache](#setting-up-the-cache-or-using-the-default-cache)
   * [How does the cache work?](#how-does-the-cache-work)
+  * [Using Pagination and Caching](#using-pagination-and-caching)
   * [What cache should I use?](#what-cache-should-i-use)
   * [Using Django Cache Without Configuring a Backend](#using-django-cache-without-configuring-a-backend)
   * [Django-Q vs Celery and why Django Auth Recovery codes use Django-q](#django-q-vs-celery-and-why-django-auth-recovery-codes-use-django-q)
@@ -97,6 +98,7 @@ The premises of this resuable application, is that it takes any Django applicati
   * [Configure your Settings.py file](#configure-your-settingspy-file)
   * [16. Set up the file-based email backend (for testing)](#16-set-up-the-file-based-email-backend-for-testing)
   * [17. Run the system checks](#17-run-the-system-checks)
+  * [17a. Generate a recovery code](#17a-generate-a-recovery-code)
   * [Run Services](#run-services)
   * [Create a Home View](#create-a-home-view)
   * [Access the Admin](#access-the-admin)
@@ -503,6 +505,18 @@ Imagine two requests to generate a new 2FA recovery code arrive simultaneously f
 This mechanism guarantees that cache data remains consistent, preventing conflicts and ensuring that recovery codes are always valid and reliable.
 
 ---
+
+
+### Using Pagination and Caching
+
+The application uses a **TTL cache** for paginated data. Without caching, every page refresh or navigation triggers a database query to fetch the relevant objects, which can be inefficient.
+
+With the TTL cache (how long an data is cached is determined by the setting flags, default five minutes):
+
+* Paginated query results (e.g., a history of recovery codes) are stored in memory for a set duration.
+* While the cache is valid, page refreshes or navigation read from the cache instead of hitting the database.
+* When underlying data changes, for example, a new batch of codes is generated, the database and the cache is updated, and the newly updated data from the cache is used. This ensures  that subsequent requests are up-to-date.
+
 
 ### What cache should I use?
 
@@ -1790,6 +1804,37 @@ python manage.py check
 This will raise errors if any settings are misconfigured (e.g., wrong data types).
 
 ---
+
+### 17a. Generate a recovery code 
+
+Run the follwoing command, make sure your virtual environment is active.
+This will drop you into shell but load all app modules
+
+```python
+
+python manage.py shell
+
+```
+Next run
+
+```python
+
+from django_auth_recovery_codes.utils.security.generator  import generate_secure_token
+
+# This will generate a secure cryptographically key which can use for your recovery key in the settings flag
+# code_length = 10, default this will generate a secret key that is 100 characters, adjust length as you see fit
+generate_secure_token(code_length=10)
+
+```
+
+Copy the key into your recovery key
+
+```
+DJANGO_AUTH_RECOVERY_KEY = 
+
+```
+
+
 
 ### Run Services
 

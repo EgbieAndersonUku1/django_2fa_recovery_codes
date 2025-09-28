@@ -108,7 +108,7 @@ def check_app_format_setting(app_configs: Optional[List[AppConfig]], **kwargs: A
     codes_per_page   = settings.DJANGO_AUTH_RECOVERY_CODE_PER_PAGE 
     errors           = []
 
-    if (max_code_visible == 0 and codes_per_page == 0):
+    if (max_code_visible <= 0 and codes_per_page <= 0):
         errors.append(
             Error(
                 f"One of more of the flags is 0",
@@ -163,3 +163,67 @@ def _check_flag(flag_name: str, config: Dict[str, Any], errors: List[CheckMessag
         errors.append(Error(config["error_if_wrong_type"], id=config["error_id"]))
 
 
+@register
+def check_ttl_setting(app_configs: Optional[List[AppConfig]], **kwargs: Any) -> List[CheckMessage]:
+    """
+    Validates the Django settings for recovery code caching.
+
+    This check ensures that the cache configuration is sensible:
+    1. CACHE_TTL, CACHE_MIN, and CACHE_MAX must be positive values.
+    2. CACHE_MIN cannot exceed CACHE_MAX.
+    3. CACHE_TTL must lie within the range defined by CACHE_MIN and CACHE_MAX.
+
+    These checks prevent misconfiguration that could lead to recovery codes
+    expiring too quickly or remaining in the cache indefinitely.
+
+    Returns:
+        List[CheckMessage]: A list of Django CheckMessages indicating any errors
+                            or inconsistencies in the cache settings.
+    """
+    cache_ttl = settings.DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL
+    cache_min = settings.DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN
+    cache_max = settings.DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX
+    errors = []
+
+    # Check for zero or negative values
+    if cache_min <= 0 or cache_max <= 0 or cache_ttl <= 0:
+        errors.append(
+            Error(
+                "One or more cache settings is zero or negative.",
+                "All cache settings must be positive as they determine how long "
+                "recovery codes remain in the cache.",
+                hint=(
+                    f"Current values: TTL={cache_ttl}, MIN={cache_min}, MAX={cache_max}. "
+                    "Consider setting them to positive integers, e.g., TTL=300, MIN=60, MAX=600."
+                )
+            )
+        )
+        return errors
+
+    # Ensure min is not greater than max
+    if cache_min > cache_max:
+        errors.append(
+            Error(
+                "CACHE_MIN cannot be greater than CACHE_MAX.",
+                "The minimum cache duration must not exceed the maximum.",
+                hint=(
+                    f"Current values: MIN={cache_min}, MAX={cache_max}, TTL={cache_ttl}. "
+                    "Swap the values or adjust them so that MIN <= MAX."
+                )
+            )
+        )
+
+    # Ensure TTL is within min and max range
+    if not (cache_min <= cache_ttl <= cache_max):
+        errors.append(
+            Error(
+                "CACHE_TTL is outside the min-max range.",
+                "The TTL should be between CACHE_MIN and CACHE_MAX to ensure proper caching behaviour.",
+                hint=(
+                    f"Current values: TTL={cache_ttl}, MIN={cache_min}, MAX={cache_max}. "
+                    "Adjust TTL to fall within the range defined by MIN and MAX."
+                )
+            )
+        )
+
+    return errors
