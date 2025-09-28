@@ -58,7 +58,7 @@ import fetchData from "../fetch.js";
 import { showTemporaryMessage } from "../messages/message.js";
 import { getCsrfToken } from "../security/csrf.js";
 import appStateManager from "../state/appStateManager.js";
-import { showSpinnerFor, toggleSpinner, toggleElement } from "../utils.js";
+import { showSpinnerFor, toggleSpinner, toggleElement, getOrFetchElement } from "../utils.js";
 
 // Local imports
 import messageContainerElement from "./appMessages.js";
@@ -73,10 +73,17 @@ const daysToExpiryGroupWrapperElement  = document.getElementById("days-to-expiry
 const codeActionButtons                = document.getElementById("code-actions");   
 
 // spinner elements
-const generateCodeWithExirySpinnerElement    = document.getElementById("generate-code-loader");
-const generateCodeWithNoExpirySpinnerElement = document.getElementById("generate-code-without-expiry-loader");
-const excludeSpinnerLoaderElement            = document.getElementById("exclude-expiry-loader");
-const tableCoderSpinnerElement               = document.getElementById("table-loader");
+// Loader element IDs
+const GENERATE_LOADER_ID                     = "generate-code-loader";
+const GENERATE_CODE_WITHOUT_EXPIRY_LOADER_ID = "generate-code-without-expiry-loader";
+const EXCLUDE_EXPIRY_LOADER_ID               = "exclude-expiry-loader";
+const TABLE_LOADER_ID                        = "table-loader";
+
+// Loader elements
+let generateCodeWithExirySpinnerElement    = document.getElementById(GENERATE_LOADER_ID);
+let generateCodeWithNoExpirySpinnerElement = document.getElementById(GENERATE_CODE_WITHOUT_EXPIRY_LOADER_ID);
+let excludeSpinnerLoaderElement            = document.getElementById(EXCLUDE_EXPIRY_LOADER_ID);
+let tableCoderSpinnerElement               = document.getElementById(TABLE_LOADER_ID);
 
 // button elements
 const generateButtonElement = document.getElementById("generate-code-button-wrapper");
@@ -127,7 +134,7 @@ export async function handleGenerateCodeWithExpiryClick(e, generateButtonID) {
         const resp = await handleRecoveryCodesAction({
             e: e,
             generateCodeBtn: generateButtonID,
-            generateCodeBtnSpinnerElement: generateCodeWithExirySpinnerElement,
+            generateCodeBtnSpinnerElement: getOrFetchElement(generateCodeWithExirySpinnerElement, GENERATE_LOADER_ID),
             alertAttributes: alertAttributes,
             url: "/auth/recovery-codes/generate-with-expiry/",
             daysToExpiry: daysToExpiry,
@@ -173,7 +180,7 @@ export async function handleGenerateCodeWithNoExpiryClick(e, generateCodeButtonI
     handleRecoveryCodesAction({
         e: e,
         generateCodeBtn: generateCodeButtonID,
-        generateCodeBtnSpinnerElement: generateCodeWithNoExpirySpinnerElement,
+        generateCodeBtnSpinnerElement: getOrFetchElement(generateCodeWithNoExpirySpinnerElement, GENERATE_CODE_WITHOUT_EXPIRY_LOADER_ID),
         alertAttributes: alertAttributes,
         url: "/auth/recovery-codes/generate-without-expiry/",
 
@@ -248,7 +255,7 @@ export async function handleRegenerateCodeButtonClick(e, regenerateButtonID, ale
  */
 export function handleIncludeExpiryDateCheckMark(e, milliseconds = 1000 ) {
 
-    showSpinnerFor(excludeSpinnerLoaderElement, milliseconds);
+    showSpinnerFor(getOrFetchElement(excludeSpinnerLoaderElement, EXCLUDE_EXPIRY_LOADER_ID), milliseconds);
 
     const excludeInputFieldCheckElement = e.target;
 
@@ -384,6 +391,7 @@ function handleCancelMessage(message = "No, codes were generated, since the acti
 function handleGenerateBaseMessage(message, milliseconds = 5000) {
     showTemporaryMessage(messageContainerElement, message);
 
+    tableCoderSpinnerElement               = getOrFetchElement(tableCoderSpinnerElement, TABLE_LOADER_ID);
     tableCoderSpinnerElement.style.display = "none";
     toggleSpinner(tableCoderSpinnerElement, false);
 

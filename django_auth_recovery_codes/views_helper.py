@@ -149,6 +149,10 @@ def set_setup_flag_if_missing_and_add_to_cache(cache_data, user, flag_name):
         raise ValueError(f"Expected a string instance but got {type(flag_name).__name__}")
     
     try:
+
+        if not isinstance(cache_data, dict):
+            raise ValueError(f"Expected cache_data to be a dict but got {type(cache_data).__name__}")
+        
         if flag_name not in cache_data:
             view_logger.debug(
                 f"Flag not found in cache, setting '{flag_name}' to the cache"
