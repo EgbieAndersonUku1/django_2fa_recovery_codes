@@ -1165,10 +1165,10 @@ button {
 #process-message {
     width: 50%;
     position: fixed;
-    bottom: 3%;
+    bottom: 0;
     display: none;
-    left: 2%;
-    padding: 6px 8px;
+    left: 2px;
+    padding: 4px 8px;
  
    
 }
@@ -1203,7 +1203,7 @@ button {
 #messages,
 #notification {
     position: fixed;
-    left: 10px;
+    left: 2px;
     bottom: 0;
     width: 50%;
     background: #28a745;
@@ -1245,6 +1245,11 @@ button {
     color: black;
 }
 
+#notifications {
+ padding: 6px 8px;
+}
+
+
 /* Show animation: float up, hold, then slide down */
 #notification.show,
 #messages.show {
@@ -1273,7 +1278,7 @@ button {
         animation-timing-function: ease-out;
     }
     40%, 50%, 70% {
-        transform: translateY(-70px);
+        transform: translateY(-75px);
         animation-timing-function: linear;
     }
     100% {

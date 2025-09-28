@@ -57,10 +57,15 @@ import { toggleButtonDisabled}                  from "../utils.js";
 import { toggleProcessMessage }                 from "./handleButtonAlertClicker.js";
 import { showTemporaryMessage }                 from "../messages/message.js";
 import { markCurrentCardBatchAsEmailed }        from "../batchCardsHistory/updateBatchHistorySection.js";
+import { getOrFetchElement }                    from "../utils.js";
 
 
-const emailButtonSpinnerElement = document.getElementById("email-code-loader");
+const EMAIL_LOADER_ID           = "email-code-loader";
+let emailButtonSpinnerElement   = document.getElementById(EMAIL_LOADER_ID); // Dynamic, doesn't exist at runtime
 const enqueuedMessages          = new EnqueuedMessages();
+
+
+
 
 
 
@@ -93,7 +98,7 @@ export async function handleEmailCodeeButtonClick(e, emailButtonID) {
 
     const resp = await handleButtonAlertClickHelper(e,
                                                     emailButtonID,
-                                                    emailButtonSpinnerElement,
+                                                    getOrFetchElement(emailButtonSpinnerElement, EMAIL_LOADER_ID),
                                                     alertAttributes, 
                                                     handleEmailFetchApiSend
                                                     );

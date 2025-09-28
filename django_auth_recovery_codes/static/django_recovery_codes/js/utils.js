@@ -587,3 +587,18 @@ export function clearElement(element) {
 
     element.innerHTML = "";
 }
+
+
+/**
+ * Fetches a DOM element by ID and caches it in a variable.
+ *
+ * @param {HTMLElement|null} cachedElement - The current cached reference (may be null/undefined).
+ * @param {string} elementId - The ID of the DOM element to fetch.
+ * @returns {HTMLElement|null} The cached element or the newly fetched one.
+ */
+export function getOrFetchElement(cachedElement, elementId) {
+    if (!cachedElement) {
+        cachedElement = document.getElementById(elementId);
+    }
+    return cachedElement;
+}

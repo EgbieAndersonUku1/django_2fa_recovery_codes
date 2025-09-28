@@ -62,7 +62,7 @@ export function showTemporaryMessage(container, message, duration = 6000) {
  * // Messages will appear one by one in #message-box,
  * // each visible for ~6s, staggered 500ms apart.
  */
-export async function showEnqueuedMessages(enqueueMessages, container, duration = 6000, stagger = 3000) {
+export async function showEnqueuedMessages(enqueueMessages, container, duration = 6000, stagger = 4000) {
     if (enqueueMessages.length === 0) {
         warnError("showEnqueuedMessages", "The enqueueMessages is empty")
         return;

@@ -237,10 +237,14 @@ def download_code(request):
     """
     user = request.user
 
-    cache = get_cache_or_set(CACHE_KEY.format(user.id), 
-                             value_or_func=lambda: RecoveryCodesBatch.get_by_user(user=user).get_cache_values(),
-                              ttl=TTL
-                            )
+    try:
+        cache = get_cache_or_set(CACHE_KEY.format(user.id), 
+                                value_or_func=lambda: RecoveryCodesBatch.get_by_user(user=user).get_cache_values(),
+                                ttl=TTL
+                                )
+    except AttributeError:
+        cache = {}
+        
     if cache and cache.get("downloaded"):
         return JsonResponse({
             "SUCCESS": False,
@@ -348,7 +352,8 @@ def mark_all_recovery_codes_as_pending_delete(request):
         # removes the raw codes from the session to ensure that it can't be downloaded or emailed 
         # when the frontend buttons are clicked
         request.session.get("recovery_codes_state", {}).pop("codes", None)  
-        set_cache(CACHE_KEY.format(request.user.id), recovery_batch.reset_cache_values(), TTL)
+        recovery_batch.reset_cache_values()
+        set_cache(CACHE_KEY.format(request.user.id), recovery_batch.get_cache_values(), TTL)
       
 
         data.update({

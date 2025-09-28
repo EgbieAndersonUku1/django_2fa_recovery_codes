@@ -52,22 +52,27 @@ import { handleFormSubmissionHelper }   from "./formUtils.js";
 import { handleButtonAlertClickHelper } from "./handleButtonAlertClicker.js";
 import fetchData                        from "../fetch.js";
 import { getCsrfToken }                 from "../security/csrf.js";
-import { checkIfHTMLElement }           from "../utils.js";
+import { checkIfHTMLElement, 
+         getOrFetchElement }            from "../utils.js";
 import { toggleElement }                from "../utils.js";
 import { AlertUtils }                   from "../alerts.js";
 import { doNothing }                    from "../utils.js";
 import { toggleProcessMessage }         from "./handleButtonAlertClicker.js";
 import { markCardAsDeleted }            from "../batchCardsHistory/markCardAsDeleted.js";
 import { getCurrentCard }               from "../batchCardsHistory/updateBatchHistorySection.js";
+import { clearElement }                 from "../utils.js";
 
 
 
 export const deleteInputFieldElement      = document.getElementById("delete-code-input");
 
+const DELETE_ALL_LOADER_ID                = "delete-all-code-loader"
 const testSetupFormContainerElement       = document.getElementById("dynamic-verify-form-container");
-const deleteAllCodeButtonSpinnerElement   = document.getElementById("delete-all-code-loader");
+const deleteAllCodeButtonSpinnerElement   = document.getElementById(DELETE_ALL_LOADER_ID); // Dynamic, doesn't exist at runtime
 const deleteCodeButtonSpinnerElement      = document.getElementById("delete-current-code-loader");
 const deleteFormElement                   = document.getElementById("delete-form");
+const pageCodeActionButtonsElements       = document.getElementById("page-buttons");
+const tableCodeElements                   = document.getElementById("table-code-view");
 
 
 
@@ -84,8 +89,9 @@ const deleteFormElement                   = document.getElementById("delete-form
 export function oneTimeElementsCheck() {
     checkIfHTMLElement(deleteInputFieldElement,        "Delete input field",        true);
     checkIfHTMLElement(testSetupFormContainerElement,  "Test setup form container", true);
-    checkIfHTMLElement(deleteCodeButtonSpinnerElement, "Delete code button spinner",true);
     checkIfHTMLElement(deleteFormElement,              "Delete form",               true);
+    checkIfHTMLElement(pageCodeActionButtonsElements,  "Buttons containings action buttons set", true);
+    checkIfHTMLElement(tableCodeElements,              "Table containing codes",     true);
 }
 
 // call immediately
@@ -243,7 +249,7 @@ export async function handleDeleteCodeeButtonClick(e, deleteButtonID) {
  * Note: The process can only be done once meaning 
  * @param {Event} e - The click event triggered by the button.
  */
-export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID, alertMessage) {
+export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID) {
 
     const alertAttributes = {
         title: "Delete All codes?",
@@ -270,7 +276,7 @@ export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID,
 
     const resp = await handleButtonAlertClickHelper(e,
                         deleteAllCodesButtonID,
-                        deleteAllCodeButtonSpinnerElement,
+                        getOrFetchElement(deleteAllCodeButtonSpinnerElement, DELETE_ALL_LOADER_ID),
                         alertAttributes,
                         handleDeleteAllCodesApiRequest,
                     )
@@ -280,6 +286,7 @@ export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID,
         return;
     }
 
+    console.log(resp)
     if (resp.SUCCESS) {
 
         const {codeActionButtons, tableCodes} = getDynamicCodeUIElements();
@@ -294,16 +301,20 @@ export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID,
         toggleCodeUIElementsOff(codeActionButtons, tableCodes);
         showSuccessDeleteAlert();
         toggleAlertAndFormElements();
+        clearElement(pageCodeActionButtonsElements);
+        clearElement(tableCodeElements);
 
         try {
             toggleElement(testSetupFormElement)
         } catch (error) {
             doNothing();
+            toggleProcessMessage(false);
             }
 
         }  else {
              toggleProcessMessage(false);
-     }
+
+     } 
 
 } 
 

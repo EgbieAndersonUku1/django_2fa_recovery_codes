@@ -58,9 +58,11 @@ import { buttonStates }                        from "../generateCodeActionButton
 import { logError, warnError }                 from "../logger.js";
 import { toggleProcessMessage }                from "./handleButtonAlertClicker.js";
 import { markCurrentCardBatchAsDownload }      from "../batchCardsHistory/updateBatchHistorySection.js";
+import { getOrFetchElement }                   from "../utils.js";
 
+const DOWNLOAD_LOADER_ID               = "download-code-loader";
+let   downloadCodeButtonElementSpinner = document.getElementById(DOWNLOAD_LOADER_ID); // Dynamic, doesn't exist at runtime
 
-const downloadCodeButtonElementSpinner = document.getElementById("download-code-loader");
 
 
 /**
@@ -280,7 +282,7 @@ export async function handleDownloadButtonClick(e, downloadButtonID) {
     const resp = await handleButtonAlertClickHelper(e,
                                                     downloadButtonID,
                                                     {},
-                                                    downloadCodeButtonElementSpinner,
+                                                    getOrFetchElement(downloadCodeButtonElementSpinner, DOWNLOAD_LOADER_ID),
                                                     handleDownloadCodesApiRequest,
                                                      )
 
