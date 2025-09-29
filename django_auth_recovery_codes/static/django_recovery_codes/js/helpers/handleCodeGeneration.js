@@ -69,29 +69,29 @@ import { populateTableWithUserCodes } from "./tableUtils.js";
 import { generaterecoveryBatchSectionElement, recoveryBatchSectionElement } from "../batchCardsHistory/batchCardElements.js";
 
 // The elemnts are not checked
-const daysToExpiryGroupWrapperElement  = document.getElementById("days-to-expiry-group");
-const codeActionButtons                = document.getElementById("code-actions");   
+const daysToExpiryGroupWrapperElement = document.getElementById("days-to-expiry-group");
+const codeActionButtons = document.getElementById("code-actions");
 
 // spinner elements
 // Loader element IDs
-const GENERATE_LOADER_ID                     = "generate-code-loader";
+const GENERATE_LOADER_ID = "generate-code-loader";
 const GENERATE_CODE_WITHOUT_EXPIRY_LOADER_ID = "generate-code-without-expiry-loader";
-const EXCLUDE_EXPIRY_LOADER_ID               = "exclude-expiry-loader";
-const TABLE_LOADER_ID                        = "table-loader";
+const EXCLUDE_EXPIRY_LOADER_ID = "exclude-expiry-loader";
+const TABLE_LOADER_ID = "table-loader";
 
 // Loader elements
-let generateCodeWithExirySpinnerElement    = document.getElementById(GENERATE_LOADER_ID);
+let generateCodeWithExirySpinnerElement = document.getElementById(GENERATE_LOADER_ID);
 let generateCodeWithNoExpirySpinnerElement = document.getElementById(GENERATE_CODE_WITHOUT_EXPIRY_LOADER_ID);
-let excludeSpinnerLoaderElement            = document.getElementById(EXCLUDE_EXPIRY_LOADER_ID);
-let tableCoderSpinnerElement               = document.getElementById(TABLE_LOADER_ID);
+let excludeSpinnerLoaderElement = document.getElementById(EXCLUDE_EXPIRY_LOADER_ID);
+let tableCoderSpinnerElement = document.getElementById(TABLE_LOADER_ID);
 
 // button elements
 const generateButtonElement = document.getElementById("generate-code-button-wrapper");
 
 // forms elements
 const generateCodeWithExpiryFormElement = document.getElementById("generate-form-code-with-expiry");
-const dynamicTestFormSetupElement       = document.getElementById("dynamic-form-setup");
-const verifyTestFormContainer           = document.getElementById("verify-form-container");
+const dynamicTestFormSetupElement = document.getElementById("dynamic-form-setup");
+const verifyTestFormContainer = document.getElementById("verify-form-container");
 
 
 
@@ -217,10 +217,10 @@ export async function handleRegenerateCodeButtonClick(e, regenerateButtonID, ale
     }
 
     if (!alertMessage) {
-         toggleElement(alertMessage);
+        toggleElement(alertMessage);
 
     }
-   
+
     handleRecoveryCodesAction({
         e: e,
         generateCodeBtn: regenerateButtonID,
@@ -253,7 +253,7 @@ export async function handleRegenerateCodeButtonClick(e, regenerateButtonID, ale
  * @param {Event} e - The event triggered by clicking the checkbox.
  * @returns {void}
  */
-export function handleIncludeExpiryDateCheckMark(e, milliseconds = 1000 ) {
+export function handleIncludeExpiryDateCheckMark(e, milliseconds = 1000) {
 
     showSpinnerFor(getOrFetchElement(excludeSpinnerLoaderElement, EXCLUDE_EXPIRY_LOADER_ID), milliseconds);
 
@@ -306,36 +306,55 @@ function handleCanGenerateCodeSuccessUI(resp) {
 
     toggleElement(generaterecoveryBatchSectionElement);
 
-    const isPopulated   = populateTableWithUserCodes(resp.CODES);
+    const isPopulated = populateTableWithUserCodes(resp.CODES);
     const MILLI_SECONDS = 5000;
-
+  
     if (isPopulated) {
 
         sendPostFetchWithoutBody("/auth/recovery-codes/viewed/", "Failed to mark code as viewed ");
         updateBatchHistorySection(recoveryBatchSectionElement, resp.BATCH, resp.ITEM_PER_PAGE);
-        toggleElement(codeActionButtons, false);
+
+     
+        if (!appStateManager.isRequestCodeGenerationActive()) {           
+            toggleElement(codeActionButtons, false);
+        } 
 
         appStateManager.setCodeGeneration(false);
-
-        // show the optional verification form
-        // toggleElement(testSetupFormContainerElement, false);
-        if (!resp.HAS_COMPLETED_SETUP) {
-
-            if (!verifyTestFormContainer) {
-                console.log("The static verify form is hidden due to django if-statement, display dynamic one instead")
-                toggleElement(dynamicTestFormSetupElement, false);
-            }
-          
-            loadTestVerificationElements();
-        }
+        handleInitializeFirstTimeVerificationTest(resp);
+     
 
     }
 
-      setTimeout(() => {
-                toggleProcessMessage(false);
-            }, MILLI_SECONDS)
+    setTimeout(() => {
+        toggleProcessMessage(false);
+    }, MILLI_SECONDS)
     return true;
 }
+
+
+
+/**
+ * Initializes the verification test setup for users running it for the first time.
+ *
+ * If the user has not completed the initial setup (`HAS_COMPLETED_SETUP` is false):
+ *   - Displays the dynamic verification form if the static form container is hidden.
+ *   - Loads additional elements required for the verification test.
+ *
+ * @param {Object} resp - The server response object containing user setup status.
+ * @param {boolean} resp.HAS_COMPLETED_SETUP - Indicates whether the user has completed the setup.
+ */
+function handleInitializeFirstTimeVerificationTest(resp) {
+    if (!resp.HAS_COMPLETED_SETUP) {
+
+        if (!verifyTestFormContainer) {
+            console.log("The static verify form is hidden due to Django if-statement; displaying dynamic form instead");
+            toggleElement(dynamicTestFormSetupElement, false);
+        }
+
+        loadTestVerificationElements();
+    }
+}
+
 
 
 /**
@@ -346,7 +365,7 @@ function handleCanGenerateCodeSuccessUI(resp) {
  * @param {number} [milliseconds=5000] - Duration to show the error message in milliseconds.
  * @param {string} [message="Oops, something went wrong and your request wasn't processed"] - Error message to display.
  */
-function handleCannotGenerateCodeError(milliseconds = 5000, message  = "OOps, something went wrong and your request wasn't processed") {
+function handleCannotGenerateCodeError(milliseconds = 5000, message = "OOps, something went wrong and your request wasn't processed") {
     handleGenerateBaseMessage(message, milliseconds);
 }
 
@@ -391,7 +410,7 @@ function handleCancelMessage(message = "No, codes were generated, since the acti
 function handleGenerateBaseMessage(message, milliseconds = 5000) {
     showTemporaryMessage(messageContainerElement, message);
 
-    tableCoderSpinnerElement               = getOrFetchElement(tableCoderSpinnerElement, TABLE_LOADER_ID);
+    tableCoderSpinnerElement = getOrFetchElement(tableCoderSpinnerElement, TABLE_LOADER_ID);
     tableCoderSpinnerElement.style.display = "none";
     toggleSpinner(tableCoderSpinnerElement, false);
 
@@ -469,7 +488,7 @@ async function handleRecoveryCodesAction({ e,
 
     tableCoderSpinnerElement.style.display = "inline-block";
     toggleSpinner(tableCoderSpinnerElement);
-    
+
     const resp = await handleButtonAlertClickHelper(e,
         generateCodeBtn,
         generateCodeBtnSpinnerElement,
@@ -477,28 +496,28 @@ async function handleRecoveryCodesAction({ e,
         handleGenerateCodeFetchApi
     )
 
-  
+    // if no action was perform e.g cancelled, show the buttons
     if (!resp) {
         handleCancelMessage();
         toggleElement(codeActionButtons, false);
         toggleProcessMessage(false);
-       return;
+        return;
     }
 
     if (resp.SUCCESS) {
-    
+
         if (resp.CAN_GENERATE) {
 
             handleCanGenerateCodeSuccessUI(resp);
-        
+
         } else {
             handleCannotGenerateCodeUI(resp);
-        
+
         }
-       
+
     } else {
         handleCannotGenerateCodeError();
-   
+
     }
 
     toggleElement(codeActionButtons, false);
@@ -523,7 +542,7 @@ async function handleRecoveryCodesAction({ e,
  */
 function handleSuccessOperationAlertAndUpdate(data, successCompareMessage, fieldName) {
     const icon = data.ALERT_TEXT === successCompareMessage ? "success" : "info";
-
+   
     AlertUtils.showAlert({
         title: data.ALERT_TEXT,
         text: data.MESSAGE,
@@ -532,7 +551,7 @@ function handleSuccessOperationAlertAndUpdate(data, successCompareMessage, field
     });
 
     if (icon === "success") {
-        updateCurrentRecoveryCodeBatchCard(recoveryBatchSectionElement, fieldName);
+        updateCurrentRecoveryCodeBatchCard(fieldName);
     }
 }
 
@@ -566,7 +585,7 @@ function handleFailureOperationAlertAndUpdate() {
  * This is used for general validation errors where the code entered is not recognized.
  */
 function handleErrorOperationAlertAndUpdate() {
-     AlertUtils.showAlert({
+    AlertUtils.showAlert({
         title: "The code is invalid",
         text: "The code entered is an invalid code",
         icon: "error",
@@ -601,12 +620,11 @@ export function handleRecoveryCodeAlert(data, successCompareMessage, fieldName) 
     if (data && Object.hasOwn(data, "SUCCESS")) {
 
         if (data.OPERATION_SUCCESS) {
-            
-            return handleSuccessOperationAlertAndUpdate(data, successCompareMessage, fieldName); 
+            return handleSuccessOperationAlertAndUpdate(data, successCompareMessage, fieldName);
         }
-        
+
         return handleFailureOperationAlertAndUpdate();
-        
+
     }
 
     return handleErrorOperationAlertAndUpdate();

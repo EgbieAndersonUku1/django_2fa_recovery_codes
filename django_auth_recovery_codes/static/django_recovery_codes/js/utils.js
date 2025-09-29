@@ -25,19 +25,22 @@ export function showSpinnerFor(spinnerElement, timeToDisplay = 500) {
 
 
 /**
- * Toggles the visibility of the spinner.
- * 
- * This function shows or hides the spinner by setting its display property to either 'block' or 'none'.
- * 
- * @param {boolean} [show=true] - A boolean indicating whether to show or hide the spinner.
- *                               If `true`, the spinner is shown; if `false`, it is hidden.
+ * Toggles the visibility of a spinner element.
+ *
+ * This function shows or hides the spinner by adding or removing the
+ * "show-spinner" class and, if necessary, setting its `display` style
+ * to 'none' to ensure it is hidden.
+ *
+ * @param {HTMLElement} spinnerElement - The spinner element to toggle.
+ * @param {boolean} [show=true] - Whether to show or hide the spinner.
+ *                                `true` shows the spinner, `false` hides it.
+ * @param {boolean} [silent=true] - If `false`, logs a message when the
+ *                                  element is not found. If `true`, suppresses messages.
  */
-export function toggleSpinner(spinnerElement, show=true) {
-   
-    if (!checkIfHTMLElement(spinnerElement, "spinner element")) {
-        console.log("spinner not found")
-        return;
-    };
+export function toggleSpinner(spinnerElement, show = true, silent = true) {
+    if (!checkIfHTMLElement(spinnerElement, "spinner element", silent)) {
+        return false;
+    }
 
     if (show) {
         spinnerElement.classList.add("show-spinner");
@@ -46,9 +49,8 @@ export function toggleSpinner(spinnerElement, show=true) {
 
     spinnerElement.classList.remove("show-spinner");
     spinnerElement.style.display = "none"; // force hide in case class removal doesn’t work
-
-   
 }
+
 
 
 /**
@@ -87,34 +89,46 @@ export function formatIsoDate(isoDate, locale = "en-GB") {
 }
 
 
-export function checkIfHTMLElement(element, elementName = "Unknown") {
+export function checkIfHTMLElement(element, elementName = "Unknown", silent = false) {
     const msg = `Could not find the element: '${elementName}'. Ensure the selector is correct.`;
-    return checkIfCorrectHTMLElementHelper(element, HTMLElement, msg);
+    return checkIfCorrectHTMLElementHelper(element, HTMLElement, msg, silent);
 
 }
 
 
-export function checkIfFormHTMLElement(formElement) {
+export function checkIfFormHTMLElement(formElement, silent = false) {
     const msg = `The element entered is not a form element. Expected a form element got ${typeof formElement}`;
-    return checkIfCorrectHTMLElementHelper(formElement, HTMLFormElement, msg)  
+    return checkIfCorrectHTMLElementHelper(formElement, HTMLFormElement, msg, silent)  
     
 }
 
 
-export function checkIfInputHTMLElement(inputElement) {
+export function checkIfInputHTMLElement(inputElement, silent) {
     const msg = `The element entered is not a form element. Expected a form element got ${typeof inputElement}`;
-    return checkIfCorrectHTMLElementHelper(inputElement, HTMLInputElement, msg);
+    return checkIfCorrectHTMLElementHelper(inputElement, HTMLInputElement, msg, silent);
   
 }
 
 
-function checkIfCorrectHTMLElementHelper(element, htmlElement, msg, throwError = false) {
+/**
+ * Checks whether an element is an instance of a specified HTML element type.
+ *
+ * @param {any} element - The element to check.
+ * @param {Function} htmlElement - The expected constructor, e.g., HTMLElement, HTMLDivElement.
+ * @param {string} msg - Message to log or throw if the check fails.
+ * @param {boolean} [throwError=false] - Whether to throw an error if the check fails.
+ * @param {boolean} [silent=false] - If true, suppresses console warnings.
+ * @returns {boolean} True if the element is of the expected type, false otherwise.
+ */
+function checkIfCorrectHTMLElementHelper(element, htmlElement, msg, throwError = false, silent = false) {
     if (!(element instanceof htmlElement)) {
-        console.error(msg);
+        if (!silent) {
+            warnError("checkIfCorrectHTMLElementHelper", msg);
+            return false;
+        }
         if (throwError) {
             throw new Error(msg);
         }
-
         return false;
     }
     return true;
@@ -150,7 +164,8 @@ export function applyDashToInput(e, lengthPerDash=5, digitsOnly=false) {
   
     if (!value) return;
     if (!Number.isInteger(lengthPerDash)) {
-        console.error(`The lengthPerDash must be integer. Expected an integer but got ${typeof lengthPerDash}`);
+        const msg = `The lengthPerDash must be integer. Expected an integer but got ${typeof lengthPerDash}`;
+        warnError("applyDashToInput", msg);
     };
 
     let santizeValue   = sanitizeText(value, digitsOnly);

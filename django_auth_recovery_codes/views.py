@@ -76,6 +76,9 @@ def recovery_codes_regenerate(request):
         for the frontend
     
     """
+    request.session["is_downloaded"] = False
+    request.session["is_emailed"]    = False
+    request.session["force_update"]  = True
     return generate_recovery_code_fetch_helper(request, CACHE_KEY, regenerate_code = True)
    
 
@@ -251,10 +254,10 @@ def download_code(request):
             "MESSAGE": "You have already downloaded your codes, only one download per batch"
         }, status=200)
       
-    
     raw_codes = request.session.get("recovery_codes_state", {}).get("codes", [])
 
     if not raw_codes:
+        request.session["is_downloaded"] = False
         return JsonResponse({
             "SUCCESS": False,
             "MESSAGE": "You logged or out before downloading the codes or hit the regenerate button, and due to security reasons you can no longer download the codes"
@@ -301,7 +304,6 @@ def download_code(request):
     response["Content-Disposition"]  = f'attachment; filename="{file_name}"'
     response["X-Success"]            = "true"
     
-    request.session["is_downloaded"] = False
     request.session["force_update"]  = True
 
     return response
@@ -683,6 +685,7 @@ def login_user(request):
                     if code:
 
                         code.mark_code_as_used()
+                        request.session["force_update"] = True
                         login(request, user)
                         return redirect(reverse("recovery_dashboard"))
                     else:

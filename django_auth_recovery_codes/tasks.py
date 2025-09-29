@@ -54,8 +54,7 @@ def purge_all_expired_batches(*args, **kwargs):
     Scheduled task to purge all expired recovery codes.
     Uses kwargs to ensure all arguments reach the function reliably.
     """
-    retention_days = kwargs.get("retention_days", settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS)
-
+    retention_days     = kwargs.get("retention_days", settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS)
     bulk_delete        = kwargs.get("bulk_delete", True)
     use_with_logger    = kwargs.get("use_with_logger", settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER)
     delete_empty_batch = kwargs.get("delete_empty_batch", True)
@@ -75,19 +74,17 @@ def purge_all_expired_batches(*args, **kwargs):
     purge_code_logger.debug("[RecoveryCodes] Found %s batches to check", batches.count())
 
     for batch in batches:
-        purged_count, is_empty = batch.purge_expired_codes(
 
-            retention_days=retention_days,
-            delete_empty_batch=delete_empty_batch,
-        )
+        purged_count, is_empty, batch_id = batch.purge_expired_codes(retention_days=retention_days, delete_empty_batch=delete_empty_batch)
 
         if purged_count > 0:
             total_purged += purged_count
             total_batches += 1
-            batch_report = _generate_purged_batch_code_json_report(batch, purged_count, is_empty)
+            batch_report = _generate_purged_batch_code_json_report(batch, purged_count, is_empty, batch_id)
             purged_batches_info.append(batch_report)
 
             purge_code_logger.info(f"[RecoveryCodes] Batch purged | user_id={batch.user.id}, batch_id={batch.id}, purged_count={purged_count}, is_empty={is_empty}")
+                
         else:
             total_skipped += 1
             purge_code_logger.debug(
@@ -95,11 +92,12 @@ def purge_all_expired_batches(*args, **kwargs):
                 batch.user.id, batch.id, purged_count
             )
 
-    RecoveryCodePurgeHistory.objects.create(
-        total_codes_purged=total_purged,
-        total_batches_purged=total_batches,
-        retention_days=retention_days,
-    )
+    if total_batches > 0 or total_purged > 0:
+        RecoveryCodePurgeHistory.objects.create(
+            total_codes_purged=total_purged,
+            total_batches_purged=total_batches,
+            retention_days=retention_days,
+        )
 
     purge_code_logger.info(
         "[RecoveryCodes] Purge complete | total_batches_purged=%s, total_codes_purged=%s, "
@@ -107,11 +105,15 @@ def purge_all_expired_batches(*args, **kwargs):
         total_batches, total_purged, total_skipped, timezone.now()
     )
 
-    return {
+    result = {
         "reports": purged_batches_info,
         "use_with_logger": bool(use_with_logger),
         "schedule_name" : schedule_name,
+        "total_batches_removed": total_batches,
     }
+
+    purge_code_logger.info(f"[RecoveryCodes] Returning result: {result}")
+    return result
 
 
 
@@ -141,7 +143,7 @@ def clean_up_old_audits_task():
     return deleted
 
 
-def _generate_purged_batch_code_json_report(batch: RecoveryCodesBatch, purged_count: int, is_empty: bool) -> dict:
+def _generate_purged_batch_code_json_report(batch: RecoveryCodesBatch, purged_count: int, is_empty: bool, batch_id: str) -> dict:
     """
     Creates a JSON report for a purged batch of 2FA recovery codes.
 
@@ -170,6 +172,7 @@ def _generate_purged_batch_code_json_report(batch: RecoveryCodesBatch, purged_co
         batch (RecoveryCodesBatch): The purged batch instance.
         purged_count (int): Number of codes deleted during purge.
         is_empty (bool): Whether the batch is now empty after deletion.
+        batch_id (str): The batch id for the given batch
 
     Raises:
         TypeError:
@@ -216,12 +219,12 @@ def _generate_purged_batch_code_json_report(batch: RecoveryCodesBatch, purged_co
         raise TypeError(f"The `is_empty` parameter is not a boolean. Expected a boolean object but got an object with type {type(is_empty).__name__}")
     
     purged_batch_info = {
-                            "id": batch.id,
+                            "id": batch_id,
                             "number_issued": batch.number_issued,
                             "number_removed": purged_count,
                             "is_batch_empty": is_empty,
                             "number_used": batch.number_used,
-                            "number_remaining_in_batch": (batch.number_issued - batch.number_used),
+                            "number_remaining_in_batch": batch.active_codes_remaining,
                             "user_issued_to": batch.user.username,
                             "batch_creation_date": batch.created_at,
                             "last_modified": batch.modified_at,
@@ -232,6 +235,7 @@ def _generate_purged_batch_code_json_report(batch: RecoveryCodesBatch, purged_co
                             "was_codes_viewed": batch.viewed,
                             "was_code_generated": batch.generated,
             }
+
     return purged_batch_info
 
 
@@ -300,7 +304,7 @@ def hook_email_purge_report(task):
             .add_email_sender_instance(email_sender)    
             .from_address(settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER)
             .to(settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL)
-            .with_context({"report": reports, "username": settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL})
+            .with_context({"reports": reports, "username": settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL})
             .with_subject(subject)
             .with_html_template(html, "recovery_codes_deletion")
             .with_text_template(text, "recovery_codes_deletion")

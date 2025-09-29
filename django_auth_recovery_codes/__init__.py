@@ -14,7 +14,7 @@ def notify_user(user_id: int, message: str):
     if message:
         messages.append(message)
 
-    set_cache(key, messages, ttl=60)
+    set_cache(key, messages, ttl=3600)
 
 
 default_app_config = "django_auth_recovery_codes.apps.DjangoAuthRecoveryCodesConfig"

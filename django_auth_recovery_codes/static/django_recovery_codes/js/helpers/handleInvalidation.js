@@ -140,6 +140,7 @@ export async function handleInvalidateButtonClick(e) {
         handleInvalidateCodeFetchAPI
     );
 
+  
 
     handleRecoveryCodeAlert(data, "Code successfully deactivated", "invalidate");
 

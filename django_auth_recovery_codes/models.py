@@ -13,7 +13,7 @@ from django.db.models.query      import QuerySet
 from django.conf                 import settings
 from django.utils                import timezone
 from django_email_sender.models  import EmailBaseLog
-from typing                      import Tuple
+from typing                      import Self, Tuple
 
 from django_auth_recovery_codes.app_settings import default_max_login_attempts
 from django_auth_recovery_codes.base_models import (
@@ -316,7 +316,12 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         """A string representation of the model"""
 
         return f"Batch {self.id} for {self.user or 'Deleted User'}"
-       
+
+    @property
+    def active_codes_remaining(self):
+        """Returns the active code still remaining"""
+        return self.number_issued - self.number_used   
+        
     @classmethod
     def can_generate_new_code(cls, user: User) -> tuple[bool, int]:
         """
@@ -457,9 +462,6 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
 
             if batch_size and isinstance(batch_size, int):
 
-                deleted_counts = []  # track individual deletion counts; avoids rebinding immutable integers on each increment which is more memory efficient
-                                     # than deleted_count += deleted_count. Calls sum at the end to get the result
-
                 while expired_codes.exists():
 
                     batch_ids = list(expired_codes.values_list('id', flat=True)[:batch_size])
@@ -467,17 +469,14 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
                         break
 
                     batch_deleted_count, _ = expired_codes.filter(id__in=batch_ids).delete()
+                    deleted_count += batch_deleted_count
 
                     if max_deletions != -1 and deleted_count >= max_deletions:
                         purge_code_logger.info(f"Reached max deletions ({max_deletions}) for this run.")
                         break
                     
                     expired_codes  = self._get_expired_recovery_codes_qs(retention_days)
-                    deleted_counts.append(batch_deleted_count)
-
-                deleted_count = sum(deleted_counts)
-
-        
+                          
             RecoveryCodeAudit.log_action(
                     user_issued_to=self.user,
                     action=RecoveryCodeAudit.Action.BATCH_PURGED,
@@ -511,13 +510,22 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         """
        
         expired_codes = self._get_expired_recovery_codes_qs(retention_days)
-      
+        batch_id      = self.id
+
+        if not isinstance(batch_size, int):
+            raise ValueError(f"The batch size is not an integer. Expected an integer but got {type(batch_size).__name__}")
+        
+        if not isinstance(retention_days, int):
+            raise ValueError(f"The retention size is not an integer. Expected an integer but got {type(retention_days).__name__}")
+
         if not expired_codes.exists():
             purge_code_logger.info(f"No codes to purge for batch {self.id} at {timezone.now()}")
             return 0, True
 
         batch_size               = settings.DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE or batch_size
-        deleted_count            = self._bulk_delete_expired_codes_by_scheduler_helper(expired_codes, batch_size = batch_size, retention_days = retention_days)
+        deleted_count            = self._bulk_delete_expired_codes_by_scheduler_helper(expired_codes, 
+                                                                                       batch_size = batch_size, 
+                                                                                       retention_days = retention_days)
         active_codes_remaining   = (self.number_issued - deleted_count)
         is_empty                 = active_codes_remaining == 0
 
@@ -535,7 +543,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         else:
             purge_code_logger.info(f"Batch {self.id} contains {active_codes_remaining} codes")
 
-        return deleted_count, is_empty
+        return deleted_count, is_empty, batch_id
 
     @staticmethod
     def get_expiry_threshold(days: int = 30) -> datetime:
@@ -1030,7 +1038,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
             recovery_code_setup.mark_as_verified()
    
         return response_data
-
+         
     @classmethod
     def delete_recovery_batch(cls, user: "User"):
         """
@@ -1584,6 +1592,127 @@ class LoginRateLimiter(AbstractCooldownPeriod, AbstractBaseModel):
         self.save(update_fields=[self.LOGIN_ATTEMPT_FIELD, self.MODIFIED_AT_FIELD])
 
     @classmethod
+    def _is_login_rate_limiter_valid(cls, login_rate_limiter: LoginRateLimiter)-> bool:
+        """
+        Validate whether the given object is a valid instance of the LoginRateLimiter class.
+
+        Args:
+            login_rate_limiter (LoginRateLimiter):
+                The object to be validated.
+
+        Returns:
+            bool:
+                True if the provided object is a valid instance of LoginRateLimiter.
+
+        Raises:
+            ValueError:
+                If the provided object is not an instance of LoginRateLimiter.
+        """
+        if not isinstance(login_rate_limiter, cls):
+            raise ValueError(f"The login_limiter is not an instance of LoginRateLimiter class." 
+                             f"Expected a class instance got {type(LoginRateLimiter).__name__}")
+        return True
+    
+    @classmethod
+    def _get_login_rate_limiter(cls, user: User, cache_key: str, ttl = 3600) -> Self:
+        """
+        Takes a user object and returns the login rate limiter belong to the user
+
+        Args:
+            user (User): The user instance
+        """
+        cls.is_user_valid(user)
+        cls._is_login_rate_limiter_valid(login_rate_limiter)    
+  
+        cache_key            = f"login_rate_limiter_{user.id}"
+        login_rate_limiter   = get_cache_with_retry(cache_key, default=None)
+       
+        if login_rate_limiter is None:
+            login_rate_limiter = LoginRateLimiter.get_by_user(user)
+
+            default_logger.debug(f"[DATBABASE_RETRIEVAL] Getting the value from the database using 'LoginRateLimiter.get_by_user()'")
+            set_cache_with_retry(cache_key, value=login_rate_limiter, ttl=ttl)
+    
+        return login_rate_limiter
+
+    @classmethod
+    def _is_under_max_attempt(cls, login_rate_limiter: "LoginRateLimiter") -> bool:
+        """
+        Check whether the user has not yet exceeded the maximum allowed login attempts.
+
+        Args:
+            login_rate_limiter (LoginRateLimiter): 
+                The rate limiter instance object that tracks the number of login attempts 
+                and the maximum allowed attempts.
+
+        Returns:
+            bool: 
+                True if the current login attempts are below the maximum allowed, 
+                False otherwise.
+
+        Raises:
+            AttributeError: 
+                If `login_rate_limiter` does not have the required attributes 
+                (`login_attempts`, `max_login_attempts`).
+        """
+        return login_rate_limiter.login_attempts < login_rate_limiter.max_login_attempts
+  
+    @classmethod
+    def _check_temporary_lockout(cls, user: "User") -> Tuple[bool, int]:
+        """
+        Verify whether the user is currently under a temporary lockout due to failed login attempts.
+
+        Args:
+            user (User): 
+                The user object whose login attempts are being validated.
+
+        Returns:
+            tuple:
+                - bool: True if the user can attempt login, False if locked out.
+                - int: Remaining wait time (in seconds) before login is allowed again.
+
+        Raises:
+            Exception:
+                If the underlying `AttemptGuard` or its `can_proceed` method fails.
+        """
+        attempt_guard        = AttemptGuard[LoginRateLimiter](instance=cls, 
+                                                              instance_attempt_field_name=cls.LOGIN_ATTEMPT_FIELD
+                                                             )
+        can_login, wait_time = attempt_guard.can_proceed(user=user, action="Login_rate_limiter")
+        return can_login, wait_time
+
+    @classmethod
+    def _unlock_user(cls, login_rate_limiter: "LoginRateLimiter", user: "User", cache_key: str) -> Tuple[bool, int]:
+        """
+        Unlock a user by resetting their login attempts, creating an audit record, 
+        and clearing any related cache entry.
+
+        Args:
+            login_rate_limiter (LoginRateLimiter): 
+                The rate limiter object tracking login attempts.
+            user (User): 
+                The user being unlocked.
+            cache_key (str): 
+                The cache key used for storing login attempt state.
+
+        Returns:
+            tuple:
+                - bool: Always True once unlock succeeds.
+                - int: Always 0 (indicating no wait time after unlock).
+
+        Raises:
+            Exception:
+                If resetting attempts, audit logging, or cache deletion fails.
+        """
+        login_rate_limiter.reset_attempts()
+        LoginRateLimterAudit.create_record_login_audit(
+            user=user, 
+            login_attempts=login_rate_limiter.login_attempts
+        )    
+        delete_cache_with_retry(cache_key)
+        return True, 0
+    
+    @classmethod
     def is_locked_out(cls, user: User) -> Tuple[bool, int]:
         """
         A class method that determines whether a given user can log in or is 
@@ -1616,31 +1745,20 @@ class LoginRateLimiter(AbstractCooldownPeriod, AbstractBaseModel):
 
         HOUR_IN_SECONDS      = 3600
         cache_key            = f"login_rate_limiter_{user.id}"
-        login_rate_limiter   = get_cache_with_retry(cache_key, default=None)
-       
-        if login_rate_limiter is None:
-            login_rate_limiter = LoginRateLimiter.get_by_user(user)
+        login_rate_limiter   = cls._get_login_rate_limiter(user, cache_key, HOUR_IN_SECONDS)
 
-            default_logger.debug(f"[DATBABASE_RETRIEVAL] Getting the value from the database using 'LoginRateLimiter.get_by_user()'")
-            set_cache_with_retry(cache_key, value=login_rate_limiter, ttl=HOUR_IN_SECONDS)
-
-        if login_rate_limiter.login_attempts < login_rate_limiter.max_login_attempts:
+        if cls._is_under_max_attempt(login_rate_limiter):
             login_rate_limiter.record_failed_attempt()
             set_cache_with_retry(cache_key, login_rate_limiter, ttl=HOUR_IN_SECONDS)
             return True, 0
 
-        attempt_guard                = AttemptGuard[LoginRateLimiter](instance=cls, instance_attempt_field_name=cls.LOGIN_ATTEMPT_FIELD)
-        is_not_locked_out, wait_time = attempt_guard.can_proceed(user=user, action="Login_rate_limiter")
-
-        if not is_not_locked_out:
-            return is_not_locked_out, wait_time   
+        can_login, wait_time = cls._check_temporary_lockout(user)
+   
+        if not can_login:
+            return can_login, wait_time   
         
-        login_rate_limiter = LoginRateLimiter.get_by_user(user)
-        LoginRateLimterAudit.create_record_login_audit(user=user, login_attempts=login_rate_limiter.login_attempts)    
-        login_rate_limiter.reset_attempts()
-        delete_cache_with_retry(cache_key)
+        return cls._unlock_user(login_rate_limiter, user, cache_key)
 
-        return is_not_locked_out, wait_time        
-
+       
      
    

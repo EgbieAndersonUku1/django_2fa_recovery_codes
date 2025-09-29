@@ -64,8 +64,12 @@
                 Please find the details for the latest purge operation below.
               </p>
 
-              <!-- If a list of reports is provided -->
               {% if reports %}
+
+                The total batches removed:  {{ total_batches_removed }}
+
+                <br>
+                
                 {% for report in reports %}
                   <table role="presentation" width="100%" class="card" cellpadding="0" cellspacing="0" border="0">
                     <tr>
@@ -87,7 +91,7 @@
                           </tr>
                           <tr>
                             <th scope="row">User Issued To</th>
-                            <td>{{ report.user_issued_to }}</td>
+                            <td>{{ report.user_issued_to  |title }}</td>
                           </tr>
                           <tr>
                             <th scope="row">Number Issued</th>
@@ -151,106 +155,20 @@
                           </tr>
                           <tr>
                             <th scope="row">Deleted By</th>
-                            <td>{{ report.deleted_by|default:"N/A" }}</td>
+                            <td>
+                              {% if report.deleted_by %}
+                               
+                                {{ report.deleted_by.username|default:"N/A" | title }}
+                              {% else %}
+                                <span class="muted">N/A</span>
+                              {% endif %}
+                            </td>
                           </tr>
                         </table>
                       </td>
                     </tr>
                   </table>
                 {% endfor %}
-
-              <!-- Otherwise, support a single report -->
-              {% elif report %}
-                <table role="presentation" width="100%" class="card" cellpadding="0" cellspacing="0" border="0">
-                  <tr>
-                    <td class="card-header">
-                      Batch #{{ report.id }} —
-                      {% if report.is_batch_empty %}
-                        <span class="badge badge-ok">Batch is now empty</span>
-                      {% else %}
-                        <span class="badge badge-warn">Batch not empty</span>
-                      {% endif %}
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>
-                      <table role="presentation" class="kv" cellpadding="0" cellspacing="0" border="0">
-                        <tr>
-                          <th scope="row">Batch ID</th>
-                          <td>{{ report.id }}</td>
-                        </tr>
-                        <tr>
-                          <th scope="row">User Issued To</th>
-                          <td>{{ report.user_issued_to }}</td>
-                        </tr>
-                        <tr>
-                          <th scope="row">Number Issued</th>
-                          <td>{{ report.number_issued }}</td>
-                        </tr>
-                        <tr>
-                          <th scope="row">Number Removed (Purged)</th>
-                          <td>{{ report.number_removed }}</td>
-                        </tr>
-                        <tr>
-                          <th scope="row">Number Used</th>
-                          <td>{{ report.number_used }} | 0</td>
-                        </tr>
-                        <tr>
-                          <th scope="row">Number Remaining in Batch</th>
-                          <td>{{ report.number_remaining_in_batch }}</td>
-                        </tr>
-                        <tr>
-                          <th scope="row">Was Codes Generated</th>
-                          <td>{{ report.was_code_generated|yesno:"Yes,No,Unknown" }}</td>
-                        </tr>
-                        <tr>
-                          <th scope="row">Were Codes Downloaded</th>
-                          <td>{{ report.was_codes_downloaded|yesno:"Yes,No,Unknown" }}</td>
-                        </tr>
-                        <tr>
-                          <th scope="row">Were Codes Viewed</th>
-                          <td>{{ report.was_codes_viewed|yesno:"Yes,No,Unknown" }}</td>
-                        </tr>
-                        <tr>
-                          <th scope="row">Batch Creation Date</th>
-                          <td>
-                            {% if report.batch_creation_date %}
-                              {{ report.batch_creation_date|date:"Y-m-d H:i:s T" }}
-                            {% else %}<span class="muted">N/A</span>{% endif %}
-                          </td>
-                        </tr>
-                        <tr>
-                          <th scope="row">Last Modified</th>
-                          <td>
-                            {% if report.last_modified %}
-                              {{ report.last_modified|date:"Y-m-d H:i:s T" }}
-                            {% else %}<span class="muted">N/A</span>{% endif %}
-                          </td>
-                        </tr>
-                        <tr>
-                          <th scope="row">Expiry Date</th>
-                          <td>
-                            {% if report.expiry_date %}
-                              {{ report.expiry_date|date:"Y-m-d H:i:s T" }}
-                            {% else %}<span class="muted">N/A</span>{% endif %}
-                          </td>
-                        </tr>
-                        <tr>
-                          <th scope="row">Deleted At</th>
-                          <td>
-                            {% if report.deleted_at %}
-                              {{ report.deleted_at|date:"Y-m-d H:i:s T" }}
-                            {% else %}<span class="muted">N/A</span>{% endif %}
-                          </td>
-                        </tr>
-                        <tr>
-                          <th scope="row">Deleted By</th>
-                          <td>{{ report.deleted_by|default:"N/A" }}</td>
-                        </tr>
-                      </table>
-                    </td>
-                  </tr>
-                </table>
               {% else %}
                 <p class="muted">No purge reports were generated.</p>
               {% endif %}
