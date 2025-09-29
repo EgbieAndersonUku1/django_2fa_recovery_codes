@@ -62,7 +62,8 @@ import { getCurrentCard }               from "../batchCardsHistory/updateBatchHi
 import { clearElement }                 from "../utils.js";
 
 
-
+const PAGE_ACTION_BUTTONS_ID              = "page-buttons";
+const TABLE_ID                            = "table-code-view";
 export const deleteInputFieldElement      = document.getElementById("delete-code-input");
 
 const DELETE_ALL_LOADER_ID                = "delete-all-code-loader"
@@ -70,8 +71,8 @@ const testSetupFormContainerElement       = document.getElementById("dynamic-ver
 const deleteAllCodeButtonSpinnerElement   = document.getElementById(DELETE_ALL_LOADER_ID); // Dynamic, doesn't exist at runtime
 const deleteCodeButtonSpinnerElement      = document.getElementById("delete-current-code-loader");
 const deleteFormElement                   = document.getElementById("delete-form");
-const pageCodeActionButtonsElements       = document.getElementById("page-buttons");
-const tableCodeElements                   = document.getElementById("table-code-view");
+let   pageCodeActionButtonsElements       = document.getElementById(PAGE_ACTION_BUTTONS_ID);
+const tableCodeElements                   = document.getElementById(TABLE_ID);
 
 
 
@@ -238,6 +239,13 @@ export async function handleDeleteCodeeButtonClick(e, deleteButtonID) {
 
 
 
+function handleBadRequestFromServer() {
+    toggleProcessMessage(false);
+    pageCodeActionButtonsElements = getOrFetchElement(pageCodeActionButtonsElements, PAGE_ACTION_BUTTONS_ID)
+    clearElement(pageCodeActionButtonsElements);
+      
+}
+
 
 /**
  * Handles the click event for the "delete all code" button.
@@ -262,9 +270,9 @@ export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID)
 
     // function
     const handleDeleteAllCodesApiRequest = async () => {
-
+        let resp;
         try {
-             const resp = await fetchData({url: "/auth/recovery-codes/mark-batch-as-deleted/",
+             resp = await fetchData({url: "/auth/recovery-codes/mark-batch-as-deleted/",
                                             csrfToken: getCsrfToken(),
                                             method: "POST",
                                             body: {forceUpdate: true},
@@ -287,22 +295,26 @@ export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID)
                         alertAttributes,
                         handleDeleteAllCodesApiRequest,
                     )
+
+    console.log(resp);
     
     if (!resp) {
-        toggleProcessMessage(false);
+        handleBadRequestFromServer();
         return;
     }
 
     if (resp.SUCCESS) {
 
         const {codeActionButtons, tableCodes} = getDynamicCodeUIElements();
+        console.log(codeActionButtons);
+        console.log(tableCodes)
         toggleProcessMessage(false);
 
         if (!(checkIfHTMLElement(codeActionButtons) && checkIfHTMLElement(tableCodes))) {
             warnError("handleDeleteAllCodeButtonClick", "The button container element wasn't found");
             return;
         }
-
+        clearElement(codeActionButtons);
         markCardAsDeleted(getCurrentCard());
         toggleCodeUIElementsOff(codeActionButtons, tableCodes);
         showSuccessDeleteAlert();
@@ -325,7 +337,8 @@ export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID)
 
 
 function deleteCodeRelatedElements() {
-    clearElement(pageCodeActionButtonsElements);
-    clearElement(tableCodeElements);
+    
+    handleBadRequestFromServer();
+    clearElement(getOrFetchElement(tableCodeElements, TABLE_ID));
     toggleProcessMessage(false);
 }

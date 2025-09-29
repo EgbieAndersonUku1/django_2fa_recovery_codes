@@ -39,7 +39,7 @@ export function showSpinnerFor(spinnerElement, timeToDisplay = 500) {
  */
 export function toggleSpinner(spinnerElement, show = true, silent = true) {
     if (!checkIfHTMLElement(spinnerElement, "spinner element", silent)) {
-        return;
+        return false;
     }
 
     if (show) {
@@ -91,7 +91,7 @@ export function formatIsoDate(isoDate, locale = "en-GB") {
 
 export function checkIfHTMLElement(element, elementName = "Unknown", silent = false) {
     const msg = `Could not find the element: '${elementName}'. Ensure the selector is correct.`;
-    return checkIfCorrectHTMLElementHelper(element, HTMLElement, msg);
+    return checkIfCorrectHTMLElementHelper(element, HTMLElement, msg, silent);
 
 }
 
@@ -124,6 +124,7 @@ function checkIfCorrectHTMLElementHelper(element, htmlElement, msg, throwError =
     if (!(element instanceof htmlElement)) {
         if (!silent) {
             warnError("checkIfCorrectHTMLElementHelper", msg);
+            return false;
         }
         if (throwError) {
             throw new Error(msg);

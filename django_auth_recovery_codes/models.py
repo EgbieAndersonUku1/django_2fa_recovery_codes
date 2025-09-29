@@ -13,7 +13,7 @@ from django.db.models.query      import QuerySet
 from django.conf                 import settings
 from django.utils                import timezone
 from django_email_sender.models  import EmailBaseLog
-from typing                      import Tuple
+from typing                      import Self, Tuple
 
 from django_auth_recovery_codes.app_settings import default_max_login_attempts
 from django_auth_recovery_codes.base_models import (
@@ -1592,6 +1592,127 @@ class LoginRateLimiter(AbstractCooldownPeriod, AbstractBaseModel):
         self.save(update_fields=[self.LOGIN_ATTEMPT_FIELD, self.MODIFIED_AT_FIELD])
 
     @classmethod
+    def _is_login_rate_limiter_valid(cls, login_rate_limiter: LoginRateLimiter)-> bool:
+        """
+        Validate whether the given object is a valid instance of the LoginRateLimiter class.
+
+        Args:
+            login_rate_limiter (LoginRateLimiter):
+                The object to be validated.
+
+        Returns:
+            bool:
+                True if the provided object is a valid instance of LoginRateLimiter.
+
+        Raises:
+            ValueError:
+                If the provided object is not an instance of LoginRateLimiter.
+        """
+        if not isinstance(login_rate_limiter, cls):
+            raise ValueError(f"The login_limiter is not an instance of LoginRateLimiter class." 
+                             f"Expected a class instance got {type(LoginRateLimiter).__name__}")
+        return True
+    
+    @classmethod
+    def _get_login_rate_limiter(cls, user: User, cache_key: str, ttl = 3600) -> Self:
+        """
+        Takes a user object and returns the login rate limiter belong to the user
+
+        Args:
+            user (User): The user instance
+        """
+        cls.is_user_valid(user)
+        cls._is_login_rate_limiter_valid(login_rate_limiter)    
+  
+        cache_key            = f"login_rate_limiter_{user.id}"
+        login_rate_limiter   = get_cache_with_retry(cache_key, default=None)
+       
+        if login_rate_limiter is None:
+            login_rate_limiter = LoginRateLimiter.get_by_user(user)
+
+            default_logger.debug(f"[DATBABASE_RETRIEVAL] Getting the value from the database using 'LoginRateLimiter.get_by_user()'")
+            set_cache_with_retry(cache_key, value=login_rate_limiter, ttl=ttl)
+    
+        return login_rate_limiter
+
+    @classmethod
+    def _is_under_max_attempt(cls, login_rate_limiter: "LoginRateLimiter") -> bool:
+        """
+        Check whether the user has not yet exceeded the maximum allowed login attempts.
+
+        Args:
+            login_rate_limiter (LoginRateLimiter): 
+                The rate limiter instance object that tracks the number of login attempts 
+                and the maximum allowed attempts.
+
+        Returns:
+            bool: 
+                True if the current login attempts are below the maximum allowed, 
+                False otherwise.
+
+        Raises:
+            AttributeError: 
+                If `login_rate_limiter` does not have the required attributes 
+                (`login_attempts`, `max_login_attempts`).
+        """
+        return login_rate_limiter.login_attempts < login_rate_limiter.max_login_attempts
+  
+    @classmethod
+    def _check_temporary_lockout(cls, user: "User") -> Tuple[bool, int]:
+        """
+        Verify whether the user is currently under a temporary lockout due to failed login attempts.
+
+        Args:
+            user (User): 
+                The user object whose login attempts are being validated.
+
+        Returns:
+            tuple:
+                - bool: True if the user can attempt login, False if locked out.
+                - int: Remaining wait time (in seconds) before login is allowed again.
+
+        Raises:
+            Exception:
+                If the underlying `AttemptGuard` or its `can_proceed` method fails.
+        """
+        attempt_guard        = AttemptGuard[LoginRateLimiter](instance=cls, 
+                                                              instance_attempt_field_name=cls.LOGIN_ATTEMPT_FIELD
+                                                             )
+        can_login, wait_time = attempt_guard.can_proceed(user=user, action="Login_rate_limiter")
+        return can_login, wait_time
+
+    @classmethod
+    def _unlock_user(cls, login_rate_limiter: "LoginRateLimiter", user: "User", cache_key: str) -> Tuple[bool, int]:
+        """
+        Unlock a user by resetting their login attempts, creating an audit record, 
+        and clearing any related cache entry.
+
+        Args:
+            login_rate_limiter (LoginRateLimiter): 
+                The rate limiter object tracking login attempts.
+            user (User): 
+                The user being unlocked.
+            cache_key (str): 
+                The cache key used for storing login attempt state.
+
+        Returns:
+            tuple:
+                - bool: Always True once unlock succeeds.
+                - int: Always 0 (indicating no wait time after unlock).
+
+        Raises:
+            Exception:
+                If resetting attempts, audit logging, or cache deletion fails.
+        """
+        login_rate_limiter.reset_attempts()
+        LoginRateLimterAudit.create_record_login_audit(
+            user=user, 
+            login_attempts=login_rate_limiter.login_attempts
+        )    
+        delete_cache_with_retry(cache_key)
+        return True, 0
+    
+    @classmethod
     def is_locked_out(cls, user: User) -> Tuple[bool, int]:
         """
         A class method that determines whether a given user can log in or is 
@@ -1624,31 +1745,20 @@ class LoginRateLimiter(AbstractCooldownPeriod, AbstractBaseModel):
 
         HOUR_IN_SECONDS      = 3600
         cache_key            = f"login_rate_limiter_{user.id}"
-        login_rate_limiter   = get_cache_with_retry(cache_key, default=None)
-       
-        if login_rate_limiter is None:
-            login_rate_limiter = LoginRateLimiter.get_by_user(user)
+        login_rate_limiter   = cls._get_login_rate_limiter(user, cache_key, HOUR_IN_SECONDS)
 
-            default_logger.debug(f"[DATBABASE_RETRIEVAL] Getting the value from the database using 'LoginRateLimiter.get_by_user()'")
-            set_cache_with_retry(cache_key, value=login_rate_limiter, ttl=HOUR_IN_SECONDS)
-
-        if login_rate_limiter.login_attempts < login_rate_limiter.max_login_attempts:
+        if cls._is_under_max_attempt(login_rate_limiter):
             login_rate_limiter.record_failed_attempt()
             set_cache_with_retry(cache_key, login_rate_limiter, ttl=HOUR_IN_SECONDS)
             return True, 0
 
-        attempt_guard                = AttemptGuard[LoginRateLimiter](instance=cls, instance_attempt_field_name=cls.LOGIN_ATTEMPT_FIELD)
-        is_not_locked_out, wait_time = attempt_guard.can_proceed(user=user, action="Login_rate_limiter")
-
-        if not is_not_locked_out:
-            return is_not_locked_out, wait_time   
+        can_login, wait_time = cls._check_temporary_lockout(user)
+   
+        if not can_login:
+            return can_login, wait_time   
         
-        login_rate_limiter = LoginRateLimiter.get_by_user(user)
-        LoginRateLimterAudit.create_record_login_audit(user=user, login_attempts=login_rate_limiter.login_attempts)    
-        login_rate_limiter.reset_attempts()
-        delete_cache_with_retry(cache_key)
+        return cls._unlock_user(login_rate_limiter, user, cache_key)
 
-        return is_not_locked_out, wait_time        
-
+       
      
    
