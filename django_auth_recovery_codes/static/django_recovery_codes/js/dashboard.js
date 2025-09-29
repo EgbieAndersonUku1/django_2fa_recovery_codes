@@ -73,8 +73,6 @@ import { handleInvalidateButtonClick } from "./helpers/handleInvalidation.js";
 import invalidateFormElement, { invalidateInputFieldElement } from "./helpers/handleInvalidation.js";
 import { handleInputFieldHelper } from "./helpers/handlers.js";
 
-
-
 // Elements
 const recovryDashboardElement        = document.getElementById("recovery-dashboard");
 const navigationIconContainerElement = document.getElementById("navigation-icon-elements");

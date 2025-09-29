@@ -115,7 +115,7 @@ export function populateTableWithUserCodes(codes) {
             tableCoderSpinnerElement.style.display = "none"
 
             toggleSpinner(tableCoderSpinnerElement, false);
-            pickRightDivAndPopulateTable(tableElement)
+            addCodeToTableAndButtons(tableElement)
             messageContainerElement.classList.remove("show");
 
             appStateManager.setCodeGeneration(false)
@@ -135,15 +135,12 @@ export function populateTableWithUserCodes(codes) {
 
 
 /**
- * Determines the correct container for the generated codes table and populates it.
- *
- * - Shows code action buttons if needed.
- * - Clears existing content in the target container.
- * - Appends the new table element.
- *
+ *  Add the codes to the table along with the buttons. Clears everything 
+ *  first to prevent duplication
+ * 
  * @param {HTMLElement} tableCodesElement - The table element containing user recovery codes.
  */
-function pickRightDivAndPopulateTable(tableCodesElement) {
+function addCodeToTableAndButtons(tableCodesElement) {
 
     if (appStateManager.shouldGenerateCodeActionButtons()) {
        showCodeActionsButton();
@@ -168,7 +165,7 @@ function pickRightDivAndPopulateTable(tableCodesElement) {
  * @returns {HTMLElement|null} The code action buttons container element, or null if not found.
  */
 function fetchCodeActionButtonsArea() {
-    return document.getElementById("")
+    return document.getElementById("code-actions");
 }
 
 

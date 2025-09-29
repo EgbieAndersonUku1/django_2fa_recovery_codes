@@ -316,7 +316,12 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         """A string representation of the model"""
 
         return f"Batch {self.id} for {self.user or 'Deleted User'}"
-       
+
+    @property
+    def active_codes_remaining(self):
+        """Returns the active code still remaining"""
+        return self.number_issued - self.number_used   
+        
     @classmethod
     def can_generate_new_code(cls, user: User) -> tuple[bool, int]:
         """
@@ -457,9 +462,6 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
 
             if batch_size and isinstance(batch_size, int):
 
-                deleted_counts = []  # track individual deletion counts; avoids rebinding immutable integers on each increment which is more memory efficient
-                                     # than deleted_count += deleted_count. Calls sum at the end to get the result
-
                 while expired_codes.exists():
 
                     batch_ids = list(expired_codes.values_list('id', flat=True)[:batch_size])
@@ -467,17 +469,14 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
                         break
 
                     batch_deleted_count, _ = expired_codes.filter(id__in=batch_ids).delete()
+                    deleted_count += batch_deleted_count
 
                     if max_deletions != -1 and deleted_count >= max_deletions:
                         purge_code_logger.info(f"Reached max deletions ({max_deletions}) for this run.")
                         break
                     
                     expired_codes  = self._get_expired_recovery_codes_qs(retention_days)
-                    deleted_counts.append(batch_deleted_count)
-
-                deleted_count = sum(deleted_counts)
-
-        
+                          
             RecoveryCodeAudit.log_action(
                     user_issued_to=self.user,
                     action=RecoveryCodeAudit.Action.BATCH_PURGED,
@@ -511,13 +510,22 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         """
        
         expired_codes = self._get_expired_recovery_codes_qs(retention_days)
-      
+        batch_id      = self.id
+
+        if not isinstance(batch_size, int):
+            raise ValueError(f"The batch size is not an integer. Expected an integer but got {type(batch_size).__name__}")
+        
+        if not isinstance(retention_days, int):
+            raise ValueError(f"The retention size is not an integer. Expected an integer but got {type(retention_days).__name__}")
+
         if not expired_codes.exists():
             purge_code_logger.info(f"No codes to purge for batch {self.id} at {timezone.now()}")
             return 0, True
 
         batch_size               = settings.DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE or batch_size
-        deleted_count            = self._bulk_delete_expired_codes_by_scheduler_helper(expired_codes, batch_size = batch_size, retention_days = retention_days)
+        deleted_count            = self._bulk_delete_expired_codes_by_scheduler_helper(expired_codes, 
+                                                                                       batch_size = batch_size, 
+                                                                                       retention_days = retention_days)
         active_codes_remaining   = (self.number_issued - deleted_count)
         is_empty                 = active_codes_remaining == 0
 
@@ -535,7 +543,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         else:
             purge_code_logger.info(f"Batch {self.id} contains {active_codes_remaining} codes")
 
-        return deleted_count, is_empty
+        return deleted_count, is_empty, batch_id
 
     @staticmethod
     def get_expiry_threshold(days: int = 30) -> datetime:
@@ -1030,7 +1038,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
             recovery_code_setup.mark_as_verified()
    
         return response_data
-
+         
     @classmethod
     def delete_recovery_batch(cls, user: "User"):
         """

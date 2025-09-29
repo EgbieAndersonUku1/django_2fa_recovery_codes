@@ -56,7 +56,6 @@ import { checkIfHTMLElement,
          getOrFetchElement }            from "../utils.js";
 import { toggleElement }                from "../utils.js";
 import { AlertUtils }                   from "../alerts.js";
-import { doNothing }                    from "../utils.js";
 import { toggleProcessMessage }         from "./handleButtonAlertClicker.js";
 import { markCardAsDeleted }            from "../batchCardsHistory/markCardAsDeleted.js";
 import { getCurrentCard }               from "../batchCardsHistory/updateBatchHistorySection.js";
@@ -264,13 +263,21 @@ export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID)
     // function
     const handleDeleteAllCodesApiRequest = async () => {
 
-        const resp = await fetchData({url: "/auth/recovery-codes/mark-batch-as-deleted/",
-                                      csrfToken: getCsrfToken(),
-                                      method: "POST",
-                                      body: {forceUpdate: true},
+        try {
+             const resp = await fetchData({url: "/auth/recovery-codes/mark-batch-as-deleted/",
+                                            csrfToken: getCsrfToken(),
+                                            method: "POST",
+                                            body: {forceUpdate: true},
                                      });
+            return resp;
+        } catch (error) {
+            resp = {}
+            resp.SUCCESS = false;
+            return resp;
+        }
+      
 
-        return resp;
+        
 
     }
 
@@ -286,7 +293,6 @@ export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID)
         return;
     }
 
-    console.log(resp)
     if (resp.SUCCESS) {
 
         const {codeActionButtons, tableCodes} = getDynamicCodeUIElements();
@@ -301,14 +307,13 @@ export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID)
         toggleCodeUIElementsOff(codeActionButtons, tableCodes);
         showSuccessDeleteAlert();
         toggleAlertAndFormElements();
-        clearElement(pageCodeActionButtonsElements);
-        clearElement(tableCodeElements);
+        deleteCodeRelatedElements();
 
         try {
             toggleElement(testSetupFormElement)
         } catch (error) {
-            doNothing();
-            toggleProcessMessage(false);
+            
+             deleteCodeRelatedElements();
             }
 
         }  else {
@@ -319,3 +324,8 @@ export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID)
 } 
 
 
+function deleteCodeRelatedElements() {
+    clearElement(pageCodeActionButtonsElements);
+    clearElement(tableCodeElements);
+    toggleProcessMessage(false);
+}

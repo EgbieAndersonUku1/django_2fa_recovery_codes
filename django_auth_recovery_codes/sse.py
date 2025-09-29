@@ -1,8 +1,10 @@
 import time
 from django.http import StreamingHttpResponse
 from django.contrib.auth.decorators import login_required
-from django.core.cache import cache
-from django_auth_recovery_codes.utils.cache.safe_cache import get_cache_or_set, cache_lock
+from django_auth_recovery_codes.utils.cache.safe_cache import (get_cache_or_set, 
+                                                               cache_lock, 
+                                                               get_cache_with_retry,
+                                                              delete_cache_with_retry)
 
 
 
@@ -18,9 +20,10 @@ def sse_notifications(request):
             
             with cache_lock(cache_key) as locked:
                 if locked:
-                    messages = cache.get(cache_key, [])
+                   
+                    messages = get_cache_with_retry(cache_key)
                     if messages:
-                        cache.delete(cache_key)  # remove messages before sending
+                        delete_cache_with_retry(cache_key)
             for msg in messages:
                 yield f"data: {msg}\n\n"
         time.sleep(1)

@@ -113,7 +113,8 @@ The premises of this resuable application, is that it takes any Django applicati
   * [Successful Login](#successful-login)
   * [Existing Project Setup](#2-existing-project-setup)
   * [Scheduling a Code Removal Using Django-Q](#scheduling-a-code-removal-using-django-q)
-* [Contributing](#contributing)
+  * [Warning ⚠](#warning)
+* [Known Issues](#known-issues)
 * [License](#license)
 * [Support](#support)
 
@@ -263,7 +264,7 @@ The project relies on the `match`-`case` syntax, which provides a more readable 
      #### Configuration flags settings for the Django Auth Recovery code app
 
       ```python
-      * DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL
+      * DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL
       * DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER
       * DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME
       * DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP
@@ -439,6 +440,7 @@ pip install django-2fa-recovery-codes
 INSTALLED_APPS = [
     ...
     'django_2fa_recovery_codes',
+    'django_q',
 ]
 ```
 
@@ -837,7 +839,7 @@ These environment variables configure the **Django Auth Recovery** system, contr
 ### **Alphabetical Reference (Easy Copy & Paste)**
 
 ```
-DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL=
+DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL=
 DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER=
 DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME=
 DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP=
@@ -910,7 +912,7 @@ These settings control which email and admin accounts are used for recovery code
 
 | Variable                                          | Description                                                                 |
 | ------------------------------------------------- | --------------------------------------------------------------------------- |
-| `DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL`           | Admin email address used to receive generated reports after scheduled code deletions. |
+| `DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL`           | Admin email address used to receive generated reports after scheduled code deletions. |
 | `DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER` | The email address used by the application to send emails, typically the same as `EMAIL_HOST_USER` in your Django settings. |
 | `DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME`        | Username associated with the admin account.                                  |
 
@@ -918,7 +920,7 @@ These settings control which email and admin accounts are used for recovery code
 
 Suppose the settings are:
 
-- `DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL = admin@example.com`  
+- `DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL = admin@example.com`  
 - `DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER = noreply@example.com`  
 - `DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME = admin`  
 
@@ -992,6 +994,17 @@ Then:
 
 For details on what a single batch includes, see [example: a single recovery code batch view](#example-a-single-recovery-code-batch-view).
 
+
+### Additional Explanation for `DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT`
+
+This setting controls **where the user is redirected after logging out**.  
+By default, the redirect points to the 2FA login page, but it can be changed to any page.  
+
+To redirect to another page, use the `name` reference of the view defined in your `urls.py`. For example:  
+
+```python
+path("auth/recovery-codes/login/", views.login_user, name="login_user")
+```
 
 ---
 
@@ -1287,7 +1300,7 @@ Then recovery emails and notifications will display the site name "My Awesome Si
 
 
 ```
-DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL=admin@example.com
+DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL=admin@example.com
 DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER=smtp@example.com
 DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME=admin
 DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP=True
@@ -1309,7 +1322,7 @@ DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN=400
 ```python
 import os
 
-ADMIN_EMAIL = os.getenv("DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL")
+ADMIN_EMAIL = os.getenv("DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL")
 ADMIN_USERNAME = os.getenv("DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME")
 AUDIT_RETENTION_DAYS = int(os.getenv("DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS", 30))
 MAX_VISIBLE = int(os.getenv("DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE", 20))
@@ -1330,7 +1343,7 @@ SECRET_KEY = os.getenv("DJANGO_AUTH_RECOVERY_KEY")
 
 | Variable                                                      | Required | Default Value        | Notes                                                                            |
 | ------------------------------------------------------------- | -------- | -------------------- | -------------------------------------------------------------------------------- |
-| `DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL`                       | ✅ Yes    | –                    | Email used to send recovery codes. Must be valid.                                |
+| `DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL`                       | ✅ Yes    | –                    | Email used to send recovery codes. Must be valid.                                |
 | `DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER`             | ✅ Yes    | –                    | SMTP or host email account. Required for sending emails.                         |
 | `DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME`                    | ✅ Yes    | –                    | Admin username associated with the email.                                        |
 | `DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP`         | ❌ No     | `False`              | Automatically clean up audit logs if True.                                       |
@@ -1577,7 +1590,8 @@ The walkthrough assumes you don’t already have a Django project, which is why 
 
 If you already have an existing Django project, skip to Existing project :
 
-- then follow the steps in this guide that apply to integration (skipping project creation).
+- then follow the steps in this guide that apply to integration (skipping project creation). 
+- In this walkthrough we will not be using Redis, Memecache to create a cache in the settings.py, we do nothing an allow it to defualt the memory cache
 
 ---
 
@@ -1730,25 +1744,25 @@ urlpatterns = [
 ```python
 
 # Required values, customise for your project
-DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL = "your-email-address"
-DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER = "main-smtp-email"
-DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME = "username"
-DJANGO_AUTH_RECOVERY_KEY = "add-some-key"
-DJANGO_AUTH_RECOVERY_CODES_SITE_NAME="some site name"
+DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL    = "your-email-address"
+DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER  = "main-smtp-email"
+DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME         = "username"
+DJANGO_AUTH_RECOVERY_KEY                         = "add-some-key"
+DJANGO_AUTH_RECOVERY_CODES_SITE_NAME             = "some site name"
 
 
 # Default values (can be left as-is or overridden)
-DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP = 30
-DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS = 30
-DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE = 20
-DJANGO_AUTH_RECOVERY_CODE_PER_PAGE = 5
-DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS = 30
+DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP         = 30
+DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS              = 30
+DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE                       = 20
+DJANGO_AUTH_RECOVERY_CODE_PER_PAGE                          = 5
+DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS       = 30
 DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER = True
-DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT = "login_user"
-DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG = True
-DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE = True
-DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN = 3600
-DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE = 1000
+DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT        = "login_user"  # redirect to any page e.g. found in url
+DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG                   = True
+DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE      = True
+DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN                    = 3600
+DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE                = 1000
 DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX = 3600
 DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN = 0
 DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL = 300
@@ -2319,6 +2333,48 @@ Configure scheduler:
 ```
 
 You can also run a scheduler to remove the audit reports for `Recovery Code` by using `Recovery code audit schedulers`. The audits are store in the `Recovery code Audit` model. The steps are same as the above steps.
+
+
+### Warning
+
+In the `admin.py` interface under **Recovery Codes**, do not manually delete codes.  
+The system is tied into the **RecoveryCodesBatch** model.
+
+If you want to remove a code, **mark it as invalid** or **mark it for deletion** instead. This is important because the parent batch (`RecoveryCodesBatch`) tracks how many codes it has generated. This is good meaning it was generated and tied to its parent (RecoveryCodesBatch). Any action on the parent batch affects its children (the codes) which is the intended behaviour, but the reverse is not true which is also the intended behaviour. For example:
+
+* If a batch is deleted, all its child codes are also deleted.  
+* If a batch is marked as *pending deletion*, all its child codes are marked similarly.  
+* If any of the children (codes) are marked as **invalid** or **for deletion**, the parent batch is not affected, and thus does not impact the other child codes.
+
+#### Why this matters
+
+When a user deletes all codes from the frontend:
+
+1. The application marks the batch for deletion, which in turn marks its child codes.
+2. A scheduler later removes any codes marked for deletion.
+3. Once all child codes are deleted, the empty parent batch is automatically deleted.
+
+If you manually delete child codes in a batch:
+
+* The scheduler cannot correctly clean up the batch.
+* You will end up with an empty batch in the database, tied to nothing and effectively “floating” and unused. When the scheduler next runs, it will generate email reports for that batch, indicating that nothing was cleaned which is true, since the batch has no children. This will bury reports about actual code cleanup under a flood of emails making it hard to find your emails.
+
+If you want to delete all codes **without waiting for the scheduler**, delete the **parent batch**. This safely removes all associated codes because any action on the parent affects its children.
+
+> Note: Deleting a single child code manually does not deactivate the parent batch. Marking a single code as invalid or for deletion will not affect the rest of the batch.
+
+#### Summary
+
+1. Mark individual codes as **invalid** or **for deletion** in the admin interface, do **not manually delete** them.
+2. To delete all codes immediately, delete the **parent batch**, this is safer and ensures proper cleanup.
+
+---
+
+## Known Issues
+
+- The app is responsive across all screen sizes.  
+- However, on medium, small, or extra-small screens the `logout` button is not visible because the `hamburger` menu is not yet active.  
+- This will be addressed in a future update.  
 
 
 

@@ -49,7 +49,8 @@
 import { toggleSpinner, 
        getNthChildNested, 
        checkIfHTMLElement, 
-       addChildWithPaginatorLimit }         from "../utils.js";
+       addChildWithPaginatorLimit,
+       getOrFetchElement }                  from "../utils.js";
 import { generateRecoveryCodesSummaryCard } from "../generateBatchHistoryCard.js";
 import { markCardAsDeleted }                from "./markCardAsDeleted.js";
 import { getCardFieldElements }             from "./batchCardUtils.js";
@@ -57,7 +58,8 @@ import { getCardFieldElements }             from "./batchCardUtils.js";
 import { recoveryBatchSectionElement }      from "./batchCardElements.js";
 
 
-const dynamicBatchSpinnerElement   = document.getElementById("dynamic-batch-loader");
+const DYNAMIC_BATCH_LOADER_ID    = "dynamic-batch-loader";
+let dynamicBatchSpinnerElement   = document.getElementById("dynamic-batch-loader");
 
 
 /**
@@ -138,7 +140,7 @@ export function incrementRecoveryCardField(cardBatchElement, fieldSelector, MILL
  */
 export function updateCurrentRecoveryCodeBatchCard(fieldToUpdate) {
     const currentCardBatch = getCurrentCard();
-
+   
     switch(fieldToUpdate) {
         case "invalidate":
             incrementRecoveryCardField(currentCardBatch, "number_invalidated");
@@ -193,7 +195,8 @@ export function updateBatchHistorySection(sectionElement,
     const newBatchCard = generateRecoveryCodesSummaryCard(batch);
     
     let previousBatchCard;
-
+    
+    dynamicBatchSpinnerElement               = getOrFetchElement(dynamicBatchSpinnerElement, DYNAMIC_BATCH_LOADER_ID);
     dynamicBatchSpinnerElement.style.display = "inline-block";
     toggleSpinner(dynamicBatchSpinnerElement);
 

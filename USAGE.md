@@ -9,7 +9,8 @@ The walkthrough assumes you don’t already have a Django project, which is why 
 
 If you already have an existing Django project, skip to Existing project :
 
-- then follow the steps in this guide that apply to integration (skipping project creation).
+- then follow the steps in this guide that apply to integration (skipping project creation). 
+- In this walkthrough we will not be using Redis, Memecache to create a cache in the settings.py, we do nothing an allow it to defualt the memory cache
 
 ---
 
@@ -753,3 +754,37 @@ Configure scheduler:
 You can also run a scheduler to remove the audit reports for `Recovery Code` by using `Recovery code audit schedulers`. The audits are store in the `Recovery code Audit` model. The steps are same as the above steps.
 
 
+## Warning
+
+In the `admin.py` interface under **Recovery Codes**, do not manually delete codes.  
+The system is tied into the **RecoveryCodesBatch** model.
+
+If you want to remove a code, **mark it as invalid** or **mark it for deletion** instead. This is important because the parent batch (`RecoveryCodesBatch`) tracks how many codes it has generated. This is good meaning it was generated and tied to its parent (RecoveryCodesBatch). Any action on the parent batch affects its children (the codes) which is the intended behaviour, but the reverse is not true which is also the intended behaviour. For example:
+
+* If a batch is deleted, all its child codes are also deleted.  
+* If a batch is marked as *pending deletion*, all its child codes are marked similarly.  
+* If any of the children (codes) are marked as **invalid** or **for deletion**, the parent batch is not affected, and thus does not impact the other child codes.
+
+#### Why this matters
+
+When a user deletes all codes from the frontend:
+
+1. The application marks the batch for deletion, which in turn marks its child codes.
+2. A scheduler later removes any codes marked for deletion.
+3. Once all child codes are deleted, the empty parent batch is automatically deleted.
+
+If you manually delete child codes in a batch:
+
+* The scheduler cannot correctly clean up the batch.
+* You will end up with an empty batch in the database, tied to nothing and effectively “floating” and unused. When the scheduler next runs, it will generate email reports for that batch, indicating that nothing was cleaned which is true, since the batch has no children. This will bury reports about actual code cleanup under a flood of emails making it hard to find your emails.
+
+If you want to delete all codes **without waiting for the scheduler**, delete the **parent batch**. This safely removes all associated codes because any action on the parent affects its children.
+
+> Note: Deleting a single child code manually does not deactivate the parent batch. Marking a single code as invalid or for deletion will not affect the rest of the batch.
+
+#### Summary
+
+1. Mark individual codes as **invalid** or **for deletion** in the admin interface, do **not manually delete** them.
+2. To delete all codes immediately, delete the **parent batch**, this is safer and ensures proper cleanup.
+
+---
