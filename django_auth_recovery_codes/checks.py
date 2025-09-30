@@ -101,7 +101,7 @@ def check_app_max_deletions_per_run(app_configs: Optional[List[Any]] = None, **k
 
 
 @register
-def check_app_format_setting(app_configs: Optional[List[AppConfig]], **kwargs: Any
+def check_pagination_settings(app_configs: Optional[List[AppConfig]], **kwargs: Any
 ) -> List[CheckMessage]:
     """"""
     max_code_visible = settings.DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE 
@@ -162,7 +162,6 @@ def _check_flag(flag_name: str, config: Dict[str, Any], errors: List[CheckMessag
     if not isinstance(value, expected_type):
         errors.append(Error(config["error_if_wrong_type"], id=config["error_id"]))
 
-
 @register
 def check_ttl_setting(app_configs: Optional[List[AppConfig]], **kwargs: Any) -> List[CheckMessage]:
     """
@@ -183,19 +182,20 @@ def check_ttl_setting(app_configs: Optional[List[AppConfig]], **kwargs: Any) -> 
     cache_ttl = settings.DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL
     cache_min = settings.DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN
     cache_max = settings.DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX
-    errors = []
+    errors: List[CheckMessage] = []
 
     # Check for zero or negative values
     if cache_min <= 0 or cache_max <= 0 or cache_ttl <= 0:
         errors.append(
             Error(
                 "One or more cache settings is zero or negative.",
-                "All cache settings must be positive as they determine how long "
-                "recovery codes remain in the cache.",
                 hint=(
+                    "All cache settings must be positive as they determine how long "
+                    "recovery codes remain in the cache. "
                     f"Current values: TTL={cache_ttl}, MIN={cache_min}, MAX={cache_max}. "
                     "Consider setting them to positive integers, e.g., TTL=300, MIN=60, MAX=600."
-                )
+                ),
+                id="django_auth_recovery_codes.E001",
             )
         )
         return errors
@@ -205,11 +205,11 @@ def check_ttl_setting(app_configs: Optional[List[AppConfig]], **kwargs: Any) -> 
         errors.append(
             Error(
                 "CACHE_MIN cannot be greater than CACHE_MAX.",
-                "The minimum cache duration must not exceed the maximum.",
                 hint=(
                     f"Current values: MIN={cache_min}, MAX={cache_max}, TTL={cache_ttl}. "
                     "Swap the values or adjust them so that MIN <= MAX."
-                )
+                ),
+                id="django_auth_recovery_codes.E002",
             )
         )
 
@@ -218,11 +218,11 @@ def check_ttl_setting(app_configs: Optional[List[AppConfig]], **kwargs: Any) -> 
         errors.append(
             Error(
                 "CACHE_TTL is outside the min-max range.",
-                "The TTL should be between CACHE_MIN and CACHE_MAX to ensure proper caching behaviour.",
                 hint=(
                     f"Current values: TTL={cache_ttl}, MIN={cache_min}, MAX={cache_max}. "
                     "Adjust TTL to fall within the range defined by MIN and MAX."
-                )
+                ),
+                id="django_auth_recovery_codes.E003",
             )
         )
 

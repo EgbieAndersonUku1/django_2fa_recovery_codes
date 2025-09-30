@@ -154,13 +154,7 @@ FLAG_VALIDATORS = {
         "error_id": "django_auth_recovery_codes.E014",
         "warning_id": "django_auth_recovery_codes.W014",
     },
-    "DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL": {
-        "type": str,
-        "warning_if_missing": "DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL is not set in settings.py.",
-        "error_if_wrong_type": "DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL must be a string.",
-        "error_id": "django_auth_recovery_codes.E015",
-        "warning_id": "django_auth_recovery_codes.W015",
-    },
+   
     "DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME": {
         "type": str,
         "warning_if_missing": "DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME is not set in settings.py.",
