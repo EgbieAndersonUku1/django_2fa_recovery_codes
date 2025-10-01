@@ -243,3 +243,26 @@ FLAG_VALIDATORS = {
     },
 
 }
+
+
+
+RECOVERY_CODES = {
+    "EMAIL_TEMPLATES": {
+        "recovery_codes": {
+            "html": "email_templates/recovery_codes/recovery_codes_email.html",
+            "text": "email_templates/recovery_codes/recovery_codes_email.txt",
+        },
+        "recovery_codes_audit": {
+            "html": "email_templates/recovery_codes_audit/recovery_codes_audit_email.html",
+            "text": "email_templates/recovery_codes_audit/recovery_codes_audit_email.txt",
+        },
+        "recovery_codes_deletion": {
+            "html": "email_templates/recovery_codes_deletion/recovery_codes_deletion_email.html",
+            "text": "email_templates/recovery_codes_deletion/recovery_codes_deletion_email.txt",
+        },
+        "recovery_code_purge_history_report": {
+            "html": "email_templates/recovery_code_purge_history_report/recovery_code_purge_history_report_email.html",
+            "text": "email_templates/recovery_code_purge_history_report/recovery_code_purge_history_report_email.txt",
+        },
+    }
+}

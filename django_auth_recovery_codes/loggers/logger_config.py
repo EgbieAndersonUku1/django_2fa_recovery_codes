@@ -61,10 +61,11 @@
 
 from pathlib import Path
 
-
 # Default log directory inside the project
 LOG_DIR = Path("logs")
 LOG_DIR.mkdir(exist_ok=True, parents=True)
+
+
 
 
 # Exportable logging dict e.g from .logger.loggers import DJANGO_AUTH_RECOVERY_CODES_LOGGING
@@ -77,15 +78,18 @@ DJANGO_AUTH_RECOVERY_CODES_LOGGING = {
             "datefmt": "%Y-%m-%d %H:%M:%S",
         },
     },
+
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
             "formatter": "default",
+           
         },
         "all_file": {
             "class": "logging.FileHandler",
             "filename": LOG_DIR / "all_debug.log",
             "formatter": "default",
+           
         },
 
         # Individual file handlers
@@ -98,26 +102,31 @@ DJANGO_AUTH_RECOVERY_CODES_LOGGING = {
             "class": "logging.FileHandler",
             "filename": LOG_DIR / "email_sender.log",
             "formatter": "default",
+           
         },
         "email_purge_file": {
             "class": "logging.FileHandler",
             "filename": LOG_DIR / "email_purge.log",
             "formatter": "default",
+          
         },
         "auth_codes_file": {
             "class": "logging.FileHandler",
             "filename": LOG_DIR / "auth_recovery_codes.log",
             "formatter": "default",
+           
         },
         "auth_codes_purge_file": {
             "class": "logging.FileHandler",
             "filename": LOG_DIR / "auth_codes_purge.log",
             "formatter": "default",
+          
         },
         "audit_file": {
             "class": "logging.FileHandler",
             "filename": LOG_DIR / "audits.log",
             "formatter": "default",
+           
         },
         "django_q_file": {
             "class": "logging.FileHandler",
@@ -135,13 +144,11 @@ DJANGO_AUTH_RECOVERY_CODES_LOGGING = {
         "level": "DEBUG",
     },
     "loggers": {
-       
         "app.views_helper": {
             "level": "DEBUG",
             "handlers": ["view_helper_file", "all_file"],
             "propagate": False,
         },
-        # Email sender (isolated, no console)
         "email_sender": {
             "level": "DEBUG",
             "handlers": ["email_file", "all_file"],
@@ -152,7 +159,6 @@ DJANGO_AUTH_RECOVERY_CODES_LOGGING = {
             "handlers": ["email_purge_file", "all_file"],
             "propagate": False,
         },
-       
         "auth_recovery_codes": {
             "level": "DEBUG",
             "handlers": ["auth_codes_file", "all_file"],
@@ -168,7 +174,6 @@ DJANGO_AUTH_RECOVERY_CODES_LOGGING = {
             "handlers": ["audit_file", "all_file"],
             "propagate": False,
         },
-        # Django Q internals (console + file)
         "django_q": {
             "level": "DEBUG",
             "handlers": ["django_q_file", "console"],

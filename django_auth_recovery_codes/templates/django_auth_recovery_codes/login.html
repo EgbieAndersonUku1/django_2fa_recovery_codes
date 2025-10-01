@@ -1,4 +1,5 @@
-{% extends "base.html" %}
+{% extends "django_auth_recovery_codes/base.html" %}
+
 {% load static %}
 
 {% block title  %}Login{% endblock  %}
@@ -16,8 +17,8 @@
 </nav>
 <section id="login-user">
    
-    {% include "partials/django_messages.html" %}
-    {% include "partials/partial_forms/login_form.html" %}
+   {% include "django_auth_recovery_codes/partials/django_messages.html" %}
+    {% include "django_auth_recovery_codes/partials/partial_forms/login_form.html" %}
 </section>
 
 

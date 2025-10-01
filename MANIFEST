@@ -1,18 +1,27 @@
-include README.md
+# MANIFEST.in
+
+# Always include license, readme, and requirements
 include LICENSE
+include README.md
 include requirements.txt
-include setup.py
-include CHANGELOG.md
 
-recursive-include django_auth_recovery_codesr *.py
-recursive-include docs *
-recursive-include locale *
-recursive-include tests *.py
+# Include Django templates
+graft django_auth_recovery_codes/templates
 
-# Include any egg-info metadata
-recursive-include django_auth_recovery_codesr.egg-info *
+# Include static files
+graft django_auth_recovery_codes/static
 
-# Include all text and markdown files in the root
-include *.txt
-include *.md
-include CHANGELOG.md
+# Include migrations (so app installs cleanly)
+graft django_auth_recovery_codes/migrations
+
+# Include locale/translation files
+graft django_auth_recovery_codes/locale
+
+# Include any other data files (text, csv, etc.)
+recursive-include django_auth_recovery_codes *.txt *.csv *.json
+
+# Exclude Python cache and build junk
+global-exclude __pycache__ *.py[cod] *.so
+prune build
+prune dist
+prune *.egg-info

@@ -5,13 +5,16 @@ from django_email_sender.email_logger import LoggerType
 from django.utils import timezone
 
 from django_q.models import Task, Schedule
-from django_auth_recovery_codes import notify_user
+from django_auth_recovery_codes.utils.notification import notify_user
 from django_auth_recovery_codes.models import (RecoveryCodePurgeHistory, 
                                                RecoveryCodesBatch, 
                                                RecoveryCodeAudit, 
                                                RecoveryCodeCleanUpScheduler,
+                                              
+                                            
                                                )
 
+from django_email_sender.email_sender_constants import EmailSenderConstants
 from django_auth_recovery_codes.app_settings import app_settings
 from django_auth_recovery_codes.loggers.loggers import (email_logger,
                                                          purge_code_logger, 
@@ -21,17 +24,16 @@ from django_auth_recovery_codes.loggers.loggers import (email_logger,
 
 
 
-
 def send_recovery_codes_email(sender_email, user, codes, subject= "Your account recovery codes"):
     
     email_sender_logger = EmailSenderLogger.create()
     _store_user_email_log(email_sender_logger)
+    _if_set_to_true_use_logger(True, email_sender_logger)
 
     try:
         ( 
             email_sender_logger
             .add_email_sender_instance(EmailSender.create()) 
-            .start_logging_session()
             .config_logger(email_logger, log_level=LoggerType.INFO)
             .from_address(sender_email) 
             .to(user.username) 
@@ -41,13 +43,15 @@ def send_recovery_codes_email(sender_email, user, codes, subject= "Your account 
             .with_text_template("recovery_codes_email.txt", "recovery_codes") 
             .send()
             )
-        notify_user(user.id, "Recovery codes email sent successfully!")
+        
+        message = "Recovery codes email sent successfully!"  
+        notify_user(user, message)
   
     except Exception as e:
-        email_logger.error(f"Failed to send recovery codes: {e}")
-        notify_user(user.id, f"Failed to send recovery codes: {e}")
-
-       
+        error_msg = f"Failed to send recovery codes: {e}"
+        email_logger.error(error_msg)
+        notify_user(user, error_msg )
+   
 
 def purge_all_expired_batches(*args, **kwargs):
     """
@@ -268,6 +272,9 @@ def _if_set_to_true_use_logger(use_logger: bool, email_sender_logger: EmailSende
             "Sending email with logger turned on. All actions will be logged."
         )
         email_sender_logger.config_logger(email_logger, log_level=LoggerType.INFO)
+        email_sender_logger.exclude_fields_from_logging(EmailSenderConstants.Fields.CONTEXT.value,
+                                                        EmailSenderConstants.Fields.HEADERS.value,
+                                                        ) # exclude from logging since it contains sensitive info e.g raw codes
         email_sender_logger.start_logging_session()
     else:
         purge_email_logger.info(
@@ -287,7 +294,7 @@ def hook_email_purge_report(task):
     schedule_name    = result.get("schedule_name")
 
     if use_with_logger is None:
-        use_with_logger = settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER
+        use_with_logger = getattr(settings, "DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER", None)
 
     email_sender_logger = EmailSenderLogger.create()
 
@@ -295,23 +302,27 @@ def hook_email_purge_report(task):
         _if_set_to_true_use_logger(use_with_logger, email_sender_logger)
 
         subject, html, text = _get_email_attribrutes(reports)
-        email_sender = EmailSender.create()
+        
+        email_sender        = EmailSender.create()
         if not email_sender:
             raise RuntimeError("EmailSender.create() returned None! Cannot send email.")
 
+        admin_email = settings.DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL 
         (
             email_sender_logger
             .add_email_sender_instance(email_sender)    
             .from_address(settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER)
-            .to(settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL)
-            .with_context({"reports": reports, "username": settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL})
+            .to(admin_email)
+            .with_context({"reports": reports, "username": settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME })
             .with_subject(subject)
             .with_html_template(html, "recovery_codes_deletion")
             .with_text_template(text, "recovery_codes_deletion")
             .send()
         )
 
-        email_logger.info("Purge summary email sent successfully")
+        print(email_sender_logger.return_successful_payload())
+        if email_sender_logger.return_successful_payload():
+            email_logger.info("Purge summary email sent successfully")
 
         RecoveryCodeCleanUpScheduler.objects.filter(
             name=schedule_name
