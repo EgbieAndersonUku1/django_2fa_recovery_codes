@@ -1,0 +1,136 @@
+<h1 class="margin-top-lg medium-title">View Generated Codes</h1>
+<hr class="dividor">
+<section id="generate-code" aria-label="Generated recovery codes" class="margin-top-xlg margin-bottom-xlg padding-md">
+
+    <div class="box-display bg-subtle-gray-with-padding" role="region" aria-labelledby="page-title">
+        <p><span><i class="fa-solid fa-circle-info"></i></span> Recovery codes will only be shown once.
+            Make sure to copy and save them.</p>
+
+
+
+    </div>
+
+    <div class="margin-top-sm bg-warning-with-padding">
+        <i class="fa-solid fa-exclamation font-medium-bold"></i> Important: Save Your 2FA Recovery Codes
+        <p class="margin-top-sm">
+            Your recovery codes are shown and can be downloaded only once. Please save them securely.
+        </p>
+        <p>
+            You will not be able to view or receive them again by email or download. If you plan to download or email
+            the codes, do not log out first.
+        </p>
+        <p class="margin-top-sm">
+            Logging out before saving the codes will make them inaccessible, and you will need to generate a new set or
+            access them from memory.
+            This is done by design to ensure maximum security: only the hash of the codes is stored in the database, so
+            the raw codes are lost when you log out.
+        </p>
+
+
+        <p class="padding-top-md">
+            If you lose your recovery codes, you can generate a new set, but this will invalidate all
+            previous codes.
+        </p>
+
+
+    </div>
+
+    <p class="note text-red margin-top-sm bold">
+        Recovery codes are generated securely to ensure they are unique and impossible to guess.
+        They are stored in a protected format so even our team cannot view them.
+    </p>
+
+    <p class="note margin-top-sm">
+        Note: The recovery codes are stored as a hash not as an encryption. Encryption can be unlocked
+        with a key, but hashing is one-way and cannot be undone, once hashed.
+    </p>
+
+    <div class="spinner-container center" id="table-container-spinner">
+        <span class="loader" id="table-loader"></span>
+    </div>
+
+
+    <div class="table-wrapper" id="table-code-view">
+        <!-- Generated dynamically via JS -->
+    </div>
+
+    {% if is_viewed %}
+
+    <p class="alert-message" id="alert-message">
+        <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+        You’ve already checked these codes. No worries, you can explore the other available codes options instead!
+    </p>
+
+
+    {% endif %}
+
+
+    <div id="page-buttons">
+
+    </div>
+
+    {% if is_generated %}
+
+    <div id="code-actions">
+        <div class="buttons flex-grid fourth-column-grid margin-top-lg" id="buttons-container">
+
+            <button class="generate btn-medium padding-sm title bg-green text-white" type="button"
+                id="regenerate-code-btn">
+
+
+                <span span class="loader" id="re-generate-code-loader"></span>
+
+                <span id="regennerate-code-span-text">
+                    <i class="fa-solid fa-code"></i> Regenerate code
+                </span>
+
+            </button>
+
+            <button class="generate btn-medium padding-sm title 
+                     {% if request.session.is_emailed %} bg-blue {% else %} bg-green {% endif %} 
+                        text-white" type="button" id="email-code-btn" {% if request.session.is_emailed %} disabled
+                title="You have already emailed your recovery codes." {% endif %}>
+                <span class="loader" id="email-code-loader"></span>
+                <span id="email-code-span-text">
+                    {% if request.session.is_emailed %}
+                    <i class="fa-solid fa-ban"></i> Emailed
+                    {% else %}
+                    <i class="fa-solid fa-envelope"></i> Email code
+                    {% endif %}
+                </span>
+            </button>
+
+
+            <button class="generate btn-medium padding-sm title bg-red text-white" type="button"
+                id="delete-all-code-btn">
+                <span span class="loader" id="delete-all-code-loader"></span>
+                <span id="delete-code-span-text">
+                    <i class="fa-solid fa-trash"></i>
+                    Delete all codes
+                </span>
+
+            </button>
+
+            <button class="generate btn-medium padding-sm title 
+                    {% if request.session.is_downloaded %} bg-orange {% else %} bg-blue {% endif %}
+                    text-white" type="button" id="download-code-btn" {% if request.session.is_downloaded %} disabled
+                title="You have already downloaded your recovery codes." {% endif %}>
+                <span class="loader" id="download-code-loader"></span>
+                <span id="download-code-span-text">
+                    {% if request.session.is_downloaded %}
+                    <i class="fa-solid fa-ban"></i> Downloaded
+                    {% else %}
+                    <i class="fa-solid fa-envelope"></i> Download code
+                    {% endif %}
+                </span>
+            </button>
+
+
+        </div>
+
+    </div>
+
+    {% endif %}
+
+
+</section>

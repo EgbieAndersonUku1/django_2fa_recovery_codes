@@ -1,0 +1,22 @@
+
+
+<form action="" class="post" id="verify-setup-form" aria-labelledby="verify-setup-form-label" role="form">
+   
+    <div class="form-inner padding-top-md">
+        <div class="form-group flex-grid">
+            <label for="verify-code-input" class="">Verify setup with code</label>
+            <input type="text" id="verify-code-input" name="verify_code" class="padding-md" maxlength="41"
+                minlength="41" placeholder="987A-CCSSS-9875-125468-14789D" required />
+        </div>
+        <div class="buttons">
+            <button type="submit" class="btn-medium margin-top-sm padding-sm bg-blue text-white" id="verify-code-btn">
+                <span class="loader" id="verify-setup-code-loader"></span>
+                <span id="verify-code-span-text">
+                    <i class="fa-regular fa-clipboard-check"></i> Verify setup
+                </span>
+            </button>
+        </div>
+    </div>
+</form>
+
+<hr class="dividor margin-top-xlg">

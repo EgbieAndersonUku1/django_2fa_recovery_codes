@@ -1,0 +1,47 @@
+<section id="verify-setup" class="margin-top-xlg" aria-label="Verify recovery codes">
+    <h1 class="margin-top-lg medium-title">Verify that your code has been set up correctly</h1>
+    <hr class="dividor margin-bottom-md">
+
+   
+    <div class="box-display bg-subtle-gray-with-padding border-danger margin-bottom-sm" role="region" aria-labelledby="setup-verification-title">
+        <p>This is a one-time step to confirm that your code has been configured correctly by the backend.</p>
+
+        <p class="padding-top-md">
+            <strong>Optional:</strong> This is a one-time test to confirm that your code has been configured correctly by the backend. 
+            It is not required, but recommended before relying on your codes. The form will only show up if you haven't verified your
+            tests and will remaining till you do
+        </p>
+
+        <p class="padding-top-md padding-bottom-md bold">How it works:</p>
+        <ul id="setup-verification-list" class="padding-left-md">
+            <li>Enter any code you wish to test.</li>
+            <li>The app will check with the backend to confirm whether the set-up is correct.</li>
+            <li>This test does not use up one of your codes.</li>
+            <li>If successful, you will see a confirmation message and this section will no longer be needed.</li>
+            <li>If the set-up fails, delete the code batch, generate a new one, and try again.</li>
+        </ul>
+    </div>
+
+    <!-- Conditional form (only shown for users who haven't completed setup) -->
+    {% if is_generated %}
+        {% if not user_has_done_setup %}
+            <div class="form-container margin-top-xlg" id="verify-form-container" aria-labelledby="verify-form-label">
+                {% include "django_auth_recovery_codes/partials/partial_forms/test_setup_form.html" %}
+        
+            </div>
+        {% endif %}
+    {% endif %}
+
+    
+    
+    <div class="form-container margin-top-xlg d-none"  id="dynamic-form-setup" aria-labelledby="verify-form-label">
+        {% include "django_auth_recovery_codes/partials/partial_forms/test_setup_form.html" %}
+
+    </div> 
+    <div class="results padding-top-md" id="dynamic-verify-form-container">
+          <!-- Dynamic result area (hidden initially) -->
+    </div>
+
+    <hr class="dividor margin-top-lg margin-bottom-lg">
+</section>
+

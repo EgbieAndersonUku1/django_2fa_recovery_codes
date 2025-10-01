@@ -1,0 +1,227 @@
+{% if is_generated %}
+<h1 class="margin-top-lg pb-sm medium-title" id="batch-details-history">Code Batch details History</h1>
+<hr class="dividor">
+{% endif %}
+
+
+
+
+<!-- {% if request.session.show_batch %} -->
+
+<section id="view-batch-history" class="margin-top-xlg">
+      <div class="center">
+        <span span class="loader" id="dynamic-batch-loader"></span>
+    </div>
+    <div class="container">
+
+        <div class="history-cards">
+            <div class="cards" id="static-batch-cards-history">
+
+
+                {% for recovery_batch in recovery_batches %}
+                <div class="card">
+
+                    <div class="card-head">
+
+                        <div class="info-box">
+                            <div class="label">
+                                <p>Batch id</p>
+                            </div>
+
+                            <div class="value">
+                                <p class="id">{{ recovery_batch.id | upper }}</p>
+                            </div>
+                        </div>
+
+                        <div class="info-box">
+                            <div class="label">
+                                <p>Expiry info</p>
+                            </div>
+
+                            <div class="value">
+
+                                <p
+                                    class="expiry_date status recovery_status {% if recovery_batch.status == Status.ACTIVE %} text-green {% else %} text-red {% endif %}">
+                                    {{ recovery_batch.frontend_status }}
+
+                                </p>
+
+                            </div>
+                        </div>
+                        <div class="info-box">
+                            <div class="label">
+                                <p>User</p>
+                            </div>
+
+                            <div class="value">
+                                <p class="username">{{ recovery_batch.user.username | title }} </p>
+                            </div>
+                        </div>
+
+                        <div class="info-box">
+                            <div class="label">
+                                <p>Date issued</p>
+                            </div>
+
+                            <div class="value">
+                                <p class="created_at">{{ recovery_batch.created_at }}</p>
+                            </div>
+                        </div>
+
+                        <div class="info-box">
+                            <div class="label">
+                                <p>Date modified </p>
+                            </div>
+
+                            <div class="value">
+                                <p class="modified_at">{{ recovery_batch.modified_at }}</p>
+                            </div>
+                        </div>
+
+                        {% if recovery_batch.deleted_by %}
+                        <div class="info-box">
+                            <div class="label">
+                                <p>Deleted at </p>
+                            </div>
+
+                            <div class="value">
+                                <p class="deleted_at">{{ recovery_batch.deleted_at }}</p>
+                            </div>
+                        </div>
+
+                        <div class="info-box">
+                            <div class="label">
+                                <p>Deleted by </p>
+                            </div>
+
+                            <div class="value">
+                                <p class="deleted_by">{{ recovery_batch.deleted_by }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                        <div class="info-box">
+                            <div class="label">
+                                <p>Number of Code issued</p>
+                            </div>
+
+                            <div class="value number_issued">
+                                <p>{{ recovery_batch.number_issued }}</p>
+                            </div>
+                        </div>
+
+                        <div class="info-box">
+                            <div class="label">
+                                <p class="number_issued">Number of Code used</p>
+                            </div>
+
+                            <div class="value">
+                                <p class="number_used">{{ recovery_batch.number_used }}</p>
+                            </div>
+                        </div>
+
+                        <div class="info-box">
+                            <div class="label">
+                                <p>Number of deactivated</p>
+                            </div>
+
+                            <div class="value">
+                                <p class="number_invalidated">{{ recovery_batch.number_invalidated }}</p>
+                            </div>
+                        </div>
+
+                        <div class="info-box">
+                            <div class="label">
+                                <p>Number of removed</p>
+                            </div>
+
+                            <div class="value">
+                                <p class="number_removed">{{ recovery_batch.number_removed }}</p>
+                            </div>
+                        </div>
+
+
+
+                        <div class="info-box">
+                            <div class="label">
+                                <p>Has generated code batch</p>
+                            </div>
+
+                            <div class="value">
+
+                                <p class="generated">
+                                    {{ recovery_batch.generated }}
+                                </p>
+
+                            </div>
+
+                        </div>
+
+                        <div class="info-box">
+                            <div class="label">
+                                <p>Has viewed code batch</p>
+                            </div>
+
+                            <div class="value">
+
+                                <p class="viewed">
+                                    {{ recovery_batch.viewed }}
+                                </p>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="info-box">
+                            <div class="label">
+                                <p>Has downloaded code batch</p>
+                            </div>
+
+                            <div class="value">
+
+                                <p class="downloaded">
+                                    {{ recovery_batch.downloaded }}
+                                </p>
+
+                            </div>
+
+                        </div>
+
+                        <div class="info-box">
+                            <div class="label">
+                                <p>Has emailed code batch</p>
+                            </div>
+
+                            <div class="value">
+
+                                <p class="emailed">
+                                    {{ recovery_batch.emailed }}
+                                </p>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                    <hr class="dividor margin-top-lg margin-bottom-lg">
+
+
+
+
+                </div>
+
+                {% endfor %}
+
+
+            </div>
+
+
+        </div>
+
+    </div>
+</section>
+
+<hr class="dividor margin-top-md margin-bottom-md">
+
+<!-- {% endif %} -->

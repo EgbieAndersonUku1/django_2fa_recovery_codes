@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Audit Cleanup Report</title>
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #f9f9f9; padding: 20px;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; margin: auto; background: #ffffff; border: 1px solid #ddd; border-radius: 8px;">
+    <tr>
+      <td style="padding: 20px; text-align: center; background-color: #2c3e50; color: #ffffff; border-radius: 8px 8px 0 0;">
+        <h2 style="margin: 0;">Audit Cleanup Report</h2>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding: 20px;">
+        <p>Dear Admin,</p>
+        <p>The scheduled audit cleanup task has completed successfully. Below is the summary:</p>
+
+        <table width="100%" cellpadding="8" cellspacing="0" style="border-collapse: collapse; margin-top: 15px;">
+          <tr style="background-color: #f4f6f8;">
+            <td style="border: 1px solid #ddd;"><strong>Model</strong></td>
+            <td style="border: 1px solid #ddd;">{{ model_name }}</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid #ddd;"><strong>Cutoff Date</strong></td>
+            <td style="border: 1px solid #ddd;">{{ cutoff_date }}</td>
+          </tr>
+          <tr style="background-color: #f4f6f8;">
+            <td style="border: 1px solid #ddd;"><strong>Deleted Records</strong></td>
+            <td style="border: 1px solid #ddd;">{{ deleted_count }}</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid #ddd;"><strong>Remaining Records</strong></td>
+            <td style="border: 1px solid #ddd;">{{ remaining_count }}</td>
+          </tr>
+          <tr style="background-color: #f4f6f8;">
+            <td style="border: 1px solid #ddd;"><strong>Executed At</strong></td>
+            <td style="border: 1px solid #ddd;">{{ ran_at }}</td>
+          </tr>
+          <tr>
+            <td style="border: 1px solid #ddd;"><strong>Initiated By</strong></td>
+            <td style="border: 1px solid #ddd;">{{ initiated_by }}</td>
+          </tr>
+        </table>
+
+        <p style="margin-top: 20px;">If you did not expect this cleanup or need further details, please investigate immediately.</p>
+        <p>Best regards,<br>Your System</p>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
