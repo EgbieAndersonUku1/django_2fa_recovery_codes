@@ -29,7 +29,7 @@ from django_auth_recovery_codes.models import (RecoveryCodeNotification,
                                                LoginRateLimiter)
 
 from django_auth_recovery_codes.utils.cache.safe_cache import delete_cache_with_retry
-from django_auth_recovery_codes.views import  (generate_recovery_code_fetch_helper, 
+from django_auth_recovery_codes.views_helper import  (generate_recovery_code_fetch_helper, 
                                               recovery_code_operation_helper,
                                               get_recovery_batches_context, 
                                               set_setup_flag_if_missing_and_add_to_cache
