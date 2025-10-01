@@ -1,7 +1,8 @@
 from django.urls import path
 from django_auth_recovery_codes import views
 
-from .sse import sse_notifications
+from django_auth_recovery_codes.sse import sse_notifications
+
 
 urlpatterns = [
    

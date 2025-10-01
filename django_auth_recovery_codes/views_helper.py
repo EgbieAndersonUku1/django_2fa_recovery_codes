@@ -28,9 +28,9 @@ from typing import TypedDict
 
 from django_auth_recovery_codes.utils.converter import SecondsToTime
 
-from .models import RecoveryCode, RecoveryCodeSetup, RecoveryCodesBatch, Status
-from .utils.cache.safe_cache import set_cache_with_retry, get_cache_with_retry, delete_cache_with_retry
-from .loggers.loggers import view_logger, purge_code_logger
+from django_auth_recovery_codes.models import RecoveryCode, RecoveryCodeSetup, RecoveryCodesBatch, Status
+from django_auth_recovery_codes.utils.cache.safe_cache import set_cache_with_retry, get_cache_with_retry, delete_cache_with_retry
+from django_auth_recovery_codes.loggers.loggers import view_logger, purge_code_logger
 
 
 User = get_user_model()

@@ -1,9 +1,7 @@
 import time
 from django.http import StreamingHttpResponse
 from django.contrib.auth.decorators import login_required
-from django_auth_recovery_codes.utils.cache.safe_cache import (get_cache_or_set, 
-                                                               cache_lock, 
-                                                               get_cache_with_retry,
+from django_auth_recovery_codes.utils.cache.safe_cache import (get_cache_with_retry,
                                                               delete_cache_with_retry)
 
 @login_required
