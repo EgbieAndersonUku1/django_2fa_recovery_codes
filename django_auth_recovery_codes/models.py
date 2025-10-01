@@ -510,7 +510,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         """
        
         expired_codes = self._get_expired_recovery_codes_qs(retention_days)
-        batch_id      = self.id
+        batch_id      = self.id or None
 
         if not isinstance(batch_size, int):
             raise ValueError(f"The batch size is not an integer. Expected an integer but got {type(batch_size).__name__}")
@@ -1780,7 +1780,7 @@ class RecoveryCodeNotification(models.Model):
         return f"Notification for {self.user.username} at {self.sent_at}"
 
     @classmethod
-    def get_message_notifications(cls, user: User, is_read : bool= True, number_returned = 20) -> Tuple[list, Self]:
+    def get_message_notifications(cls, user: User, is_read : bool= False, number_returned = 20) -> Tuple[list, Self]:
         """"""
         if not isinstance(is_read, bool):
             raise ValueError(f"Expected `is_read` to be a bool but got object with type {type(is_read).__name__}")
@@ -1788,7 +1788,7 @@ class RecoveryCodeNotification(models.Model):
         if not isinstance(number_returned, int):
             raise ValueError(f"Expected `number_returned` to be a int but got object with type {type(number_returned).__name__}")
 
-        notifications           = cls.objects.filter(is_read=False, user=user).order_by("-sent_at")
+        notifications           = cls.objects.filter(is_read=is_read, user=user).order_by("-sent_at")
         notifications_to_return = list(notifications[:number_returned])
         return notifications_to_return, notifications
     

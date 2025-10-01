@@ -3,40 +3,23 @@ import { checkIfHTMLElement, sleep } from "../utils.js";
 import { warnError } from "../logger.js";
 
 
-/**
- * Shows a temporary message inside a container element and hides it after a specified duration.
- *
- * @param {HTMLElement} container - The container element that holds the message (e.g., a div).
- * @param {string} message - The text content to display inside the container.
- * @param {number} [duration=MILLI_SECONDS] - Optional. The time in milliseconds before the message is hidden. Defaults to MILLI_SECONDS.
- *
- * @example
- * showTemporaryMessage(messageContainerElement, "Operation successful!", 3000);
- */
-export function showTemporaryMessage(container, message, duration = 6000) {
 
-    if (!checkIfHTMLElement(container, "container")) {
-        return;
-    }
-    
+export function showTemporaryMessage(container, message, duration = 6000) {
+    if (!checkIfHTMLElement(container, "container")) return;
+
+    const pElement = document.createElement("p");
+    pElement.textContent = message;
+    container.appendChild(pElement);
     container.classList.add("show");
 
-    let pElement = container.querySelector("p")
-    
-    if (!pElement) {
-        pElement = document.createElement("p");
-        container.appendChild(pElement);
-    }
-    
-    pElement.textContent = message;
-
-
     setTimeout(() => {
-        container.classList.remove("show");
-       
+        container.removeChild(pElement);
+        if (!container.querySelector("p")) {
+            container.classList.remove("show");
+        }
     }, duration);
 
-     return true;
+    return true;
 }
 
 

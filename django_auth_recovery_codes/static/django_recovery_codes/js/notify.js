@@ -5,7 +5,7 @@ import { getCsrfToken } from "./security/csrf.js";
 
 
 const notificationContainer = document.getElementById("notification");
-
+const enqueueMessages = [];
 
 function oneTimeElementsCheck() {
     // === Notification ===
@@ -17,15 +17,17 @@ oneTimeElementsCheck();
 
 
 
-function pushNotificatonsInToQueue(notifications, enqueueMessages) {
+function pushNotificatonsInToQueue(notifications) {
      if (notifications) {
         notifications.forEach(msg => enqueueMessages.push(msg));
         showEnqueuedMessages(enqueueMessages, notificationContainer)
     }
 }
 
-function listenForLiveSSEMessages(enqueueMessages) {
-    const es = new EventSource("/auth/recovery-codes/sse/notifications/");
+function listenForLiveSSEMessages() {
+    const es = new EventSource(`${window.location.origin}/auth/recovery-codes/sse/notifications/`);
+
+    console.log(es)
 
     es.onmessage = (evt) => {
         
@@ -43,7 +45,7 @@ function listenForLiveSSEMessages(enqueueMessages) {
  *
  * @param {string[]} enqueueMessages - Array to store incoming messages.
  */
-export async function notify_user(enqueueMessages) {
+export async function notify_user() {
 
     const data = await fetchData({
         url: "/auth/recovery-codes/notifications/",
@@ -53,8 +55,12 @@ export async function notify_user(enqueueMessages) {
         throwOnError: false
     })
 
-   pushNotificatonsInToQueue(data.notifications, enqueueMessages);
-   listenForLiveSSEMessages(enqueueMessages);
+    pushNotificatonsInToQueue(data.notifications);
+   
    
 
 }
+
+notify_user()
+listenForLiveSSEMessages();
+console.log(enqueueMessages)

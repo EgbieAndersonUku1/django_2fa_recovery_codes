@@ -703,31 +703,38 @@ def login_user(request):
     return render(request, "django_auth_recovery_codes/login.html", context)
 
 
-
 @csrf_protect
 @login_required
 def fetch_notifications(request):
+    cache_key = NOTIFICATION_CACHE_KEY.format(request.user.id)
+    HOURS_IN_SECS = 3600
+    data = []
 
-    cache_key          = NOTIFICATION_CACHE_KEY.format(request.user.id)
-    HOURS_IN_SECS      = 3600
-    notifications      = get_cache_with_retry(cache_key)
-    notifications_list = None
-    data               = []
+    # Try getting notifications from cache
+    notifications_list = get_cache_with_retry(cache_key, default=[])
 
-    if notifications is None:
+    if not notifications_list:
+        # Cache miss → fetch from DB
         notifications_list, notification_instance = RecoveryCodeNotification.get_message_notifications(user=request.user)
-    
+
+        # Cache the fetched notifications
+        if notifications_list:
+
+            set_cache_with_retry(cache_key, notifications_list, HOURS_IN_SECS, log_failures=True)
+
+            # Mark as read in DB
+            notification_instance.update(is_read=True)
+
+    else:
+       
+        notification_instance = None  # no DB objects available
+
+
     if notifications_list:
-        
-        set_cache_with_retry(cache_key, notifications_list, HOURS_IN_SECS )
-
         data = [notification.message for notification in notifications_list]
-
-        notification_instance.update(is_read=True)
+        print(data)
 
     return JsonResponse({"notifications": data}, status=200)
-
-
 
 @csrf_protect
 @require_POST

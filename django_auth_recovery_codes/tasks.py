@@ -53,6 +53,17 @@ def send_recovery_codes_email(sender_email, user, codes, subject= "Your account 
         notify_user(user, error_msg )
    
 
+def extract_data_from_expired_code_response(response):
+    purged_count, is_empty, batch_id = 0, 0, 0
+    if not response:
+        return purged_count, is_empty, batch_id
+    if len(response) == 3:
+        purged_count, is_empty, batch_id = response
+    elif len(response) == 2:
+        purged_count, is_empty = response
+        return purged_count, is_empty, batch_id
+    return purged_count, is_empty, batch_id
+
 def purge_all_expired_batches(*args, **kwargs):
     """
     Scheduled task to purge all expired recovery codes.
@@ -79,7 +90,15 @@ def purge_all_expired_batches(*args, **kwargs):
 
     for batch in batches:
 
-        purged_count, is_empty, batch_id = batch.purge_expired_codes(retention_days=retention_days, delete_empty_batch=delete_empty_batch)
+        # throws an unpacking error because `batch.purge_expired_codes` method doesn't always return 3 variables
+        try:
+            response = batch.purge_expired_codes(retention_days=retention_days, delete_empty_batch=delete_empty_batch)
+            purged_count, is_empty, batch_id = response
+        except ValueError:
+            purged_count, is_empty, batch_id = extract_data_from_expired_code_response(response)
+      
+        
+        purge_code_logger.debug(f"Values returned purged_count={purged_count}, is_empty={is_empty} and batch id = {batch_id}")
 
         if purged_count > 0:
             total_purged += purged_count
