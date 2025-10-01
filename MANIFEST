@@ -1,6 +1,6 @@
 # MANIFEST.in
 
-# Always include license, readme, and requirements
+# Always include important metadata files
 include LICENSE
 include README.md
 include requirements.txt
@@ -11,16 +11,16 @@ graft django_auth_recovery_codes/templates
 # Include static files
 graft django_auth_recovery_codes/static
 
-# Include migrations (so app installs cleanly)
+# Include migrations (so the app installs cleanly)
 graft django_auth_recovery_codes/migrations
 
 # Include locale/translation files
 graft django_auth_recovery_codes/locale
 
-# Include any other data files (text, csv, etc.)
+# Include any other data files (text, csv, json, etc.)
 recursive-include django_auth_recovery_codes *.txt *.csv *.json
 
-# Exclude Python cache and build junk
+# Exclude Python cache and build artifacts
 global-exclude __pycache__ *.py[cod] *.so
 prune build
 prune dist
