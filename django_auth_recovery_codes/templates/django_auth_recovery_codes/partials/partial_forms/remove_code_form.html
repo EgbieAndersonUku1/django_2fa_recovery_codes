@@ -1,0 +1,31 @@
+<form action="" class="post" id="delete-form" aria-labelledby="delete-form-label" role="form">
+
+  
+
+    <h1 id="delete-form-label" class="padding-top-md font-weight-500 medium-title">Delete code
+    </h1>
+    <hr class="dividor">
+
+    <div class="form-inner padding-top-md">
+        <div class="form-group flex-grid">
+            <label for="delete-code-input" class="">Code to delete</label>
+            <input type="text" id="delete-code-input" name="delete_code" class="padding-md" maxlength="41" spellcheck="false"
+                    autocorrect="off"
+                    autocomplete="off"
+                    autocapitalize="none"
+                    minlength="41" placeholder="987A-CCSSS-9875-125468-14789D" required />
+        </div>
+        <div class="buttons">
+
+            <button type="submit" class="btn-medium margin-top-sm padding-sm bg-red text-white"
+                id="delete-current-code-btn">
+                <span span class="loader" id="delete-current-code-loader"></span>
+                <span id="delete-code-span-text"> <i class="fa-solid fa-trash">
+
+                    </i> Delete code</span>
+
+
+            </button>
+        </div>
+    </div>
+</form>

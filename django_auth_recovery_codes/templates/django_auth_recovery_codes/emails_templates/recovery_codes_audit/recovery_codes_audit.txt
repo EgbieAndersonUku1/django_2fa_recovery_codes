@@ -1,0 +1,17 @@
+Audit Cleanup Report
+
+Dear Admin,
+
+The scheduled audit cleanup task has completed successfully. Below is the summary:
+
+Model: {{ model_name }}
+Cutoff Date: {{ cutoff_date }}
+Deleted Records: {{ deleted_count }}
+Remaining Records: {{ remaining_count }}
+Executed At: {{ ran_at }}
+Initiated By: {{ initiated_by }}
+
+If you did not expect this cleanup or need further details, please investigate immediately.
+
+Best regards,
+Your System

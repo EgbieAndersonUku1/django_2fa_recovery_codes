@@ -1,0 +1,18 @@
+<h1 class="margin-top-lg medium-title">Invalidate or remove Codes</h1>
+<hr class="dividor">
+<section id="invalidate-code" class="margin-top-xlg"" aria-label=" Invalidate or delete recovery codes">
+
+    <div class="box-display bg-subtle-gray-with-padding" role="region" aria-labelledby="page-title">
+        <p><span><i class="fa-solid fa-circle-info"></i></span> Enter the code you want to invalidate or
+            delete</p>
+    </div>
+    <div class="form-container two-column-grid margin-top-xlg" id="invalidate-form-container"
+        aria-labelledby="invalidate-form-label">
+
+        {% include "django_auth_recovery_codes/partials/partial_forms/invalidate_code_form.html" %}
+        {% include "django_auth_recovery_codes/partials/partial_forms/remove_code_form.html" %}
+
+
+     
+    </div>
+</section>

@@ -1,0 +1,36 @@
+<form action="{% url 'login_user' %}" method="post" id="login-recovery-form" aria-labelledby="login-recovery-form-label">
+    
+    {% csrf_token %}
+
+    <h1 id="login-recovery-form-label" class="padding-top-md font-weight-500 medium-title center title">
+        Login using your 2FA Recovery Code Backup
+    </h1>
+    <hr class="divider">
+
+    <div class="login-icon center margin-top-lg margin-bottom-lg">
+        <i class="fa-solid fa-lock" id="login-user-icon"></i>
+    </div>
+
+    <p class="small-text center">
+        If you can’t access your account or have forgot your password, use a 2FA recovery code to log in. 
+        Codes are one-time use only.
+    </p>
+    <div class="form-inner padding-top-md">
+        <div class="form-group flex-grid login-form-container">
+
+           {{ form.email.label }}
+           {{ form.email }}
+           
+           {{ form.recovery_code.label }} 
+           {{ form.recovery_code }}
+        </div>
+        <div class="buttons">
+            <button type="submit" class="btn-medium margin-top-sm padding-sm bg-red text-white" id="login-recovery-btn">
+                <span class="loader" id="login-recovery-loader"></span>
+                <span id="login-recovery-span-text">
+                    <i class="fa-solid fa-key title"></i> Login
+                </span>
+            </button>
+        </div>
+    </div>
+</form>

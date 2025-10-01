@@ -1,0 +1,10 @@
+<nav>
+    <div class="greeting flex flex-end">
+
+        {% if request.user.username %}
+             <p><span class="profile-icon"><i class="fa-solid fa-user"></i></span>Hi, {{ user.username | title }}</p>
+        {% else %}
+             <p><span class="profile-icon"><i class="fa-solid fa-user"></i></span>Hi, User</p>
+        {% endif %}
+    </div>
+</nav>

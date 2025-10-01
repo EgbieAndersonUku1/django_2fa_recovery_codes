@@ -1,0 +1,78 @@
+{% load static %}
+<div id="sidebar" class="padding-md">
+    <div id="close-icon" class="flex flex-end rotate-360">
+        <i class="fa-solid fa-bars hamburger sidebar-close-icon" id="open-hamburger-nav-icon"></i>
+        <i class="fa-solid fa-x sidebar-close-icon x-icon" id="close-nav-icon"></i>
+    </div>
+    <div class="sidebar__container" id="navigation-icon-elements">
+
+        <div class="container text-white">
+
+            <h1 class="padding-top-md small-title">{{ site_name }}</h1>
+            <hr class="dividor margin-bottom-lg ">
+        </div>
+
+        <div class="container text-white">
+            <h1 class="padding-top-md small-title text-red"><i class="fa-solid fa-d text-white"></i>&nbsp;Recovery
+                Dashboard</h1>
+        </div>
+
+        <div class="dashboard-links margin-top-md flex-grid">
+
+            <h1 class="margin-top-md small-title title text-white">Recovery Codes</h1>
+            <hr class="dividor margin-bottom-sm ">
+            <a href="#recovery-code-dashboard"
+                class="padding-left-md padding-right-md padding-top-md title sidebar-link generate-code-link-btn ">
+
+                <span><i class="fa-solid fa-code nav-icon blue"></i></span> Generate Recovery code
+            </a>
+
+            <a href="#generate-code"
+                class="pl-md padding-right-md padding-top-md title sidebar-link view-generated-code-btn-link">
+                <span><i class="fa-solid fa-street-view nav-icon orange"></i></span> View Generated code
+            </a>
+
+            <h1 class="margin-top-sm small-title title text-white ">Invalide/remove code</h1>
+            <hr class="dividor margin-bottom-sm ">
+            <a href="#invalidate-code"
+                class="padding-left-md padding-right-md padding-top-md title sidebar-link invalidate-btn-link">
+                <span><i class="fa-solid fa-ban nav-icon red"></i></span> Invalidate Code
+            </a>
+
+            <a href="#invalidate-code"
+                class="padding-left-md padding-right-md padding-top-md title sidebar-link remove-code-btn-link">
+                <span><i class="fa-solid fa-trash nav-icon teal"></i></span> Remove Code
+            </a>
+
+            <h1 class="margin-top-sm small-title title text-white ">Batch History</h1>
+            <hr class="dividor margin-bottom-sm ">
+            <a href="#view-batch-history" class="padding-left-md padding-right-md padding-top-md title sidebar-link">
+                <span><i class="fa-solid fa-book-medical nav-icon dark"></i></span> View batch history
+            </a>
+
+
+            <h1 class="margin-top-sm small-title title text-white">Verify code setup</h1>
+            <hr class="dividor margin-bottom-sm ">
+            <a href="#verify-setup" class="padding-left-md padding-right-md padding-top-md title sidebar-link">
+                <span><i class="fa-solid fa-book-medical nav-icon orange"></i></span> Verify code setup
+            </a>
+         
+
+            <h1 class="margin-top-sm small-title title text-white ">Logout</h1>
+            <hr class="dividor margin-bottom-sm ">
+            
+            
+
+            <form method="post" action="{% url 'recovery_codes_logout' %}" id="logout-form">
+                {% csrf_token %}
+                <button type="submit"
+                    class="padding-left-md padding-right-md padding-top-md title sidebar-link logout-btn-link">
+                    <span><i class="fa-solid fa-right-from-bracket nav-icon red"></i></span> Logout
+                </button>
+            </form>
+
+
+        </div>
+
+    </div>
+</div>

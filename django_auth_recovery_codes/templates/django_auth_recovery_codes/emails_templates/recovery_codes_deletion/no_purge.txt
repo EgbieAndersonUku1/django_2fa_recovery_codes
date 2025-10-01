@@ -1,0 +1,14 @@
+2FA Recovery Codes – Purge Report
+=================================
+
+Hello Admin,
+
+The latest purge operation has completed.
+
+No codes were found for purging.
+
+This means all batches currently have active codes, or there were no expired codes to remove.
+
+---
+Environment: {{ environment|default:"production" }}
+Generated: {{ now|date:"Y-m-d H:i:s T" }}

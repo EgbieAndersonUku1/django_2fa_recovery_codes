@@ -1,0 +1,112 @@
+<h1 class="margin-top-lg medium-title title ">Generate Recovery Codes</h1>
+<hr class="dividor">
+<section id="recovery-code-dashboard" aria-label="Recovery code statistics" class="margin-top-lg margin-bottom-xlg">
+
+    <div class="container margin-top-sm">
+
+
+        <div class="box-display bg-subtle-gray-with-padding margin-bottom-sm" role="region"
+            aria-labelledby="page-title">
+
+
+            <p class="margin-top-sm">
+
+                Generate your recovery codes here. Keep them somewhere safe and you’ll need them if you
+                lose your password.
+            </p>
+
+            <p class="margin-top-sm"><span><i class="fa-solid fa-circle-info"></i></span>
+                <strong>Note:</strong>
+            </p>
+
+            <ul class="padding-left-lg padding-right-xlg  margin-top-md" id="general-recovery-ul-tips">
+                <li class="margin-top-sm">If you want to give your recovery code an expiry date, check
+                    the box.
+                    Otherwise, leave it unchecked to make the code valid indefinitely.</li>
+                <li class="margin-top-sm">
+                    If you do give it an expiry date, make sure to regenerate a new
+                    code before it expires.
+                </li>
+
+                <li class="margin-top-sm">
+                    If you set an expiry date enter a number between 1 and 365, your recovery code will
+                    stay
+                    active for this many days before expiring.
+                </li>
+            </ul>
+
+
+        </div>
+
+     
+      {% if not is_generated %}
+
+        <article class="box margin-top-lg" role="group" aria-labelledby="generate-title" id="generate-code-section">
+
+            <div id="exclude-checkbox-expiry-wrapper">
+                <input type="checkbox" name="include-expiry" id="exclude_expiry" />
+                <label for="exclude-expiry">
+                    <span class="loader text-red bg-blue" id="exclude-expiry-loader">
+                    </span>Exclude Expiry data
+                </label>
+                <br>
+                <small id="exclude-expiry-desc" class="sr-only">If checked, specify number of days until
+                    expiry</small>
+            </div>
+
+            <div class="flex-group margin-top-xlg" id="days-to-expiry-group">
+
+                <form action="#" method="post" id="generate-form-code-with-expiry" role="form">
+                    <div class="margin-top-sm">
+                        <label for="days-to-expiry" class="sr-only font-weight-500 font-label">Number of
+                            days to
+                            expiry</label>
+
+                        <div class="two-column-grid flex-grid">
+                            <input type="number" name="days-to-expiry" id="days-to-expiry" min="1" max="365" step="1"
+                                maxlength="3" placeholder="Add number of days e.g 1..." class="padding-sm" required />
+                            <span class="highlight center title" id="expiry-date-span">days</span>
+                        </div>
+
+                    </div>
+
+                    <!-- This button belongs to the expiry form. 
+                                    It is only visible when the user chooses to include expiry days. 
+                                    If the user chooses to exclude expiry days, this button is hidden. 
+                                    -->
+                    <div class="margin-top-sm">
+                        <button type="submit" class="btn-medium padding-sm title bg-green text-white"
+                            id="form-generate-code-btn">
+                            <span class="loader" id="generate-code-loader"></span>
+                            <span id="form-generate-code-span-text">Generate code</span>
+                        </button>
+                    </div>
+
+                </form>
+
+            </div>
+
+            <!-- This button is used when generating an indefinite code, 
+                            where no form submission is required. 
+                            In this case, the code is generated via the Fetch API. 
+                            -->
+            <div class="margin-top-sm d-none" id="generate-code-button-wrapper">
+                <button type="button" class="btn-medium padding-sm title bg-green text-white"
+                    id="generate-code-with-no-expiry-btn">
+                    <span class="loader" id="generate-code-without-expiry-loader"></span>
+                    <span id="generate-code-span-text">Generate code</span>
+                </button>
+            </div>
+
+
+        </article>
+     {% else %} 
+        <p class="alert-message success margin-top-md">
+            <i class="fas fa-check-circle" aria-hidden="true"></i>
+                You have successfully generated your 2FA recovery codes. Keep them safe in case you lose access to your 2FA device.
+
+        </p>
+
+     {% endif %}
+    </div>
+</section>

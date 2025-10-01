@@ -1,0 +1,38 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="{% block meta-description %}{% endblock %}">
+    <meta name="keywords" content="{% block meta-keywords %}{% endblock %}">
+    <meta name="csrf-token" content="{{ csrf_token }}" id="csrf_token">
+
+    
+
+     <!-- Favicon with default fallback -->
+    <link rel="shortcut icon" 
+          href="{% block falcon %}{% static 'images/default-favicon.ico' %}{% endblock %}" type="image/x-icon">
+
+    <link rel="stylesheet" href="{% static 'vendor/fontawesome/css/all.min.css' %}">
+    <link rel="stylesheet" href="{% static 'django_recovery_codes/css/css.css' %}">
+    <link rel="stylesheet" href="{% static 'vendor/fonts/fonts.css' %}">
+     {% block extra_styles %}{% endblock %}
+    <title>Auth Recovery Codes - {% block title %}{% endblock %}</title>
+</head>
+
+
+<body>
+    <main>
+        {% block content %}{% endblock  %}
+
+    </main>
+
+ <script src="{% static 'vendor/sweetalert2/sweetalert2.all.min.js' %}"></script>
+
+ {% block extra_scripts %}{% endblock %}
+</body>
+ 
+</html>
