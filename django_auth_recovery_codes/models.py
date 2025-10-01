@@ -1622,13 +1622,12 @@ class LoginRateLimiter(AbstractCooldownPeriod, AbstractBaseModel):
             user (User): The user instance
         """
         cls.is_user_valid(user)
-        cls._is_login_rate_limiter_valid(login_rate_limiter)    
-  
+       
         cache_key            = f"login_rate_limiter_{user.id}"
         login_rate_limiter   = get_cache_with_retry(cache_key, default=None)
-       
+      
         if login_rate_limiter is None:
-            login_rate_limiter = LoginRateLimiter.get_by_user(user)
+            login_rate_limiter = LoginRateLimiter.get_by_user_or_create(user)
 
             default_logger.debug(f"[DATBABASE_RETRIEVAL] Getting the value from the database using 'LoginRateLimiter.get_by_user()'")
             set_cache_with_retry(cache_key, value=login_rate_limiter, ttl=ttl)
@@ -1655,7 +1654,10 @@ class LoginRateLimiter(AbstractCooldownPeriod, AbstractBaseModel):
                 If `login_rate_limiter` does not have the required attributes 
                 (`login_attempts`, `max_login_attempts`).
         """
+        if not login_rate_limiter:
+            raise ValueError("Expected a login limiter got None")
         return login_rate_limiter.login_attempts < login_rate_limiter.max_login_attempts
+        
   
     @classmethod
     def _check_temporary_lockout(cls, user: "User") -> Tuple[bool, int]:
@@ -1760,5 +1762,35 @@ class LoginRateLimiter(AbstractCooldownPeriod, AbstractBaseModel):
         return cls._unlock_user(login_rate_limiter, user, cache_key)
 
        
-     
-   
+    
+class RecoveryCodeNotification(models.Model):
+    user       = models.ForeignKey(User, on_delete=models.CASCADE, related_name="recovery_notifications")
+    message    = models.TextField()
+    sent_at    = models.DateTimeField(auto_now_add=True)
+    is_read    = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering            = ["-sent_at"]
+        verbose_name        = "Recovery Code Notification"
+        verbose_name_plural = "Recovery Code Notifications"
+
+    def __str__(self):
+        return f"Notification for {self.user.username} at {self.sent_at}"
+
+    @classmethod
+    def get_message_notifications(cls, user: User, is_read : bool= True, number_returned = 20) -> Tuple[list, Self]:
+        """"""
+        if not isinstance(is_read, bool):
+            raise ValueError(f"Expected `is_read` to be a bool but got object with type {type(is_read).__name__}")
+        
+        if not isinstance(number_returned, int):
+            raise ValueError(f"Expected `number_returned` to be a int but got object with type {type(number_returned).__name__}")
+
+        notifications           = cls.objects.filter(is_read=False, user=user).order_by("-sent_at")
+        notifications_to_return = list(notifications[:number_returned])
+        return notifications_to_return, notifications
+    
+ 
+

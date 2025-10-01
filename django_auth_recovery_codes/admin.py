@@ -7,6 +7,7 @@ from .models import (RecoveryCode,
                      RecoveryCodeAudit, 
                      RecoveryCodePurgeHistory,
                      RecoveryCodeAuditScheduler,
+                     RecoveryCodeNotification,
                      RecoveryCodeEmailLog,
                      RecoveryCodeSetup,
                      LoginRateLimiter,
@@ -239,6 +240,14 @@ class RecoveryCodeAdmin(admin.ModelAdmin):
     ]
 
 
+
+class RecoveryNotificationAdmin(BaseAdmin):
+    """Tracks the notification"""
+    list_display       = ["id", "sent_at", "is_read", "created_at", "modified_at"]
+    list_display_links = ["id"]
+    readonly_fields    = ["id", "sent_at", "is_read", "created_at", "modified_at"]
+
+
 admin.site.register(RecoveryCodesBatch, RecoveryCodesBatchAdmin)
 admin.site.register(RecoveryCode, RecoveryCodeAdmin)
 admin.site.register(RecoveryCodeAudit, RecoveryCodeAuditAdmin)
@@ -249,3 +258,4 @@ admin.site.register(RecoveryCodeEmailLog, RecoveryCodeEmailLogAdmin)
 admin.site.register(RecoveryCodeSetup, RecoveryCodeSetupAdmin)
 admin.site.register(LoginRateLimiter, LoginRateLimiterAdmin)
 admin.site.register(LoginRateLimterAudit, LoginRateLimterAuditAdmin)
+admin.site.register(RecoveryCodeNotification, RecoveryNotificationAdmin)

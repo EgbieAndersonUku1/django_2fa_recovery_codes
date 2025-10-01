@@ -1,6 +1,6 @@
 
-import { sleep } from "../utils.js";
-import { checkIfHTMLElement } from "../utils.js";
+import { checkIfHTMLElement, sleep } from "../utils.js";
+import { warnError } from "../logger.js";
 
 
 /**

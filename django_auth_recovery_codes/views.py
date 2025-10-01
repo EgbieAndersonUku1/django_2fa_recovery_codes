@@ -22,7 +22,7 @@ from typing import Tuple
 
 from .forms.login_form import LoginForm
 from django_auth_recovery_codes.utils.converter import SecondsToTime
-from .models import RecoveryCodesBatch, RecoveryCode, RecoveryCodeSetup, LoginRateLimiter
+from .models import RecoveryCodeNotification, RecoveryCodesBatch, RecoveryCode, RecoveryCodeSetup, LoginRateLimiter
 from django_auth_recovery_codes.utils.cache.safe_cache import delete_cache_with_retry
 from .views_helper import  (generate_recovery_code_fetch_helper, 
                             recovery_code_operation_helper,
@@ -37,10 +37,11 @@ from .utils.cache.safe_cache import (get_cache_or_set, set_cache,
 from .loggers.loggers import view_logger
 from .tasks import send_recovery_codes_email
 from .utils.exporters.file_converters import to_csv, to_pdf, to_text
+from .utils.notification import save_notification_in_cache, NOTIFICATION_CACHE_KEY
 
 
 CACHE_KEY            = 'recovery_codes_generated_{}'
-MINUTES_IN_SECONDS   = 300
+MINUTES_IN_SECONDS   = 600
 
 
 TTL = getattr(settings, 'DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL', MINUTES_IN_SECONDS)
@@ -700,6 +701,31 @@ def login_user(request):
                                     
     context["form"] = form
     return render(request, "django_auth_recovery_codes/login.html", context)
+
+
+
+@csrf_protect
+@login_required
+def fetch_notifications(request):
+
+    cache_key          = NOTIFICATION_CACHE_KEY.format(request.user.id)
+    HOURS_IN_SECS      = 3600
+    notifications      = get_cache_with_retry(cache_key)
+    notifications_list = None
+    data               = []
+
+    if notifications is None:
+        notifications_list, notification_instance = RecoveryCodeNotification.get_message_notifications(user=request.user)
+    
+    if notifications_list:
+        
+        set_cache_with_retry(cache_key, notifications_list, HOURS_IN_SECS )
+
+        data = [notification.message for notification in notifications_list]
+
+        notification_instance.update(is_read=True)
+
+    return JsonResponse({"notifications": data}, status=200)
 
 
 
