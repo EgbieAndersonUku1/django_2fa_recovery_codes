@@ -15,7 +15,7 @@ from django.db import models
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 
-from .utils.cache.safe_cache import delete_cache_with_retry, get_cache_with_retry
+from django_auth_recovery_codes.utils.cache.safe_cache import delete_cache_with_retry, get_cache_with_retry
 from django_auth_recovery_codes.app_settings import default_cooldown_seconds, default_multiplier
 
 

@@ -20,24 +20,30 @@ from django.http import HttpResponse
 from django.conf import settings
 from typing import Tuple
 
-from .forms.login_form import LoginForm
+from django_auth_recovery_codes.forms.login_form import LoginForm
 from django_auth_recovery_codes.utils.converter import SecondsToTime
-from .models import RecoveryCodeNotification, RecoveryCodesBatch, RecoveryCode, RecoveryCodeSetup, LoginRateLimiter
+from django_auth_recovery_codes.models import (RecoveryCodeNotification, 
+                                               RecoveryCodesBatch,
+                                               RecoveryCode, 
+                                               RecoveryCodeSetup, 
+                                               LoginRateLimiter)
+
 from django_auth_recovery_codes.utils.cache.safe_cache import delete_cache_with_retry
-from .views_helper import  (generate_recovery_code_fetch_helper, 
-                            recovery_code_operation_helper,
-                            get_recovery_batches_context, 
-                            set_setup_flag_if_missing_and_add_to_cache
-                            )
-from .utils.cache.safe_cache import (get_cache_or_set, set_cache, 
-                                     get_cache_with_retry, 
-                                     set_cache_with_retry, 
+from django_auth_recovery_codes.views import  (generate_recovery_code_fetch_helper, 
+                                              recovery_code_operation_helper,
+                                              get_recovery_batches_context, 
+                                              set_setup_flag_if_missing_and_add_to_cache
+                                             )
+
+from django_auth_recovery_codes.utils.cache.safe_cache import (get_cache_or_set, set_cache, 
+                                                                get_cache_with_retry, 
+                                                                set_cache_with_retry, 
                                      )
 
-from .loggers.loggers import view_logger
-from .tasks import send_recovery_codes_email
-from .utils.exporters.file_converters import to_csv, to_pdf, to_text
-from .utils.notification import save_notification_in_cache, NOTIFICATION_CACHE_KEY
+from django_auth_recovery_codes.loggers.loggers import view_logger
+from django_auth_recovery_codes.tasks import send_recovery_codes_email
+from django_auth_recovery_codes.utils.exporters.file_converters import to_csv, to_pdf, to_text
+from django_auth_recovery_codes.utils.notification import NOTIFICATION_CACHE_KEY
 
 
 CACHE_KEY            = 'recovery_codes_generated_{}'

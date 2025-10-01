@@ -45,7 +45,7 @@ from django_auth_recovery_codes.utils.utils import (
     schedule_future_date,
 )
 
-from .utils.attempt_guard import AttemptGuard
+from django_auth_recovery_codes.utils.attempt_guard import AttemptGuard
 
 User   = get_user_model()
 logger = logging.getLogger("auth_recovery_codes")

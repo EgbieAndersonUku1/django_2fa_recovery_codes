@@ -1,8 +1,5 @@
 import logging
 from django.apps import AppConfig
-from django.utils import timezone
-
-
 
 logger = logging.getLogger(__name__)
 
