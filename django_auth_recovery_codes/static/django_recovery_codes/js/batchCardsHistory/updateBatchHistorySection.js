@@ -196,8 +196,6 @@ export function updateBatchHistorySection(sectionElement,
     
     let previousBatchCard;
     
-    dynamicBatchSpinnerElement               = getOrFetchElement(dynamicBatchSpinnerElement, DYNAMIC_BATCH_LOADER_ID);
-    dynamicBatchSpinnerElement.style.display = "inline-block";
     toggleSpinner(dynamicBatchSpinnerElement);
 
     setTimeout(() => {
