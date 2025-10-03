@@ -48,16 +48,14 @@
 
 
 
-import messageContainerElement                  from "./appMessages.js";
-import EnqueuedMessages                         from "../messages/enqueueMessages.js";
-import { handleButtonAlertClickHelper }         from "./handleButtonAlertClicker.js";
-import { sendPostFetchWithoutBody }             from "../fetch.js";
-import { updateButtonFromConfig, buttonStates } from "../generateCodeActionButtons.js";
-import { toggleButtonDisabled}                  from "../utils.js";
-import { toggleProcessMessage }                 from "./handleButtonAlertClicker.js";
-import { showTemporaryMessage }                 from "../messages/message.js";
-import { markCurrentCardBatchAsEmailed }        from "../batchCardsHistory/updateBatchHistorySection.js";
-import { getOrFetchElement }                    from "../utils.js";
+import messageContainerElement                   from "./appMessages.js";
+import EnqueuedMessages                           from "../messages/enqueueMessages.js";
+import { handleButtonAlertClickHelper }           from "./handleButtonAlertClicker.js";
+import { sendPostFetchWithoutBody }               from "../fetch.js";
+import { updateButtonFromConfig, buttonStates }   from "../generateCodeActionButtons.js";
+import { toggleButtonDisabled, getOrFetchElement} from "../utils.js";
+import { showTemporaryMessage }                   from "../messages/message.js";
+import { markCurrentCardBatchAsEmailed }          from "../batchCardsHistory/updateBatchHistorySection.js";
 
 
 const EMAIL_LOADER_ID           = "email-code-loader";
@@ -105,7 +103,7 @@ export async function handleEmailCodeeButtonClick(e, emailButtonID) {
 
     if (resp === undefined) {
         showTemporaryMessage("Something went wrong and the email wasn't sent");
-        toggleProcessMessage(false);
+
         return;
     }
    
@@ -140,11 +138,7 @@ function handleEmailSuccessMessageUI(e, resp) {
     enqueuedMessages.showEnqueuedMessages(messageContainerElement);
     markCurrentCardBatchAsEmailed();
 
-    setTimeout(() => {
-        toggleProcessMessage(false);
-
-    }, MILLI_SECONDS);
-   
+ 
 }
 
 
@@ -163,5 +157,4 @@ function handleEmailFailureMessageUI(resp) {
         enqueuedMessages.showEnqueuedMessages(messageContainerElement);
     }
  
-    toggleProcessMessage(false)
 }

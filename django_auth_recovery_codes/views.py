@@ -2,48 +2,52 @@ import logging
 import json
 import threading
 
-from django.db import IntegrityError
-from django.urls.exceptions import NoReverseMatch
-from django.contrib import messages
-from django.contrib.auth import login
-from django.views.decorators.http import require_POST
-from django.contrib.auth import logout
-from django_q.tasks import async_task
-from django.http import JsonResponse
-from django.shortcuts import render, redirect
-from django.urls import reverse
+from django.conf                    import settings
+from django.db                      import IntegrityError
+from django.urls.exceptions         import NoReverseMatch
+from django.contrib                 import messages
+from django.contrib.auth            import login
+from django.views.decorators.http   import require_POST
+from django.contrib.auth            import logout
+from django_q.tasks                 import async_task
+from django.http                    import JsonResponse
+from django.shortcuts               import render, redirect
+from django.urls                    import reverse
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.csrf import csrf_protect
-from django.views.decorators.http import require_http_methods
-from django.contrib.auth import get_user_model
-from django.http import HttpResponse
-from django.conf import settings
-from typing import Tuple
+from django.views.decorators.csrf   import csrf_protect
+from django.views.decorators.http   import require_http_methods
+from django.contrib.auth            import get_user_model
+from django.http                    import HttpResponse
+from django.conf                    import settings
+from typing                         import Tuple
 
 from django_auth_recovery_codes.forms.login_form import LoginForm
-from django_auth_recovery_codes.utils.converter import SecondsToTime
-from django_auth_recovery_codes.models import (RecoveryCodeNotification, 
-                                               RecoveryCodesBatch,
-                                               RecoveryCode, 
-                                               RecoveryCodeSetup, 
-                                               LoginRateLimiter)
+from django_auth_recovery_codes.utils.converter  import SecondsToTime
+from django_auth_recovery_codes.models           import (
+                                                        RecoveryCodesBatch,
+                                                        RecoveryCode, 
+                                                        RecoveryCodeSetup, 
+                                                        LoginRateLimiter
+                                                        )
 
-from django_auth_recovery_codes.utils.cache.safe_cache import delete_cache_with_retry
-from django_auth_recovery_codes.views_helper import  (generate_recovery_code_fetch_helper, 
-                                              recovery_code_operation_helper,
-                                              get_recovery_batches_context, 
-                                              set_setup_flag_if_missing_and_add_to_cache
-                                             )
+from django_auth_recovery_codes.utils.cache.safe_cache    import delete_cache_with_retry
+
+from django_auth_recovery_codes.views_helper              import set_setup_flag_if_missing_and_add_to_cache
+from django_auth_recovery_codes.views_dashboard_helper    import get_recovery_batches_context
+from django_auth_recovery_codes.views_code_handler_helper import  (generate_recovery_code_fetch_helper, 
+                                                                  recovery_code_operation_helper,
+                                                                  )
 
 from django_auth_recovery_codes.utils.cache.safe_cache import (get_cache_or_set, set_cache, 
-                                                                get_cache_with_retry, 
-                                                                set_cache_with_retry, 
-                                     )
+                                                               get_cache_with_retry, 
+                                                               set_cache_with_retry, 
+                                                                )
 
-from django_auth_recovery_codes.loggers.loggers import view_logger
-from django_auth_recovery_codes.tasks import send_recovery_codes_email
-from django_auth_recovery_codes.utils.exporters.file_converters import to_csv, to_pdf, to_text
-from django_auth_recovery_codes.utils.notification import NOTIFICATION_CACHE_KEY
+from django_auth_recovery_codes.loggers.loggers                 import view_logger
+from django_auth_recovery_codes.tasks                           import send_recovery_codes_email
+from django_auth_recovery_codes.views_download_helper           import format_recovery_codes_for_download
+from django_auth_recovery_codes.utils.errors.error_messages     import construct_raised_error_msg
+from django_auth_recovery_codes.utils.errors.enforcer           import enforce_types
 
 
 CACHE_KEY            = 'recovery_codes_generated_{}'
@@ -89,9 +93,6 @@ def recovery_codes_regenerate(request):
     return generate_recovery_code_fetch_helper(request, CACHE_KEY, regenerate_code = True)
    
 
-
-
-
 @require_http_methods(['POST'])
 @csrf_protect
 @login_required
@@ -129,22 +130,26 @@ def delete_recovery_code(request):
         messages or errors.
     """
 
+    @enforce_types()
     def delete_code(recovery_code: RecoveryCode) -> Tuple[bool, dict]:
+        """
+        Delete a RecoveryCode instance and update its batch counts.
 
-        if not recovery_code:
-            raise TypeError("The reocvery code instance must not be none")
-        
-        if not isinstance(recovery_code, RecoveryCode):
-            raise TypeError(f"The recovery code must be an instance of the Recovery Model",
-                            f"Expected a recovery model instance but got object with type: {type(recovery_code.__name__)}"
-                            )
-        
+        The `enforce_types` decorator ensures that `recovery_code` is a valid
+        RecoveryCode instance and not None, raising TypeError if the check fails.
+
+        Args:
+            recovery_code (RecoveryCode): The recovery code instance to delete.
+
+        Returns:
+            Tuple[bool, dict]: A tuple containing a success flag and a dictionary
+            with operation messages.
+        """
         recovery_code.delete_code()
         recovery_code_batch = recovery_code.batch
         recovery_code_batch.update_delete_code_count(save=True)
 
-        
-        response_data = {
+        return {
             "SUCCESS": True,
             "OPERATION_SUCCESS": True,
             "TITLE": "Code deleted",
@@ -152,12 +157,7 @@ def delete_recovery_code(request):
             "ALERT_TEXT": "Code successfully deleted"
         }
 
-        cache_key = f"attempts:recovery_code:{request.user.id}"
-        delete_cache_with_retry(cache_key)
-
-        return response_data
         
-    
     delete_code.operation_name = "delete"  # Assign a custom attribute to the function for the helper to use
     return recovery_code_operation_helper(request, delete_code)
 
@@ -190,17 +190,22 @@ def invalidate_user_code(request):
         deactivated. The response contains 'SUCCESS' and may include additional
         messages or errors.
     """
-
+    
+    @enforce_types()
     def invalidate_code(recovery_code: RecoveryCode) -> dict:
+        """
+        Deactivate a RecoveryCode instance and update its batch counts.
 
-        if not recovery_code:
-            raise TypeError("The reocvery code instance must not be none")
-        
-        if not isinstance(recovery_code, RecoveryCode):
-            raise TypeError(f"The recovery code must be an instance of the Recovery Model",
-                            f"Expected a recovery model instance but got object with type: {type(recovery_code.__name__)}"
-                            )
-        
+        Type and non-None checks for `recovery_code` are enforced automatically
+        by the `enforce_types` decorator, raising TypeError if invalid.
+
+        Args:
+            recovery_code (RecoveryCode): The recovery code instance to deactivate.
+
+        Returns:
+            dict: A dictionary with status and messages about the operation.
+        """
+     
         recovery_code.invalidate_code()
         recovery_code_batch = recovery_code.batch
         recovery_code_batch.update_invalidate_code_count(save=True)
@@ -278,33 +283,7 @@ def download_code(request):
 
     set_cache(CACHE_KEY,  recovery_batch.get_cache_values(), TTL)
 
-    # Determine desired format (default to TXT)
-    format_to_save = getattr(settings, 'DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT', 'txt')
-    file_name      = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME", "recovery_codes")
-
-    # Default filename and content
-    defaault_file_name = "recovery_codes.txt"
-    response_content   = b""
-    content_type       = "text/plain"
-
-    match format_to_save:
-
-        case "txt":
-            response_content = to_text(raw_codes).encode("utf-8")
-
-        case "csv":
-
-            file_name        = "recovery_codes.csv"
-            response_content = to_csv(raw_codes).encode("utf-8")
-            content_type     = "text/csv"
-
-        case "pdf":
-            file_name        = "recovery_codes.pdf"
-            response_content = to_pdf(raw_codes)
-            content_type     = "application/pdf"
-   
-    if not file_name:
-        file_name = defaault_file_name
+    response_content, content_type, file_name = format_recovery_codes_for_download(raw_codes)
         
     response = HttpResponse(response_content, content_type=content_type)
 
@@ -447,16 +426,17 @@ def email_recovery_codes(request):
     recovery_batch.mark_as_emailed()
 
     set_cache_with_retry(CACHE_KEY.format(user.id), recovery_batch.get_cache_values(), TTL)
-   
+    
+    default_email_success_msg       = "Success! Your email has been sent."
     request.session["is_emailed"]   = True  # needed to hide the page in the UI
     request.session["force_update"] = True
+
     resp.update({
-        "MESSAGE": "Recovery codes email has been queued. We will notify you once they have been sent",
+        "MESSAGE": getattr(settings, "DJANGO_AUTH_RECOVERY_CODE_EMAIL_SUCCESS_MSG", default_email_success_msg),
         "SUCCESS": True,
     })
     return JsonResponse(resp, status=200)
     
-
 
 @require_http_methods(['POST'])
 @csrf_protect
@@ -559,7 +539,7 @@ def verify_test_code_setup(request):
 
         result = RecoveryCodesBatch.verify_setup(request.user, plaintext_code)
         if not isinstance(result, dict):
-            raise TypeError(f"Expected a dictionary but got object with type ({type(result).__name__})")
+            raise TypeError(construct_raised_error_msg("result", dict, result))
         
         response_data.update(result)
         
@@ -651,7 +631,7 @@ def recovery_dashboard(request):
         
     
     if not isinstance(recovery_batch_context, dict):
-        raise TypeError(f"Expected a context dictionary but got object with type {type(recovery_batch_context).__name__}")
+        raise TypeError(construct_raised_error_msg("Context dictionary", dict, recovery_batch))
 
     context.update(recovery_batch_context)
     
@@ -672,8 +652,8 @@ def login_user(request):
 
         if form.is_valid():
 
-            recovery_code = form.cleaned_data["recovery_code"]
-            email         = form.cleaned_data["email"].strip()
+            recovery_code        = form.cleaned_data["recovery_code"]
+            email                = form.cleaned_data["email"].strip()
             can_login, wait_time = None, None
 
             try:
@@ -709,38 +689,6 @@ def login_user(request):
     return render(request, "django_auth_recovery_codes/login.html", context)
 
 
-@csrf_protect
-@login_required
-def fetch_notifications(request):
-    cache_key = NOTIFICATION_CACHE_KEY.format(request.user.id)
-    HOURS_IN_SECS = 3600
-    data = []
-
-    # Try getting notifications from cache
-    notifications_list = get_cache_with_retry(cache_key, default=[])
-
-    if not notifications_list:
-        # Cache miss → fetch from DB
-        notifications_list, notification_instance = RecoveryCodeNotification.get_message_notifications(user=request.user)
-
-        # Cache the fetched notifications
-        if notifications_list:
-
-            set_cache_with_retry(cache_key, notifications_list, HOURS_IN_SECS, log_failures=True)
-
-            # Mark as read in DB
-            notification_instance.update(is_read=True)
-
-    else:
-       
-        notification_instance = None  # no DB objects available
-
-
-    if notifications_list:
-        data = [notification.message for notification in notifications_list]
-        print(data)
-
-    return JsonResponse({"notifications": data}, status=200)
 
 @csrf_protect
 @require_POST

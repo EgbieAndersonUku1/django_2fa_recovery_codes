@@ -53,6 +53,7 @@ import { AlertUtils } from "../alerts.js";
 import { updateBatchHistorySection } from "../batchCardsHistory/updateBatchHistorySection.js";
 import { updateCurrentRecoveryCodeBatchCard } from "../batchCardsHistory/updateBatchHistorySection.js";
 import { loadTestVerificationElements } from "../codesSetupVerifcation/handleTestSetup.js";
+import { updateButtonFromConfig, buttons }   from "../generateCodeActionButtons.js";
 import { sendPostFetchWithoutBody } from "../fetch.js";
 import fetchData from "../fetch.js";
 import { showTemporaryMessage } from "../messages/message.js";
@@ -60,10 +61,12 @@ import { getCsrfToken } from "../security/csrf.js";
 import appStateManager from "../state/appStateManager.js";
 import { showSpinnerFor, toggleSpinner, toggleElement, getOrFetchElement } from "../utils.js";
 
+
+import { safeUIUpdate } from "../utils.js";
+
 // Local imports
 import messageContainerElement from "./appMessages.js";
 import { handleButtonAlertClickHelper } from "./handleButtonAlertClicker.js";
-import { toggleProcessMessage } from "./handleButtonAlertClicker.js";
 import { handleFormSubmissionHelper } from "./formUtils.js";
 import { populateTableWithUserCodes } from "./tableUtils.js";
 import { generaterecoveryBatchSectionElement, recoveryBatchSectionElement } from "../batchCardsHistory/batchCardElements.js";
@@ -78,12 +81,16 @@ const GENERATE_LOADER_ID = "generate-code-loader";
 const GENERATE_CODE_WITHOUT_EXPIRY_LOADER_ID = "generate-code-without-expiry-loader";
 const EXCLUDE_EXPIRY_LOADER_ID = "exclude-expiry-loader";
 const TABLE_LOADER_ID = "table-loader";
+const EMAIL_BUTTON_ID = "email-code-btn";
+const DOWNLOAD_CODE_BTN_ID = "download-code-btn";
 
 // Loader elements
 let generateCodeWithExirySpinnerElement = document.getElementById(GENERATE_LOADER_ID);
 let generateCodeWithNoExpirySpinnerElement = document.getElementById(GENERATE_CODE_WITHOUT_EXPIRY_LOADER_ID);
 let excludeSpinnerLoaderElement = document.getElementById(EXCLUDE_EXPIRY_LOADER_ID);
 let tableCoderSpinnerElement = document.getElementById(TABLE_LOADER_ID);
+let emailButtonElement            = document.getElementById(EMAIL_BUTTON_ID);
+let downloadButtonElement         = document.getElementById(DOWNLOAD_CODE_BTN_ID)
 
 // button elements
 const generateButtonElement = document.getElementById("generate-code-button-wrapper");
@@ -94,8 +101,63 @@ const dynamicTestFormSetupElement = document.getElementById("dynamic-form-setup"
 const verifyTestFormContainer = document.getElementById("verify-form-container");
 
 
+function handleTableSpinnerElements() {
+    tableCoderSpinnerElement.style.display = "inline-block";
+    toggleSpinner(tableCoderSpinnerElement);
+}
 
 
+function resetEmailButton() {
+    const msg = "Click the button to email your code"
+    resetButtonsHelper(emailButtonElement,
+                        EMAIL_BUTTON_ID,
+                        buttons.emailCode,
+                        msg,
+                       
+
+    )
+}
+
+
+function resetDownloadButton() {
+    const msg = "Click the button to download your code"
+    resetButtonsHelper(downloadButtonElement,
+                        DOWNLOAD_CODE_BTN_ID,
+                         buttons.downloadCode,
+                        msg,
+                       
+    )
+}
+
+
+function resetButtonsHelper(buttonElement, buttonID, buttonNewState, buttonMsg) {
+    buttonElement = getOrFetchElement(buttonElement, buttonID);
+    if (!buttonElement) return;
+
+    console.log(buttonNewState);
+    
+    // Check that the config is valid
+    if (!buttonNewState || !buttonNewState.button || !buttonNewState.button.buttonClassList) {
+        console.warn(
+            `Invalid button config passed for button with ID "${buttonID}".`,
+            buttonNewState,
+        );
+        return;
+    }
+
+    // Check that buttonMsg is a string
+    if (typeof buttonMsg !== "string") {
+        console.warn(
+            `Button message should be a string for button with ID "${buttonID}".`,
+            buttonMsg
+        );
+        buttonMsg = "";
+    }
+
+    // safe update
+    updateButtonFromConfig(buttonElement, buttonNewState, buttonMsg);
+    
+}
 
 /**
  * Handles the click event for the "Generate Code" button.
@@ -221,7 +283,7 @@ export async function handleRegenerateCodeButtonClick(e, regenerateButtonID, ale
 
     }
 
-    handleRecoveryCodesAction({
+    return handleRecoveryCodesAction({
         e: e,
         generateCodeBtn: regenerateButtonID,
         generateCodeBtnSpinnerElement: generateCodeWithNoExpirySpinnerElement,
@@ -307,7 +369,7 @@ function handleCanGenerateCodeSuccessUI(resp) {
     toggleElement(generaterecoveryBatchSectionElement);
 
     const isPopulated = populateTableWithUserCodes(resp.CODES);
-    const MILLI_SECONDS = 5000;
+    const MILLI_SECONDS = 1000;
   
     if (isPopulated) {
 
@@ -315,9 +377,15 @@ function handleCanGenerateCodeSuccessUI(resp) {
         updateBatchHistorySection(recoveryBatchSectionElement, resp.BATCH, resp.ITEM_PER_PAGE);
 
      
-        if (!appStateManager.isRequestCodeGenerationActive()) {           
+        if (appStateManager.isRequestCodeGenerationActive()) {           
             toggleElement(codeActionButtons, false);
-        } 
+            setTimeout(() => {
+                resetEmailButton();
+                resetDownloadButton();
+            }, MILLI_SECONDS);
+        } else {
+            toggleElement(codeActionButtons, false);
+        }
 
         appStateManager.setCodeGeneration(false);
         handleInitializeFirstTimeVerificationTest(resp);
@@ -325,9 +393,6 @@ function handleCanGenerateCodeSuccessUI(resp) {
 
     }
 
-    setTimeout(() => {
-        toggleProcessMessage(false);
-    }, MILLI_SECONDS)
     return true;
 }
 
@@ -472,6 +537,8 @@ async function handleRecoveryCodesAction({ e,
     body.forceUpdate = true;
 
     toggleElement(generaterecoveryBatchSectionElement);
+
+    console.log(appStateManager.isRequestCodeGenerationActive())
     toggleElement(codeActionButtons);
 
     const handleGenerateCodeFetchApi = async () => {
@@ -486,9 +553,8 @@ async function handleRecoveryCodesAction({ e,
         return resp;
     }
 
-    tableCoderSpinnerElement.style.display = "inline-block";
-    toggleSpinner(tableCoderSpinnerElement);
-
+    handleTableSpinnerElements();
+   
     const resp = await handleButtonAlertClickHelper(e,
         generateCodeBtn,
         generateCodeBtnSpinnerElement,
@@ -500,7 +566,6 @@ async function handleRecoveryCodesAction({ e,
     if (!resp) {
         handleCancelMessage();
         toggleElement(codeActionButtons, false);
-        toggleProcessMessage(false);
         return;
     }
 
@@ -523,9 +588,7 @@ async function handleRecoveryCodesAction({ e,
     toggleElement(codeActionButtons, false);
     appStateManager.setCodeGeneration(false);
 
-    setTimeout(() => {
-        toggleProcessMessage(false);
-    }, MILLI_SECONDS);
+   
 }
 
 

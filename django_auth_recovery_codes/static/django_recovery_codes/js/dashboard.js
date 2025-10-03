@@ -53,7 +53,7 @@ import { toggleElement,checkIfHTMLElement } from "./utils.js";
 
 // Messages & notifications
 import EnqueuedMessages from "./messages/enqueueMessages.js";
-import { notify_user } from "./notify.js";
+
 
 // Code setup & test verification
 import { handleTestCodeVerificationSetupClick, loadTestVerificationElements } from "./codesSetupVerifcation/handleTestSetup.js";
@@ -72,6 +72,7 @@ import { handleGenerateCodeWithNoExpiryClick,
 import { handleInvalidateButtonClick } from "./helpers/handleInvalidation.js";
 import invalidateFormElement, { invalidateInputFieldElement } from "./helpers/handleInvalidation.js";
 import { handleInputFieldHelper } from "./helpers/handlers.js";
+import { safeUIUpdate } from "./utils.js";
 
 // Elements
 const recovryDashboardElement        = document.getElementById("recovery-dashboard");
@@ -129,10 +130,6 @@ const EXCLUDE_EXPIRY_CHECKBOX_ID          = "exclude_expiry"
 const enqueuedMessages = new EnqueuedMessages();
 
 
-document.addEventListener("DOMContentLoaded", () => {
-    notify_user(enqueuedMessages.getEnqueuedMessages());
-
-});
 
 
 let alertMessage;
@@ -179,24 +176,39 @@ function handleEventDelegation(e) {
         case GENERATE_CODE_WITH_EXPIRY_BUTTON_ID:
             appStateManager.setCodeGeneration(true);
             handleGenerateCodeWithExpiryClick(e, GENERATE_CODE_WITH_EXPIRY_BUTTON_ID);
-            loadTestVerificationElements();
+
+            safeUIUpdate(() => {
+                loadTestVerificationElements();
+            })
+          
             appStateManager.setGenerateActionButtons(true);
             break;
         case GENERATE_CODE_WITH_NO_EXPIRY:
             appStateManager.setCodeGeneration(true)
             handleGenerateCodeWithNoExpiryClick(e, GENERATE_CODE_WITH_NO_EXPIRY);
-            appStateManager.setGenerateActionButtons(true)
-            loadTestVerificationElements();
+            appStateManager.setGenerateActionButtons(true);
+
+             safeUIUpdate(() => {
+                loadTestVerificationElements();
+            })
+
             break;
         case EMAIL_BUTTON_ID:
-            handleEmailCodeeButtonClick(e, EMAIL_BUTTON_ID);
+            safeUIUpdate(() => {
+                handleEmailCodeeButtonClick(e, EMAIL_BUTTON_ID);
+            })
+         
             break;
         case EXCLUDE_EXPIRY_CHECKBOX_ID:
             handleIncludeExpiryDateCheckMark(e);
             break;
         case VERIFY_SETUP_BUTTON:
             appStateManager.setVerificationTest(true);
-            handleTestCodeVerificationSetupClick(e, VERIFY_SETUP_BUTTON);
+
+            safeUIUpdate(async () => {
+                await handleTestCodeVerificationSetupClick(e, VERIFY_SETUP_BUTTON);
+            })
+        
             break;
         case REGENERATE_BUTTON_ID:
 
@@ -208,20 +220,41 @@ function handleEventDelegation(e) {
                 alertMessage = document.getElementById("alert-message");
             }
 
-            appStateManager.setCodeGeneration(true)
+            appStateManager.setCodeGeneration(true);
+
+            if (!appStateManager.isRequestCodeGenerationActive()) {
+                appStateManager.setRequestCodeRegeneration(true);
+
+            }
+           
             toggleElement(alertMessage);
-            handleRegenerateCodeButtonClick(e, REGENERATE_BUTTON_ID, alertMessage);
-            appStateManager.setRequestCodeRegeneration(true);
+            
+            safeUIUpdate(async () => {
+                await handleRegenerateCodeButtonClick(e, REGENERATE_BUTTON_ID, alertMessage);
+            });
+
+          
+           
             break;
 
         case DELETE_CURRENT_CODE_BUTTON_ID:
-            handleDeleteCodeeButtonClick(e, DELETE_CURRENT_CODE_BUTTON_ID)
+            safeUIUpdate(async () => {
+                handleDeleteCodeeButtonClick(e, DELETE_CURRENT_CODE_BUTTON_ID)
+            })
             break;
         case DELETE_ALL_CODES_BUTTON_ID:
-            handleDeleteAllCodeButtonClick(e, DELETE_ALL_CODES_BUTTON_ID, alertMessage)
+
+            safeUIUpdate( async () => {
+                 handleDeleteAllCodeButtonClick(e, DELETE_ALL_CODES_BUTTON_ID, alertMessage)
+            })
+           
             break;
         case DOWNLOAD_CODE_BTN_ID:
-            handleDownloadButtonClick(e, DOWNLOAD_CODE_BTN_ID);
+
+            safeUIUpdate(async () => {
+                handleDownloadButtonClick(e, DOWNLOAD_CODE_BTN_ID);
+            })
+          
             break;
         case OPEN_NAV_BAR_HAMBURGERR_ICON:
             toggleSideBarIcon(navigationIconElement)

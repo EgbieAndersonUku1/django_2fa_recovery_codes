@@ -5,16 +5,12 @@ from django_email_sender.email_logger import LoggerType
 from django.utils import timezone
 
 from django_q.models import Task, Schedule
-from django_auth_recovery_codes.utils.notification import notify_user
 from django_auth_recovery_codes.models import (RecoveryCodePurgeHistory, 
                                                RecoveryCodesBatch, 
                                                RecoveryCodeAudit, 
                                                RecoveryCodeCleanUpScheduler,
-                                              
-                                            
                                                )
 
-from django_email_sender.email_sender_constants import EmailSenderConstants
 from django_auth_recovery_codes.app_settings import app_settings
 from django_auth_recovery_codes.loggers.loggers import (email_logger,
                                                          purge_code_logger, 
@@ -22,18 +18,20 @@ from django_auth_recovery_codes.loggers.loggers import (email_logger,
                                                          purge_email_logger)
 
 
+from django_auth_recovery_codes.helpers import PurgedStatsCollector
+from django_auth_recovery_codes.utils.errors.error_messages import construct_raised_error_msg
 
 
 def send_recovery_codes_email(sender_email, user, codes, subject= "Your account recovery codes"):
     
     email_sender_logger = EmailSenderLogger.create()
     _store_user_email_log(email_sender_logger)
-    _if_set_to_true_use_logger(True, email_sender_logger)
 
     try:
         ( 
             email_sender_logger
             .add_email_sender_instance(EmailSender.create()) 
+            .start_logging_session()
             .config_logger(email_logger, log_level=LoggerType.INFO)
             .from_address(sender_email) 
             .to(user.username) 
@@ -43,26 +41,11 @@ def send_recovery_codes_email(sender_email, user, codes, subject= "Your account 
             .with_text_template("recovery_codes_email.txt", "recovery_codes") 
             .send()
             )
-        
-        message = "Recovery codes email sent successfully!"  
-        notify_user(user, message)
   
     except Exception as e:
-        error_msg = f"Failed to send recovery codes: {e}"
-        email_logger.error(error_msg)
-        notify_user(user, error_msg )
-   
+        email_logger.error(f"Failed to send recovery codes: {e}")
+      
 
-def extract_data_from_expired_code_response(response):
-    purged_count, is_empty, batch_id = 0, 0, 0
-    if not response:
-        return purged_count, is_empty, batch_id
-    if len(response) == 3:
-        purged_count, is_empty, batch_id = response
-    elif len(response) == 2:
-        purged_count, is_empty = response
-        return purged_count, is_empty, batch_id
-    return purged_count, is_empty, batch_id
 
 def purge_all_expired_batches(*args, **kwargs):
     """
@@ -75,69 +58,57 @@ def purge_all_expired_batches(*args, **kwargs):
     delete_empty_batch = kwargs.get("delete_empty_batch", True)
     schedule_name      = kwargs.get("schedule_name")
 
-    purge_code_logger.info(
-        f"[RecoveryCodes] Starting purge job | retention_days={retention_days}, bulk_delete={bulk_delete}, "
-        f"delete_empty_batch={delete_empty_batch}, use_with_logger={use_with_logger}s, started_at={timezone.now()}",
-    )
+    purge_code_logger.info( f"[RecoveryCodes] Starting purge job | retention_days={retention_days}, bulk_delete={bulk_delete}, "
+                             f"delete_empty_batch={delete_empty_batch}, use_with_logger={use_with_logger}s, started_at={timezone.now()}"
+                            )
 
-    total_batches = 0
-    total_purged = 0
-    total_skipped = 0
-    purged_batches_info = []
+    stats      = PurgedStatsCollector(logger=purge_code_logger)
+    batches    = RecoveryCodesBatch.objects.select_related("user").all()
+    MAX_LENGTH = 3
 
-    batches = RecoveryCodesBatch.objects.select_related("user").all()
     purge_code_logger.debug("[RecoveryCodes] Found %s batches to check", batches.count())
 
     for batch in batches:
 
-        # throws an unpacking error because `batch.purge_expired_codes` method doesn't always return 3 variables
         try:
-            response = batch.purge_expired_codes(retention_days=retention_days, delete_empty_batch=delete_empty_batch)
-            purged_count, is_empty, batch_id = response
-        except ValueError:
-            purged_count, is_empty, batch_id = extract_data_from_expired_code_response(response)
-      
-        
-        purge_code_logger.debug(f"Values returned purged_count={purged_count}, is_empty={is_empty} and batch id = {batch_id}")
 
-        if purged_count > 0:
-            total_purged += purged_count
-            total_batches += 1
-            batch_report = _generate_purged_batch_code_json_report(batch, purged_count, is_empty, batch_id)
-            purged_batches_info.append(batch_report)
+            result = batch.purge_expired_codes(retention_days=retention_days, delete_empty_batch=delete_empty_batch)
 
-            purge_code_logger.info(f"[RecoveryCodes] Batch purged | user_id={batch.user.id}, batch_id={batch.id}, purged_count={purged_count}, is_empty={is_empty}")
-                
-        else:
-            total_skipped += 1
-            purge_code_logger.debug(
-                "[RecoveryCodes] Batch skipped | user_id=%s, batch_id=%s, purged_count=%s",
-                batch.user.id, batch.id, purged_count
-            )
+            if not isinstance(result, tuple) or len(result) != MAX_LENGTH:
+                purge_code_logger.error(f"Unexpected return from purge_expired_codes: {result} | skipping batch {batch.id}")
+                continue
 
-    if total_batches > 0 or total_purged > 0:
+            purged_count, is_empty, batch_id = result
+
+            purge_code_logger.error(f" purge_expired_codes: {result} | processing batch {batch_id}")
+            stats.process_batch(batch, purged_count=purged_count, is_empty=is_empty, batch_id=batch_id, use_with_logger=True)        
+
+        except Exception as e:
+            purge_code_logger.error(f"Unexpected error while purging batch {batch.id}: {e}", exc_info=True)
+            continue
+
+    if stats.total_batches > 0 or stats.total_purged > 0:
         RecoveryCodePurgeHistory.objects.create(
-            total_codes_purged=total_purged,
-            total_batches_purged=total_batches,
+            total_codes_purged=stats.total_purged,
+            total_batches_purged=stats.total_batches,
             retention_days=retention_days,
         )
 
     purge_code_logger.info(
         "[RecoveryCodes] Purge complete | total_batches_purged=%s, total_codes_purged=%s, "
         "total_batches_skipped=%s, finished_at=%s",
-        total_batches, total_purged, total_skipped, timezone.now()
+        stats.total_batches, stats.total_purged, stats.total_skipped, timezone.now()
     )
 
     result = {
-        "reports": purged_batches_info,
+        "reports": stats.batches_report,
         "use_with_logger": bool(use_with_logger),
-        "schedule_name" : schedule_name,
-        "total_batches_removed": total_batches,
+        "schedule_name": schedule_name,
+        "total_batches_removed": stats.total_batches,
     }
 
     purge_code_logger.info(f"[RecoveryCodes] Returning result: {result}")
     return result
-
 
 
 def clean_up_old_audits_task():  
@@ -166,102 +137,6 @@ def clean_up_old_audits_task():
     return deleted
 
 
-def _generate_purged_batch_code_json_report(batch: RecoveryCodesBatch, purged_count: int, is_empty: bool, batch_id: str) -> dict:
-    """
-    Creates a JSON report for a purged batch of 2FA recovery codes.
-
-    Each batch contains recovery codes that may be active or expired.
-    After purging, this function compiles a structured JSON report with
-    details about the batch state and its metadata.
-
-    JSON fields:
-        "id": Batch ID.
-        "number_issued": Total number of codes issued to the batch.
-        "number_removed": Number of codes removed during purge.
-        "is_batch_empty": Whether the batch is now empty.
-        "number_used": Number of codes already used.
-        "number_remaining_in_batch": Active codes still left in the batch.
-        "user_issued_to": Username of the person the batch was issued to.
-        "batch_creation_date": When the batch was created.
-        "last_modified": When the batch was last modified.
-        "expiry_date": Expiry date assigned to the batch codes.
-        "deleted_at": When the batch was deleted/purged.
-        "deleted_by": Who deleted the batch.
-        "was_codes_downloaded": Whether codes were downloaded before purge.
-        "was_codes_viewed": Whether codes were viewed before purge.
-        "was_code_generated": Whether codes were generated before purge.
-
-    Args:
-        batch (RecoveryCodesBatch): The purged batch instance.
-        purged_count (int): Number of codes deleted during purge.
-        is_empty (bool): Whether the batch is now empty after deletion.
-        batch_id (str): The batch id for the given batch
-
-    Raises:
-        TypeError:
-            - If `batch` is not a RecoveryCodesBatch instance.
-            - If `purged_count` is not an integer.
-            - If `is_empty` is not a boolean.
-
-    Example 1:
-        >>> batch = RecoveryCodesBatch.get_by_user(request.user)
-        >>> batch.purge_expired_codes()
-        >>> report = _generate_purged_batch_code_json_report(batch, purged_count=5, is_empty=True)
-        >>> report["number_removed"]
-    
-    Example Out:
-        
-        {
-            "id": 42,
-            "number_issued": 10,
-            "number_removed": 8,
-            "is_batch_empty": False,
-            "number_used": 3,
-            "number_remaining_in_batch": 2,
-            "user_issued_to": "alice",
-            "batch_creation_date": "2025-08-01T09:00:00Z",
-            "last_modified": "2025-09-01T12:00:00Z",
-            "expiry_date": "2025-09-30T00:00:00Z",
-            "deleted_at": "2025-09-01T12:34:56Z",
-            "deleted_by": "admin",
-            "was_codes_downloaded": True,
-            "was_codes_viewed": False,
-            "was_code_generated": True,
-        }
-    """
-
-    if not isinstance(batch, RecoveryCodesBatch):
-        raise TypeError(f"Expected the instance of the batch to be  of RecoveryCodesBatch",
-                        f"But got a batch instance with type {type(batch).__name__}"
-                        )
-    
-    if  not isinstance(purged_count, int):
-        raise TypeError(f"The `purged_count` parameter is not an integer. Expected an integer but got an object with type {type(purged_count).__name__}")
-    
-    if not isinstance(is_empty, bool):
-        raise TypeError(f"The `is_empty` parameter is not a boolean. Expected a boolean object but got an object with type {type(is_empty).__name__}")
-    
-    purged_batch_info = {
-                            "id": batch_id,
-                            "number_issued": batch.number_issued,
-                            "number_removed": purged_count,
-                            "is_batch_empty": is_empty,
-                            "number_used": batch.number_used,
-                            "number_remaining_in_batch": batch.active_codes_remaining,
-                            "user_issued_to": batch.user.username,
-                            "batch_creation_date": batch.created_at,
-                            "last_modified": batch.modified_at,
-                            "expiry_date": batch.expiry_date,
-                            "deleted_at": batch.deleted_at,
-                            "deleted_by": batch.deleted_by,
-                            "was_codes_downloaded": batch.downloaded,
-                            "was_codes_viewed": batch.viewed,
-                            "was_code_generated": batch.generated,
-            }
-
-    return purged_batch_info
-
-
 def _if_set_to_true_use_logger(use_logger: bool, email_sender_logger: EmailSenderLogger) -> None:
     """
     Decides if a logger should be turned on for a given scheduled action.
@@ -276,30 +151,21 @@ def _if_set_to_true_use_logger(use_logger: bool, email_sender_logger: EmailSende
     """
 
     if not isinstance(use_logger, bool):
-        raise TypeError(
-            f"The `use_logger` must be a bool. Got {type(use_logger).__name__}"
-        )
-
+        raise TypeError(construct_raised_error_msg("use_logger", bool, use_logger))
+      
     if not isinstance(email_sender_logger, EmailSenderLogger):
-        raise TypeError(
-            f"The `email_sender_logger` must be an instance of `EmailSenderLogger`. "
-            f"Got {type(email_sender_logger).__name__}"
-        )
+        raise TypeError(construct_raised_error_msg("email_sender_logger", EmailSenderLogger, email_sender_logger))
 
     if use_logger or settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER:
         purge_email_logger.info(
             "Sending email with logger turned on. All actions will be logged."
         )
         email_sender_logger.config_logger(email_logger, log_level=LoggerType.INFO)
-        email_sender_logger.exclude_fields_from_logging(EmailSenderConstants.Fields.CONTEXT.value,
-                                                        EmailSenderConstants.Fields.HEADERS.value,
-                                                        ) # exclude from logging since it contains sensitive info e.g raw codes
         email_sender_logger.start_logging_session()
     else:
         purge_email_logger.info(
             "Sending email with logger turned off. No actions will be logged."
         )
-
 
 
 def hook_email_purge_report(task):
@@ -313,7 +179,7 @@ def hook_email_purge_report(task):
     schedule_name    = result.get("schedule_name")
 
     if use_with_logger is None:
-        use_with_logger = getattr(settings, "DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER", None)
+        use_with_logger = settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER
 
     email_sender_logger = EmailSenderLogger.create()
 
@@ -321,27 +187,24 @@ def hook_email_purge_report(task):
         _if_set_to_true_use_logger(use_with_logger, email_sender_logger)
 
         subject, html, text = _get_email_attribrutes(reports)
-        
-        email_sender        = EmailSender.create()
+        email_sender = EmailSender.create()
         if not email_sender:
             raise RuntimeError("EmailSender.create() returned None! Cannot send email.")
 
-        admin_email = settings.DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL 
+        admin_email = settings.DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL
         (
             email_sender_logger
             .add_email_sender_instance(email_sender)    
             .from_address(settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER)
             .to(admin_email)
-            .with_context({"reports": reports, "username": settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME })
+            .with_context({"reports": reports, "username": settings.DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME})
             .with_subject(subject)
             .with_html_template(html, "recovery_codes_deletion")
             .with_text_template(text, "recovery_codes_deletion")
             .send()
         )
 
-        print(email_sender_logger.return_successful_payload())
-        if email_sender_logger.return_successful_payload():
-            email_logger.info("Purge summary email sent successfully")
+        email_logger.info("Purge summary email sent successfully")
 
         RecoveryCodeCleanUpScheduler.objects.filter(
             name=schedule_name
@@ -441,11 +304,8 @@ def _store_user_email_log(email_sender_logger: EmailSenderLogger):
         # If False, no database storage occurs.
     """
     if not isinstance(email_sender_logger, EmailSenderLogger):
-        raise TypeError(
-            f"Expected an instance of EmailSenderLogger, "
-            f"but got {type(email_sender_logger).__name__}"
-        )
-
+        raise TypeError(construct_raised_error_msg("email_sender_logger", EmailSenderLogger, email_sender_logger))
+       
     if settings.DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG:
         from django_auth_recovery_codes.models import RecoveryCodeEmailLog
 

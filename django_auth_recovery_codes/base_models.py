@@ -10,13 +10,13 @@
 import logging
 from typing import Self
 from datetime import timedelta
-from django.core.cache import cache
 from django.db import models
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 
 from django_auth_recovery_codes.utils.cache.safe_cache import delete_cache_with_retry, get_cache_with_retry
 from django_auth_recovery_codes.app_settings import default_cooldown_seconds, default_multiplier
+from django_auth_recovery_codes.utils.errors.error_messages import construct_raised_error_msg
 
 
 User  = get_user_model()
@@ -47,7 +47,7 @@ class AbstractBaseModel(models.Model):
 
     @staticmethod
     def is_user_valid(user):
-        """"""
+        """Takes a user and checks if the user instance provided is an instance of User"""
         if not isinstance(user, User):
             raise TypeError(f"The user instance is not instance of User. Expected user to be an instance of user but got {type(user).__name__}")
         return True
@@ -242,13 +242,13 @@ def flush_cache_and_write_attempts_to_db(instance, field_name, cache_key: str, l
     Add cached attempts to the batch and clear cache.
     """
     if not isinstance(cache_key, str):
-        raise ValueError(f"Expected the cache key to be a string but got a value with {type(cache_key).__name__}")
+        raise construct_raised_error_msg("cache key", str)
     
     if not isinstance(logger, logging.Logger):
         raise ValueError(f"Expected a Logger instance, got logger with {type(logger).__name__}")
     
     if not isinstance(field_name, str):
-        raise ValueError(f"Expected the field name to be a string but got a value with {type(field_name).__name__}") 
+        raise construct_raised_error_msg("field name", str)
     
     if not hasattr(instance, field_name):
         raise ValueError(f"This field name: '{field_name}' was not found in the instance model")

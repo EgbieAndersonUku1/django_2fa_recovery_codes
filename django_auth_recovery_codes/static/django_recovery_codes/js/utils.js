@@ -1,6 +1,7 @@
 
-import { logError, warnError } from "./logger.js";
-import { specialChars }        from "./specialChars.js";
+import { logError, warnError }  from "./logger.js";
+import { specialChars }         from "./specialChars.js";
+import { toggleProcessMessage } from "./helpers/handleButtonAlertClicker.js";
 
 
 /**
@@ -614,6 +615,29 @@ export function clearElement(element) {
 export function getOrFetchElement(cachedElement, elementId) {
     if (!cachedElement) {
         cachedElement = document.getElementById(elementId);
+        
     }
+
     return cachedElement;
+}
+
+
+/**
+ * Safely executes a UI update function and ensures the process message/spinner is hidden.
+ *
+ * @param {Function} fn - The UI update function to execute (can be async).
+ * @param {number} [delay=0] - Optional delay in milliseconds before hiding the spinner.
+ */
+export async function safeUIUpdate(fn, delay = 6000) {
+    try {
+        await fn(); 
+    } catch (error) {
+        console.error("safeUIUpdate error:", error);
+    } finally {
+        if (delay > 0) {
+            setTimeout(() => toggleProcessMessage(false), delay);
+        } else {
+            toggleProcessMessage(false);
+        }
+    }
 }

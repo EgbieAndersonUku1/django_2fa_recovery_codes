@@ -9,6 +9,3 @@ class RightIndentedFormatter(logging.Formatter):
         # Add a custom indent to the beginning of the log message
         original_message = super().format(record)
         return f"    {original_message}"  
-
-
-

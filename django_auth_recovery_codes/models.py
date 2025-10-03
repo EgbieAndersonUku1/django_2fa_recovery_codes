@@ -3,6 +3,9 @@ from __future__ import annotations
 import logging
 import uuid
 
+
+
+from typing                      import Any, Optional, Self, Tuple, Union
 from datetime                    import datetime
 from datetime                    import timedelta
 from django.contrib.auth         import get_user_model
@@ -13,7 +16,7 @@ from django.db.models.query      import QuerySet
 from django.conf                 import settings
 from django.utils                import timezone
 from django_email_sender.models  import EmailBaseLog
-from typing                      import Self, Tuple
+
 
 from django_auth_recovery_codes.app_settings import default_max_login_attempts
 from django_auth_recovery_codes.base_models import (
@@ -30,22 +33,25 @@ from django_auth_recovery_codes.enums import (
     UsageStatus,
     ValidityStatus,
 )
-from django_auth_recovery_codes.loggers.loggers import default_logger, purge_code_logger
+from django_auth_recovery_codes.loggers.loggers        import default_logger, purge_code_logger
 from django_auth_recovery_codes.utils.cache.safe_cache import (
     delete_cache_with_retry,
     get_cache_with_retry,
     set_cache_with_retry,
 )
-from django_auth_recovery_codes.utils.cooldown_period import RecoveryCooldownManager
+from django_auth_recovery_codes.utils.cooldown_period    import RecoveryCooldownManager
 from django_auth_recovery_codes.utils.security.generator import generate_2fa_secure_recovery_code
-from django_auth_recovery_codes.utils.security.hash import is_already_hashed, make_lookup_hash
-from django_auth_recovery_codes.utils.utils import (
+from django_auth_recovery_codes.utils.security.hash      import is_already_hashed, make_lookup_hash
+from django_auth_recovery_codes.utils.utils              import (
     create_json_from_attrs,
     create_unique_string,
     schedule_future_date,
 )
 
-from django_auth_recovery_codes.utils.attempt_guard import AttemptGuard
+from django_auth_recovery_codes.utils.attempt_guard          import AttemptGuard
+from django_auth_recovery_codes.utils.errors.error_messages  import construct_raised_error_msg
+from django_auth_recovery_codes.utils.errors.enforcer        import enforce_types
+
 
 User   = get_user_model()
 logger = logging.getLogger("auth_recovery_codes")
@@ -83,6 +89,7 @@ class RecoveryCodeSetup(AbstractBaseModel):
         Explicitly creates a setup for a user.
         Returns the new instance.
         """
+        cls.is_user_valid(user)
         instance = cls.objects.create(user=user)
         return instance
     
@@ -103,7 +110,6 @@ class RecoveryCodeSetup(AbstractBaseModel):
         """       
         cls.is_user_valid(user)
         return cls.objects.filter(user=user, success=True).exists()
-
 
 
 class RecoveryCodeAudit(models.Model):
@@ -147,47 +153,44 @@ class RecoveryCodeAudit(models.Model):
     def __str__(self):
         """Render a string representation of the model"""
         return f"{self.get_action_display()} for {self.user_issued_to or 'Unknown User'} at {self.timestamp:%Y-%m-%d %H:%M:%S}"
-
+    
     @classmethod
-    def log_action(cls, user_issued_to=None, action=None, deleted_by=None, batch=None, number_deleted=0, number_issued=0, reason=None):
+    def log_action(
+        cls,
+        user_issued_to: Optional[User] = None,
+        action: "RecoveryCodeAudit.Action" = None,
+        deleted_by: Optional[User] = None,
+        batch: Optional[RecoveryCodesBatch] = None,
+        number_deleted: int = 0,
+        number_issued: int = 0,
+        reason: Optional[str] = None,
+        ):
         """
         Create a new RecoveryCodeAudit entry to log an action performed on recovery codes.
 
-        This method validates input parameters and records a new audit log entry,
-        including the action type, the user affected, the user performing the action,
-        any related batch, and optional counts and reason.
+        This method validates input parameters (via the decorator) and records
+        a new audit log entry, including the action type, the user affected,
+        the user performing the action, any related batch, and optional counts and reason.
 
         Args:
-            user_issued_to (User, optional): The user to whom the recovery code was issued.
+            user_issued_to (User | None): The user to whom the recovery code was issued.
             action (RecoveryCodeAudit.Action): The action performed. Must be one of the RecoveryCodeAudit.Action choices.
-            deleted_by (User, optional): The user who performed the action. Can be None if the action was automatic.
-            batch (RecoveryCodesBatch, optional): The batch related to the action, if any.
-            number_deleted (int, optional): Number of recovery codes deleted. Defaults to 0.
-            number_issued (int, optional): Number of recovery codes issued. Defaults to 0.
-            reason (str, optional): Optional explanation or context for the action.
+            deleted_by (User | None): The user who performed the action.
+            batch (RecoveryCodesBatch | None): The batch related to the action, if any.
+            number_deleted (int): Number of recovery codes deleted.
+            number_issued (int): Number of recovery codes issued.
+            reason (str | None): Optional explanation or context for the action.
 
         Raises:
-            ValueError: If `action` is not provided or not a valid RecoveryCodeAudit.Action.
-            TypeError: If `user_issued_to`, `deleted_by`, or `batch` are not model instances or None.
+            ValueError: If `action` is not provided.
+            TypeError: Raised automatically by `enforce_types` if any argument is of the wrong type.
 
         Returns:
             RecoveryCodeAudit: The newly created audit log entry.
         """
-    
+
         if action is None:
             raise ValueError("Action is required.")
-
-        if not isinstance(action, cls.Action):
-            raise ValueError(f"Invalid action '{action}'. Use RecoveryCodeAudit.Action constants.")
-
-        if user_issued_to is not None and not isinstance(user_issued_to, models.Model):
-            raise TypeError(f"user_issued_to must be a User instance or None. Expect instance but got {type(user_issued_to).__name__}")
-
-        if deleted_by is not None and not isinstance(deleted_by, models.Model):
-            raise TypeError(f"deleted_by must be a User instance or None. Expect instance but got {type(deleted_by).__name__}")
-
-        if batch is not None and not isinstance(batch, models.Model):
-            raise TypeError(f"batch must be a RecoveryCodesBatch instance or None. Expect instance but got {type(batch).__name__}")
 
         return cls.objects.create(
             user_issued_to=user_issued_to,
@@ -200,12 +203,10 @@ class RecoveryCodeAudit(models.Model):
         )
     
     @classmethod
-    def clean_up_audit_records(cls, retention_days = 0):
+    @enforce_types()
+    def clean_up_audit_records(cls, retention_days: int = 0):
         """Delete RecoveryCodeAudit rows older than retention period, if configured."""
 
-        if retention_days != 0 and retention_days and not isinstance(retention_days, int):
-            raise TypeError(f"Expected the retention days to be int but got object with type ({type(retention_days).__name__})")
-        
         if retention_days == 0:
             num_deleted, _ = cls.objects.all().delete()  
             return  True, num_deleted
@@ -366,9 +367,10 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         >>> True
         >>>
         """
+        cls.is_user_valid(user)
         attempt_guard = AttemptGuard[RecoveryCodesBatch](instance=cls, instance_attempt_field_name=cls.REQUEST_ATTEMPT_FIELD)
         return attempt_guard.can_proceed(user=user, action="recovery_code")
-    
+
     def _get_expired_recovery_codes_qs(self, retention_days: int = None) -> QuerySet[RecoveryCode]:
         """
         Return a queryset of recovery codes eligible for automatic removal with two extra conditions.
@@ -390,18 +392,14 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
                                   before it is removed
         
         Raises:
-            TypeError: Raised if the retention days is not an integer. Note an error is not
-            raised if the number is a negative number since the method assumes that the 
-            user wants all expired codes regrdless of age.
+        
+            TypeError: Raised by `enforce_types` if `retention_days` is not an int or None.
+
 
         Returns:
         QuerySet[RecoveryCode]: The filtered recovery codes queryset.
 
         """
-
-        if retention_days is not None and not isinstance(retention_days, int):
-            raise TypeError(f"Expected a int for retention_days parameter but got object with type f{type(retention_days).__name__}")
-        
         qs = self.recovery_codes.filter(
             automatic_removal=True,
             status__in=self.terminal_statuses()
@@ -409,8 +407,11 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         if retention_days > 0:
             qs = qs.filter(modified_at__lt=self.get_expiry_threshold(retention_days))
         return qs
- 
-    def _bulk_delete_expired_codes_by_scheduler_helper(self, expired_codes: RecoveryCodesBatch, batch_size : int= None, retention_days: int = None):
+
+    def _bulk_delete_expired_codes_by_scheduler_helper(self, 
+                                                       expired_codes: object,
+                                                        batch_size : int= None, 
+                                                        retention_days: int = None):
         """
         Delete expired recovery codes in bulk, with optional batching and throttling.
 
@@ -452,6 +453,15 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
 
             - An audit log entry is created after deletions complete.
         """
+
+        if not isinstance(expired_codes, (RecoveryCodesBatch, QuerySet)):
+            raise TypeError(
+                construct_raised_error_msg("expired_codes", 
+                                           expected_types=(RecoveryCodesBatch, QuerySet), 
+                                           value=expired_codes)
+                
+            )
+
         max_deletions    = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN", None)
         number_to_delete = expired_codes.count()
 
@@ -490,7 +500,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
             purge_code_logger.debug(f"There is nothing to delete in the batch. Batch has {number_to_delete} to delete")
         return deleted_count
 
-    def purge_expired_codes(self, retention_days=1, delete_empty_batch = True, batch_size: int = 500):
+    def purge_expired_codes(self, retention_days: int = 1, delete_empty_batch: bool = True, batch_size: int | None = 500):
         """
         Hard-delete recovery codes in this batch marked for deletion or invalidated,
         optionally logging per code or in bulk. Deletes batch if empty.
@@ -509,20 +519,17 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
             int: Number of codes deleted.
         """
        
-        expired_codes = self._get_expired_recovery_codes_qs(retention_days)
-        batch_id      = self.id or None
-
-        if not isinstance(batch_size, int):
-            raise ValueError(f"The batch size is not an integer. Expected an integer but got {type(batch_size).__name__}")
-        
-        if not isinstance(retention_days, int):
-            raise ValueError(f"The retention size is not an integer. Expected an integer but got {type(retention_days).__name__}")
+        expired_codes      = self._get_expired_recovery_codes_qs(retention_days)
+        batch_id           = self.id
+        default_batch_size = 500
 
         if not expired_codes.exists():
             purge_code_logger.info(f"No codes to purge for batch {self.id} at {timezone.now()}")
             return 0, True
 
-        batch_size               = settings.DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE or batch_size
+        if batch_size is None:
+             batch_size  = settings.DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE or default_batch_size
+             
         deleted_count            = self._bulk_delete_expired_codes_by_scheduler_helper(expired_codes, 
                                                                                        batch_size = batch_size, 
                                                                                        retention_days = retention_days)
@@ -535,6 +542,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
                 f"  Number issued    : {self.number_issued}\n"
                 f"  Codes remaining  : {active_codes_remaining}\n"
                 f"  Is batch empty   : {is_empty}"
+                f"  Batch size       : {batch_size}"
         )
 
         if delete_empty_batch and is_empty:
@@ -546,6 +554,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         return deleted_count, is_empty, batch_id
 
     @staticmethod
+    @enforce_types()
     def get_expiry_threshold(days: int = 30) -> datetime:
         """
         Uses a days as a parameteer to calculate the datetime representing the 
@@ -555,8 +564,9 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
             days (int): Uses the days to calcuate the expiry threshold (days ago from now)
 
         Raises:
-            Raises a valueError if days is not an int
-        
+            TypeError: Raised automatically by the `enforce_types` decorator
+                if `fields_list` is not a list or `save` is not a boolean.
+            
         """
         if not (days, int):
             raise ValueError(f"Days must be an int. Expected an int got {type(int).__name__}")
@@ -701,7 +711,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         Raises
         ------
         TypeError
-            If `save` is not a boolean.
+            If `save` is not a boolean enforce by the `update_field_counter`.
 
         Returns
         -------
@@ -734,7 +744,8 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         self._update_field_counter("number_removed", save=save, atomic=True)
         return self
        
-    def _update_field_counter(self, field_name: str, save: bool = False, atomic: bool = True):
+    @enforce_types()
+    def _update_field_counter(self, field_name: str, save: bool = False, atomic: bool = True) -> RecoveryCodesBatch:
         """
         Internal helper to increment a numeric counter field safely.
 
@@ -757,6 +768,10 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         -------
         self : Model instance
             The updated instance for method chaining.
+
+        Raises:
+            TypeError: Raised automatically by the `enforce_types()` decorator
+                if `fields_list` is not a list or `save` is not a boolean.
 
         Notes
         -----
@@ -822,7 +837,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
            save (bool): Saves the value straight away if true or 
                          defers it for later
         Raises:
-            TypeError if the save is not a boolean
+            TypeError if the save is not a boolean raised through the update_field_helper
         """
         self.viewed = True
         return self._update_field_helper(fields_list=[self.VIEWED_FLAG, self.MODIFIED_AT_FIELD], save=save)
@@ -838,7 +853,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
            save (bool): Saves the value straight away if true or 
                          defers it for later
         Raises:
-            TypeError if the save is not a boolean
+            TypeError if the save is not a boolean raised through the `_update_field_helper`
         """
         self.downloaded = True
         return self._update_field_helper(fields_list=[self.DOWNLOADED_FLAG, self.MODIFIED_AT_FIELD], save=save)
@@ -870,18 +885,32 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
            save (bool): Saves the value straight away if true or 
                          defers it for later
         Raises:
-            TypeError if the save is not a boolean
+            TypeError if the save is not a boolean raised through the update_field_helper
         """
         self.generated = True
         self._update_field_helper(fields_list=[self.GENERATED_FLAG, self.MODIFIED_AT_FIELD], save=save)
     
-    def _update_field_helper(self, fields_list: list, save : bool = True):
+    @enforce_types()
+    def _update_field_helper(self, fields_list: list, save : bool = True) -> Any:
+        """
+        Update specified fields of the model instance and optionally save it.
 
-        if not isinstance(fields_list, list):
-            raise TypeError(f"Expected a list of fields but got {type(fields_list).__name__}")
-        if not isinstance(save, bool):
-            raise TypeError(f"Expected a bool object for save but got {type(save).__name__}")
+        Args:
+            fields_list (list): A list of field names to update.
+            save (bool, optional): Whether to save the instance after updating.
+                Defaults to True.
+
+        Returns:
+            bool: Returns the instance itself if saved, otherwise False.
+
+        Raises:
+            TypeError: Raised automatically by the `enforce_types()` decorator
+                if `fields_list` is not a list or `save` is not a boolean.
         
+        Notes:
+            This helper is intended for internal use and relies on the 
+            `enforce_types()` decorator to perform runtime type checking.
+        """
         if save:
             self.save(update_fields=fields_list)
             return self
@@ -889,6 +918,24 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
     
     @classmethod
     def _if_async_supported_async_bulk_create_or_use_sync_bulk_create(cls, batch: list):
+        """
+        Bulk-create RecoveryCode instances using asynchronous support if available,
+        otherwise fallback to synchronous bulk creation.
+
+        This method checks whether the current database connection supports async operations.
+        If async is supported, it uses `RecoveryCode.objects.abulk_create` within an asyncio event loop.
+        Otherwise, it falls back to `RecoveryCode.objects.bulk_create`.
+
+        Args:
+            batch (list): A list of `RecoveryCode` instances to be created in bulk.
+
+        Raises:
+            TypeError: Raised by the `enforce_types` decorator if `batch` is not a list.
+        
+        Notes:
+            - This is an internal helper method intended for bulk operations.
+            - Async creation is only attempted if the database backend supports it.
+        """
         async_supported = getattr(connections['default'], 'supports_async', False)
         if async_supported:
             import asyncio
@@ -899,9 +946,9 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
             RecoveryCode.objects.bulk_create(batch)
 
     @classmethod
-    def _ensure_setup_for_user(cls, user):
+    def _ensure_setup_for_user(cls, user: User):
         """Ensures that RecoveryCodeSetup for a user is set, creating it if it doesn't exist."""
-
+    
         recovery_code_setup = RecoveryCodeSetup.get_by_user(user)
         if recovery_code_setup is None:
             RecoveryCodeSetup.create_for_user(user)
@@ -1098,13 +1145,32 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
     
     @classmethod
     def get_by_user(cls, user, status=Status.ACTIVE):
+        """
+        Retrieve a single instance of the model for a given user and status.
+
+        Args:
+            user (User): The user associated with the model instance.
+            status (Status, optional): The status to filter by. 
+                Defaults to `Status.ACTIVE`.
+
+        Returns:
+            cls | None: The matching model instance if found, otherwise None.
+
+        Raises:
+            MultipleObjectsReturned: If more than one object matches the query.
+
+        Notes:
+            This is a convenience method that wraps `cls.objects.get(...)`.
+            If no matching object exists, it returns None instead of raising
+            a `DoesNotExist` exception.
+        """
         try:
             return cls.objects.get(user=user, status=status)
         except cls.DoesNotExist:
             return None
     
     @classmethod
-    def _deactivate_all_batches_except_current(cls, current_batch):
+    def _deactivate_all_batches_except_current(cls, current_batch: RecoveryCodesBatch):
         """
         Deactivates all active batches for the given user except the current one.
         """
@@ -1127,6 +1193,30 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
 
 
 class RecoveryCode(models.Model):
+    """
+    Represents a single recovery code associated with a user.
+
+    Recovery codes are generated as part of the authentication and 
+    account recovery process. Each code is stored securely as a hash 
+    and linked to a user and a batch for organisational purposes.
+
+    Key Fields:
+        id (UUIDField): Unique identifier for the recovery code.
+        hash_code (CharField): Hashed value of the recovery code. Indexed for fast lookups and never editable.
+        look_up_hash (CharField): Secondary hash used for code lookup. Must be unique.
+        mark_for_deletion (BooleanField): Indicates if the code has been flagged for removal in a cleanup process.
+        created_at (DateTimeField): Timestamp when the code was created.
+        modified_at (DateTimeField): Timestamp when the code was last updated.
+        status (CharField): Current status of the recovery code (e.g., active, inactive).
+        user (ForeignKey): The user who owns this recovery code.
+        batch (ForeignKey): Reference to the batch this code belongs to, allowing grouped management.
+        automatic_removal (BooleanField): Whether the code should be automatically removed once used or expired.
+        days_to_expire (PositiveSmallIntegerField): Number of days before the code expires. Default is 0 (no expiration).
+        is_used (BooleanField): Whether this code has already been used.
+        is_deactivated (BooleanField): Whether the code has been manually deactivated.
+        deleted_at (DateTimeField): When the code was deleted (if applicable).
+        deleted_by (ForeignKey): Reference to the user who deleted the code (if it was deleted manually).
+    """
     id                = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True, db_index=True)
     hash_code         = models.CharField(max_length=128, db_index=True, null=False, editable=False)
     look_up_hash      = models.CharField(max_length=128, unique=True, db_index=True, blank=True, editable=False)
@@ -1171,7 +1261,8 @@ class RecoveryCode(models.Model):
 
         email = self.user.email
         return f"{email}" if self.user.email else self.id
-  
+    
+    @enforce_types()
     def mark_code_as_used(self, save: bool = True):
         """
         Marks the recovery code as used. Once the code has been marked for used 
@@ -1212,6 +1303,7 @@ class RecoveryCode(models.Model):
                                      ])
         return True
 
+    @enforce_types()
     def mark_code_for_deletion(self, save: bool = True):
         """
         Marks the recovery code for deletion.
@@ -1240,6 +1332,7 @@ class RecoveryCode(models.Model):
             self.save(update_fields=[self.MARK_FOR_DELETION_FIELD, self.MODIFIED_AT_FIELD])
         return True
 
+    @enforce_types()
     def invalidate_code(self, save: bool = True):
         """
         Marks this recovery code as in-active.
@@ -1290,6 +1383,7 @@ class RecoveryCode(models.Model):
                                      ])
         return True
 
+    @enforce_types()
     def delete_code(self, save: bool = True) -> "RecoveryCode":
         """
         Marks this recovery code pending to be deleed.
@@ -1339,7 +1433,8 @@ class RecoveryCode(models.Model):
 
                                      )
         return self
-
+    
+    @enforce_types()
     def _verify_recovery_code(self, plaintext_code: str) -> bool:
         """
         Verify a recovery code against its stored Django-hashed value.
@@ -1435,6 +1530,7 @@ class RecoveryCode(models.Model):
         is_valid = candidate._verify_recovery_code(plaintext_code)
         return candidate if is_valid else None
 
+    @enforce_types()
     def hash_raw_code(self, code: str):
         """Hashes a plaintext recovery code and stores it securely in the instance.
 
@@ -1483,6 +1579,20 @@ class RecoveryCodeEmailLog(EmailBaseLog):
 
 
 class LoginRateLimterAudit(AbstractBaseModel):
+    """
+    Tracks and audits user login attempts for rate-limiting purposes.
+
+    The `LoginRateLimiter` is a single record associated to a
+    given user that logs the number of failed attempts. If the attempts
+    are greater than max attempts they are locked out.
+
+    However, once they are logged backed the `LoginRateLimiter`
+    reset the attempts back to `0`, This class acts as an audit
+    that records the attempt before it is wiped.
+
+    This model can be used to monitor repeated failed login attempts 
+
+    """
 
     user           = models.OneToOneField(User, on_delete=models.SET_NULL, null=True)
     created_at     = models.DateTimeField(auto_now_add=True)
@@ -1490,14 +1600,29 @@ class LoginRateLimterAudit(AbstractBaseModel):
     login_attempts = models.PositiveSmallIntegerField(default=0)
 
     def __str__(self):
-        return f"{self.user} with {self.login_attempts} login attempt"
+        return f"{self.user} with {self.login_attempts} login attempt(s)"
 
     @classmethod
     def create_record_login_audit(cls, user: User, login_attempts: int):
-        """"""
+        """
+        Create a login audit record for a user if none exists.
+
+        This method checks if the given user already has an associated
+        LoginRateLimterAudit record. If not, it creates one with the
+        specified number of login attempts.
+
+        Args:
+            user (User): The user for whom to create the audit record.
+            login_attempts (int): Initial number of login attempts to record.
+
+        Raises:
+            ValueError: If the user is invalid according to `cls.is_user_valid`.
+        """
         cls.is_user_valid(user)
         if not cls.objects.filter(user=user).exists():
             cls.objects.get_or_create(user=user, login_attempts=login_attempts)
+
+
 
 
 class LoginRateLimiter(AbstractCooldownPeriod, AbstractBaseModel):
@@ -1760,37 +1885,3 @@ class LoginRateLimiter(AbstractCooldownPeriod, AbstractBaseModel):
             return can_login, wait_time   
         
         return cls._unlock_user(login_rate_limiter, user, cache_key)
-
-       
-    
-class RecoveryCodeNotification(models.Model):
-    user       = models.ForeignKey(User, on_delete=models.CASCADE, related_name="recovery_notifications")
-    message    = models.TextField()
-    sent_at    = models.DateTimeField(auto_now_add=True)
-    is_read    = models.BooleanField(default=False, db_index=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    modified_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering            = ["-sent_at"]
-        verbose_name        = "Recovery Code Notification"
-        verbose_name_plural = "Recovery Code Notifications"
-
-    def __str__(self):
-        return f"Notification for {self.user.username} at {self.sent_at}"
-
-    @classmethod
-    def get_message_notifications(cls, user: User, is_read : bool= False, number_returned = 20) -> Tuple[list, Self]:
-        """"""
-        if not isinstance(is_read, bool):
-            raise ValueError(f"Expected `is_read` to be a bool but got object with type {type(is_read).__name__}")
-        
-        if not isinstance(number_returned, int):
-            raise ValueError(f"Expected `number_returned` to be a int but got object with type {type(number_returned).__name__}")
-
-        notifications           = cls.objects.filter(is_read=is_read, user=user).order_by("-sent_at")
-        notifications_to_return = list(notifications[:number_returned])
-        return notifications_to_return, notifications
-    
- 
-

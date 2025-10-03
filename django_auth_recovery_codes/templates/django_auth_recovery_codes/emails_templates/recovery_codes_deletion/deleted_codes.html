@@ -122,6 +122,10 @@
                             <td>{{ report.was_codes_viewed|yesno:"Yes,No,Unknown" }}</td>
                           </tr>
                           <tr>
+                            <th scope="row">Were Codes Emailed</th>
+                            <td>{{ report.was_codes_emailed|yesno:"Yes,No,Unknown" }}</td>
+                          </tr>
+                          <tr>
                             <th scope="row">Batch Creation Date</th>
                             <td>
                               {% if report.batch_creation_date %}

@@ -7,7 +7,7 @@ from django.dispatch import receiver
 from django_auth_recovery_codes.models import (RecoveryCodeCleanUpScheduler, 
                                                RecoveryCodeSetup,
                                                RecoveryCodeAuditScheduler,
-                                                )
+                                            )
 from django_q.tasks import schedule, Schedule
 from django.core.exceptions import ValidationError
 from django_auth_recovery_codes.tasks import unschedule_task, clear_queued_tasks

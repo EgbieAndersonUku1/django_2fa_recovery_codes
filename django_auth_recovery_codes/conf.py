@@ -154,15 +154,6 @@ FLAG_VALIDATORS = {
         "error_id": "django_auth_recovery_codes.E014",
         "warning_id": "django_auth_recovery_codes.W014",
     },
-   
-    "DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME": {
-        "type": str,
-        "warning_if_missing": "DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME is not set in settings.py.",
-        "error_if_wrong_type": "DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME must be a string.",
-        "error_id": "django_auth_recovery_codes.E016",
-        "warning_id": "django_auth_recovery_codes.W016",
-    },
-
     # --- Logger / Email Log Settings ---
     "DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER": {
         "type": bool,
@@ -242,27 +233,13 @@ FLAG_VALIDATORS = {
         "warning_id": "django_auth_recovery_codes.W025",
     },
 
-}
+     # --- Email successsful sent message / Email successful message Settings ---
+    'DJANGO_AUTH_RECOVERY_CODE_EMAIL_SUCCESS_MSG': {
+        "type": str,
+        "warning_if_missing": "DJANGO_AUTH_RECOVERY_CODE_EMAIL_SUCCESS_MSG is not set in settings.py.",
+        "error_if_wrong_type": "DJANGO_AUTH_RECOVERY_CODE_EMAIL_SUCCESS_MSG must be a string or none.",
+        "error_id": "django_auth_recovery_codes.E025",
+        "warning_id": "django_auth_recovery_codes.W025",
+    },
 
-
-
-RECOVERY_CODES = {
-    "EMAIL_TEMPLATES": {
-        "recovery_codes": {
-            "html": "email_templates/recovery_codes/recovery_codes_email.html",
-            "text": "email_templates/recovery_codes/recovery_codes_email.txt",
-        },
-        "recovery_codes_audit": {
-            "html": "email_templates/recovery_codes_audit/recovery_codes_audit_email.html",
-            "text": "email_templates/recovery_codes_audit/recovery_codes_audit_email.txt",
-        },
-        "recovery_codes_deletion": {
-            "html": "email_templates/recovery_codes_deletion/recovery_codes_deletion_email.html",
-            "text": "email_templates/recovery_codes_deletion/recovery_codes_deletion_email.txt",
-        },
-        "recovery_code_purge_history_report": {
-            "html": "email_templates/recovery_code_purge_history_report/recovery_code_purge_history_report_email.html",
-            "text": "email_templates/recovery_code_purge_history_report/recovery_code_purge_history_report_email.txt",
-        },
-    }
 }

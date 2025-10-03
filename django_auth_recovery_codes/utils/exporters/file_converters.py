@@ -81,11 +81,9 @@ def to_csv(data: Union[str, list]) -> str:
 
 def to_pdf(data: list[str]) -> bytes:
     """Return data as PDF bytes."""
+ 
+    _raise_error_if_all_values_in_list_are_not_strings(data)
 
-    if not isinstance(data, list):
-        raise TypeError(f"The data must be a list but got type {type(data).__name__}")
-    
-    
     buffer      = io.BytesIO()
     can         = canvas.Canvas(buffer, pagesize=letter)
     text_object = can.beginText(40, 750)
@@ -98,3 +96,33 @@ def to_pdf(data: list[str]) -> bytes:
     pdf_data = buffer.getvalue()
     buffer.close()
     return pdf_data
+
+
+def _raise_error_if_all_values_in_list_are_not_strings(data: list) -> None:
+    """
+    Check if all the values in a given list are all strings.
+    Raises an error if not.
+
+    Args:
+        data (list): The value to check
+    
+    Returns:
+        Raises an error if not all the elements within list 
+        are strings else returns None
+    """
+   
+    
+    elements      = []
+    elements_type = []
+
+    for code in data:
+        elements       = elements.append(isinstance(code, str))
+        elements_type.append(type(code).__name__)
+    
+    if not all(isinstance(elements)):
+        elements_type_string = ", ".join(elements_type)
+
+        raise TypeError(
+            f"All elements in `data` must be strings. Got: {elements_type_string}"
+        )
+    
