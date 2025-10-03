@@ -474,7 +474,11 @@ export function exceedsPaginatorLimit(parentElement, pageLimit) {
         );
         return false;
     }
-    return parentElement.children.length >= pageLimit;
+
+    if (parentElement && checkIfHTMLElement(parentElement, "Parent element Batch")) {
+          return parentElement.children.length >= pageLimit;
+    }
+  
 }
 
 
