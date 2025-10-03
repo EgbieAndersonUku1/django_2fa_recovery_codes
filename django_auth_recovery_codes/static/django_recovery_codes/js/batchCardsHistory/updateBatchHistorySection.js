@@ -54,12 +54,13 @@ import { toggleSpinner,
 import { generateRecoveryCodesSummaryCard } from "../generateBatchHistoryCard.js";
 import { markCardAsDeleted }                from "./markCardAsDeleted.js";
 import { getCardFieldElements }             from "./batchCardUtils.js";
+import { warnError }                        from "../logger.js";
 
 import { recoveryBatchSectionElement }      from "./batchCardElements.js";
 
 
 const DYNAMIC_BATCH_LOADER_ID    = "dynamic-batch-loader";
-let dynamicBatchSpinnerElement   = document.getElementById("dynamic-batch-loader");
+let dynamicBatchSpinnerElement   = document.getElementById(DYNAMIC_BATCH_LOADER_ID);
 
 
 /**
@@ -196,13 +197,15 @@ export function updateBatchHistorySection(sectionElement,
     
     let previousBatchCard;
     
-    dynamicBatchSpinnerElement               = getOrFetchElement(dynamicBatchSpinnerElement, DYNAMIC_BATCH_LOADER_ID);
-    dynamicBatchSpinnerElement.style.display = "inline-block";
-    toggleSpinner(dynamicBatchSpinnerElement);
+    dynamicBatchSpinnerElement  = getOrFetchElement(dynamicBatchSpinnerElement, DYNAMIC_BATCH_LOADER_ID);
+    if (dynamicBatchSpinnerElement) {
+           dynamicBatchSpinnerElement.style.display = "inline-block";
+            toggleSpinner(dynamicBatchSpinnerElement);
+    }
+ 
 
     setTimeout(() => {
         addChildWithPaginatorLimit(sectionElement, newBatchCard, batchPerPage);
-
         previousBatchCard = getNthChildNested(
             sectionElement,
             batchNumberToUpdate,
