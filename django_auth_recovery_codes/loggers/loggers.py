@@ -10,7 +10,7 @@ default_logger  = logging.getLogger(__name__)
 # ----------------------------------------
 # Attempt guard helper
 # ----------------------------------------
-attempt_guard_logger  = logging.getLogger("attempt_guard")
+attempt_guard_logger  = logging.getLogger("app.attempt_guard")
 
 
 

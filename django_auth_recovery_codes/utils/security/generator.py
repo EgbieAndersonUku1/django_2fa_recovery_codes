@@ -1,9 +1,6 @@
 import secrets
 
-
-from django.conf import settings
 from string import punctuation
-
 
 SAFE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijklmnopqrstuvwzyz23456789"
 SAFE_TOKEN    = SAFE_ALPHABET + punctuation

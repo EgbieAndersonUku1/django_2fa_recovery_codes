@@ -134,9 +134,9 @@ export async function handleButtonAlertClickHelper(e, buttonElementID, buttonSpi
 
         } 
         if (resp) {
-            
+          
             toggleProcessMessage(true);
-
+           
             if (func) {
                 return func()
             }
@@ -147,6 +147,7 @@ export async function handleButtonAlertClickHelper(e, buttonElementID, buttonSpi
     } finally {
         toggleSpinner(buttonSpinnerElement, false);
         toggleButtonDisabled(buttonElement, false);
+       
       
     }
 

@@ -82,6 +82,33 @@ export const buttons = {
 
 
 
+
+// when the button has changed
+export const buttonStates = {
+  emailed: createButtonConfig({
+    idPrefix: "email-code",
+    color: "blue",
+    icon: "fa-ban",
+    text: "Emailed",
+  }),
+
+  downloaded: createButtonConfig({
+    idPrefix: "download-code",
+    color: "orange",
+    icon: "fa-ban",
+    text: "Downloaded",
+  }),
+
+  failed: createButtonConfig({
+    idPrefix: "failed-code",
+    color: "red",
+    icon: "fa-times",
+    text: "Failed",
+  }),
+};
+
+
+
 /**
  * Generates a container <div> with all code action buttons.
  * 
@@ -224,30 +251,6 @@ function addClassesToElement(element, selectorList) {
 }
 
 
-
-
-export const buttonStates = {
-  emailed: createButtonConfig({
-    idPrefix: "email-code",
-    color: "blue",
-    icon: "fa-ban",
-    text: "Emailed",
-  }),
-
-  downloaded: createButtonConfig({
-    idPrefix: "download-code",
-    color: "orange",
-    icon: "fa-ban",
-    text: "Downloaded",
-  }),
-
-  failed: createButtonConfig({
-    idPrefix: "failed-code",
-    color: "red",
-    icon: "fa-times",
-    text: "Failed",
-  }),
-};
 
 
 export function updateButtonFromConfig(btn, config, btnTitleMsg) {

@@ -35,6 +35,7 @@ Batch #{{ report.id|default:"N/A" }}
 - Was Codes Generated: {{ report.was_code_generated|yesno:"Yes,No,Unknown" }}
 - Were Codes Downloaded: {{ report.was_codes_downloaded|yesno:"Yes,No,Unknown" }}
 - Were Codes Viewed: {{ report.was_codes_viewed|yesno:"Yes,No,Unknown" }}
+- Were Codes Emailed: {{ report.was_codes_emailed|yesno:"Yes,No,Unknown" }}
 
 - Batch Creation Date: {% if report.batch_creation_date %}{{ report.batch_creation_date|date:"Y-m-d H:i:s T" }}{% else %}N/A{% endif %}
 - Last Modified: {% if report.last_modified %}{{ report.last_modified|date:"Y-m-d H:i:s T" }}{% else %}N/A{% endif %}

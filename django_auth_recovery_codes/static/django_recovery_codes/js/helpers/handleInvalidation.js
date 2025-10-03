@@ -49,12 +49,12 @@
 
 
 import { handleRecoveryCodeAlert } from "./handleCodeGeneration.js";
-import { handleButtonAlertClickHelper } from "./handleButtonAlertClicker.js";
+import { handleButtonAlertClickHelper, toggleProcessMessage } from "./handleButtonAlertClicker.js";
 import { handleFormSubmissionHelper } from "./formUtils.js";
 import fetchData from "../fetch.js";
 import { getCsrfToken } from "../security/csrf.js";
 import { checkIfHTMLElement } from "../utils.js";
-import { toggleProcessMessage } from "./handleButtonAlertClicker.js";
+import { safeUIUpdate } from "../utils.js";
 
 
 const invalidateSpinnerElement            = document.getElementById("invalidate-code-loader");
@@ -102,52 +102,56 @@ export default invalidateFormElement;
  * 
  * @param {Event} e - The click event triggered by the button.
  * @returns {void}
- */
-export async function handleInvalidateButtonClick(e) {
-    const formData = await handleInvalidationFormSubmission(e);
+ */export async function handleInvalidateButtonClick(e) {
+    try {
+        const formData = await handleInvalidationFormSubmission(e);
 
-    if (!formData) return;
+        if (!formData) return;
 
-    const code = formData.invalidateCode;
+        const code = formData.invalidateCode;
 
-    const alertAttributes = {
-        title: "Invalidate Code",
-        text: `You are about to invalidate code "${code}". This action cannot be undone. Are you sure you want to proceed?`,
-        icon: "warning",
-        cancelMessage: "Cancelled – your code is safe.",
-        messageToDisplayOnSuccess: `Awesome! Your request to invalidate code "${code}" is being processed.`,
-        confirmButtonText: "Yes, invalidate",
-        denyButtonText: "No, keep code safe"
-    };
+        const alertAttributes = {
+            title: "Invalidate Code",
+            text: `You are about to invalidate code "${code}". This action cannot be undone. Are you sure you want to proceed?`,
+            icon: "warning",
+            cancelMessage: "Cancelled – your code is safe.",
+            messageToDisplayOnSuccess: `Awesome! Your request to invalidate code "${code}" is being processed.`,
+            confirmButtonText: "Yes, invalidate",
+            denyButtonText: "No, keep code safe"
+        };
 
-    const handleInvalidateCodeFetchAPI = async () => {
-        const data = await fetchData({
-            url: "/auth/recovery-codes/invalidate-codes/",
-            csrfToken: getCsrfToken(),
-            method: "POST",
-            body: { code: code },
-            throwOnError: false,
-        });
+        const handleInvalidateCodeFetchAPI = async () => {
+            return await fetchData({
+                url: "/auth/recovery-codes/invalidate-codes/",
+                csrfToken: getCsrfToken(),
+                method: "POST",
+                body: { code },
+                throwOnError: false,
+            });
+        };
 
-        return data;
-    };
+        const data = await handleButtonAlertClickHelper(
+            e,
+            INVALIDATE_CODE_BTN_ID,
+            invalidateSpinnerElement,
+            alertAttributes,
+            handleInvalidateCodeFetchAPI
+        );
 
-    const data = await handleButtonAlertClickHelper(
-        e,
-        INVALIDATE_CODE_BTN_ID,
-        invalidateSpinnerElement,
-        alertAttributes,
-        handleInvalidateCodeFetchAPI
-    );
+     
+        const MILLI_SECONDS = 1000;
 
-  
+        safeUIUpdate(() => {
+            handleRecoveryCodeAlert(data, "Code successfully deactivated", "invalidate");
+        }, MILLI_SECONDS);
 
-    handleRecoveryCodeAlert(data, "Code successfully deactivated", "invalidate");
+        invalidateFormElement.reset();
 
-    invalidateFormElement.reset();
-    toggleProcessMessage(false);
+    } catch (error) {
+        doNothing(); 
+        toggleProcessMessage(false);
+    } 
 }
-
 
 
 /**

@@ -51,11 +51,12 @@ import appStateManager                                         from "../state/ap
 import fetchData                                               from "../fetch.js";
 
 // Named imports
-import { handleButtonAlertClickHelper, toggleProcessMessage }  from "../helpers/handleButtonAlertClicker.js";
+import { handleButtonAlertClickHelper }                        from "../helpers/handleButtonAlertClicker.js";
 import { handleFormSubmissionHelper }                          from "../helpers/formUtils.js";
 import { getCsrfToken }                                        from "../security/csrf.js";
 import { clearTestResultContainer, displayResults }            from "./generateSetupElement.js";
-import { checkIfHTMLElement, doNothing, toggleElement }        from "../utils.js";
+import { checkIfHTMLElement, doNothing, toggleElement, 
+                      }        from "../utils.js";
 
 
 
@@ -207,11 +208,12 @@ export async function handleTestCodeVerificationSetupClick(e, verifySetupButtonI
         } catch (error) {
             doNothing();
             appStateManager.setVerificationTest(false);
-        }
+        } 
 
-        setTimeout(() => {
-            toggleProcessMessage(false);
-        }, MILLI_SECONDS);
+     
+
+    
+
     }
 }
 
@@ -257,10 +259,7 @@ export async function displayTestResults(data) {
         }
     } catch {
         doNothing();
-    } finally {
-        // Ensure the process message is hidden at the end
-        toggleProcessMessage(false);
-    }
+    } 
 }
 
 
@@ -276,7 +275,6 @@ export async function displayTestResults(data) {
  * @returns {void}
  */
 export function loadTestVerificationElements() {
-    toggleProcessMessage(false);
 
     if (!dynamicSetupButton) {
         dynamicSetupButton = document.getElementById(VERIFY_SETUP_BUTTON);

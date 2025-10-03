@@ -1,6 +1,5 @@
 import { handleButtonAlertClickHelper } from "./handleButtonAlertClicker.js";
 import { handleFormSubmissionHelper } from "./formUtils.js";
-import { toggleProcessMessage } from "./handleButtonAlertClicker.js";
 
 
 /**
@@ -63,46 +62,30 @@ export async function handleTestCodeVerificationSetupClick(e, testSetupFormEleme
     if (data) {
 
         try {
-
             const isComplete = await displayResults(data);
 
             if (!data.FAILURE) {
-
                 toggleElement(dynamicTestFormSetupElement);
 
                 try {
-                    // Removes the form after a successful test.
-                    //
-                    // The form is hidden via Jinja until the page refreshes, so it may not exist
-                    // in the DOM yet. Attempting to remove it while hidden would raise an error.
                     toggleElement(testSetupFormElement);
-                    toggleProcessMessage(false);
                 } catch (error) {
                     doNothing();
-                    toggleProcessMessage(false);
                 }
-
             }
+
             testFormSectionElement.reset();
 
             if (isComplete) {
                 verificationTestComplete();
-                toggleProcessMessage(false);
             }
-
-
 
         } catch (error) {
             doNothing();
-            toggleProcessMessage(false);
-        }
-    }
-
-    toggleProcessMessage(false);
-
+        } 
 
 }
-
+}
 
 /**
  * Handles the submission event for the "delete" form.

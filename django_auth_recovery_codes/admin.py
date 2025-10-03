@@ -1,29 +1,27 @@
 from django.contrib import admin
 from django_auth_recovery_codes.forms.schedule_form import RecoveryCodeCleanUpSchedulerForm
 
-from django_auth_recovery_codes.models import (RecoveryCode, 
-                                                RecoveryCodeCleanUpScheduler, 
-                                                RecoveryCodesBatch, 
-                                                RecoveryCodeAudit, 
-                                                RecoveryCodePurgeHistory,
-                                                RecoveryCodeAuditScheduler,
-                                                RecoveryCodeNotification,
-                                                RecoveryCodeEmailLog,
-                                                RecoveryCodeSetup,
-                                                LoginRateLimiter,
-                                                LoginRateLimterAudit,
+from .models import (RecoveryCode, 
+                     RecoveryCodeCleanUpScheduler, 
+                     RecoveryCodesBatch, 
+                     RecoveryCodeAudit, 
+                     RecoveryCodePurgeHistory,
+                     RecoveryCodeAuditScheduler,
+                     RecoveryCodeEmailLog,
+                     RecoveryCodeSetup,
+                     LoginRateLimiter,
+                     LoginRateLimterAudit,
                      )
 
 
 
+class LoginRateLimiterAdmin(admin.ModelAdmin):
+    list_display    = ["id", "user", "login_attempts", "max_login_attempts", "last_attempt", "created_at", "modified_at"]
+    readonly_fields = ["id", "user", "login_attempts", "max_login_attempts", "last_attempt", "created_at", "modified_at"]
+
 
 class BaseAdmin(admin.ModelAdmin):
     list_per_page = 25
-
-
-class LoginRateLimiterAdmin(BaseAdmin):
-    list_display    = ["id", "user", "login_attempts", "max_login_attempts", "last_attempt", "created_at", "modified_at"]
-    readonly_fields = ["id", "user", "login_attempts", "max_login_attempts", "last_attempt", "created_at", "modified_at"]
 
 
 class LoginRateLimterAuditAdmin(BaseAdmin):
@@ -60,6 +58,7 @@ class RecoveryCodeEmailLogAdmin(BaseAdmin):
     readonly_fields      = ["id", "from_email", "to_email", "subject", "status", "created_on", "email_body"]
     list_display_links   = ["id", "from_email", "to_email"]
     search_fields        = ["from_email", "to_email", "subject"]
+
 
 
 class RecoveryCodePurgeHistoryAdmin(BaseAdmin):
@@ -117,6 +116,7 @@ class RecoveryCodeAuditSchedulerAdmin(BaseAdmin):
     def save_form(self, request, form, change):
         return super().save_form(request, form, change)
    
+    
 
 class RecoveryCodeAuditAdmin(BaseAdmin):
     """
@@ -132,6 +132,8 @@ class RecoveryCodeAuditAdmin(BaseAdmin):
     list_filter           = ["action", ]
     search_fields         = ["id", "user__username", "user__email", "action"]
     ordering              = ["-timestamp",]
+
+
 
 
 class RecoveryCodesBatchAdmin(BaseAdmin):
@@ -227,13 +229,6 @@ class RecoveryCodeAdmin(admin.ModelAdmin):
     ]
 
 
-class RecoveryNotificationAdmin(BaseAdmin):
-    """Tracks the notification"""
-    list_display       = ["id", "sent_at", "is_read", "created_at", "modified_at"]
-    list_display_links = ["id"]
-    readonly_fields    = ["id", "sent_at", "is_read", "created_at", "modified_at"]
-
-
 admin.site.register(RecoveryCodesBatch, RecoveryCodesBatchAdmin)
 admin.site.register(RecoveryCode, RecoveryCodeAdmin)
 admin.site.register(RecoveryCodeAudit, RecoveryCodeAuditAdmin)
@@ -244,4 +239,3 @@ admin.site.register(RecoveryCodeEmailLog, RecoveryCodeEmailLogAdmin)
 admin.site.register(RecoveryCodeSetup, RecoveryCodeSetupAdmin)
 admin.site.register(LoginRateLimiter, LoginRateLimiterAdmin)
 admin.site.register(LoginRateLimterAudit, LoginRateLimterAuditAdmin)
-admin.site.register(RecoveryCodeNotification, RecoveryNotificationAdmin)

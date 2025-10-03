@@ -48,7 +48,7 @@
 
 
 import { showTemporaryMessage }                from "../messages/message.js";
-import { toggleSpinner, toggleButtonDisabled } from "../utils.js";
+import { toggleSpinner, toggleButtonDisabled, getOrFetchElement } from "../utils.js";
 import { updateButtonFromConfig }              from "../generateCodeActionButtons.js";
 import messageContainerElement                 from "./appMessages.js";
 import { handleButtonAlertClickHelper }        from "./handleButtonAlertClicker.js";
@@ -56,9 +56,7 @@ import fetchData                               from "../fetch.js";
 import { getCsrfToken }                        from "../security/csrf.js";
 import { buttonStates }                        from "../generateCodeActionButtons.js";
 import { logError, warnError }                 from "../logger.js";
-import { toggleProcessMessage }                from "./handleButtonAlertClicker.js";
 import { markCurrentCardBatchAsDownload }      from "../batchCardsHistory/updateBatchHistorySection.js";
-import { getOrFetchElement }                   from "../utils.js";
 
 const DOWNLOAD_LOADER_ID               = "download-code-loader";
 let   downloadCodeButtonElementSpinner = document.getElementById(DOWNLOAD_LOADER_ID); // Dynamic, doesn't exist at runtime
@@ -286,7 +284,7 @@ export async function handleDownloadButtonClick(e, downloadButtonID) {
                                                     handleDownloadCodesApiRequest,
                                                      )
 
-    toggleProcessMessage(false);
+  
     const isProcessed = await ifJsonResponseAndProcess(resp);
   
     if (isProcessed) {
@@ -296,7 +294,7 @@ export async function handleDownloadButtonClick(e, downloadButtonID) {
     const respData = await downloadFromResponse(resp);
    
     setTimeout(() => {
-         toggleProcessMessage(false)
+    
         if (respData && respData.success) {
             handleDownloadSuccessMessageUI(e);
             

@@ -31,7 +31,9 @@ def check_app_settings(
     errors: List[CheckMessage] = []
 
     # Fl
-    flags_to_skip = ["DJANGO_AUTH_RECOVERY_CODES_PURGE_MAX_DELETIONS_PER_RUN"]
+    flags_to_skip = [] 
+                  
+                     
 
     for flag_name, config in FLAG_VALIDATORS.items():
         if flag_name not in flags_to_skip:
@@ -101,7 +103,7 @@ def check_app_max_deletions_per_run(app_configs: Optional[List[Any]] = None, **k
 
 
 @register
-def check_pagination_settings(app_configs: Optional[List[AppConfig]], **kwargs: Any
+def check_app_format_setting(app_configs: Optional[List[AppConfig]], **kwargs: Any
 ) -> List[CheckMessage]:
     """"""
     max_code_visible = settings.DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE 
@@ -162,6 +164,41 @@ def _check_flag(flag_name: str, config: Dict[str, Any], errors: List[CheckMessag
     if not isinstance(value, expected_type):
         errors.append(Error(config["error_if_wrong_type"], id=config["error_id"]))
 
+
+def check_email_success_setting(
+    app_configs: Optional[List[AppConfig]] = None, **kwargs: Any
+) -> List[CheckMessage]:
+    """
+    Validates the Django setting for the recovery code success email message.
+
+    This setting is the notification shown to users after they
+    have successfully emailed themselves a copy of their recovery codes.
+
+    This check ensures that the setting is a string (can be empty) and not some other type.
+
+    Args:
+        app_configs (Optional[List[AppConfig]]): Standard Django argument for system checks.
+        **kwargs: Additional keyword arguments (ignored).
+
+    Returns:
+        List[CheckMessage]: A list of Django CheckMessages indicating any errors
+                            or inconsistencies in the email success message setting.
+    """
+   
+    email_msg = settings.DJANGO_AUTH_RECOVERY_CODE_EMAIL_SUCCESS_MSG
+    errors = []
+
+    if not isinstance(email_msg, str):
+        errors.append(
+            Warning(
+                "DJANGO_AUTH_RECOVERY_CODE_EMAIL_SUCCESS_MSG must be a string.",
+                hint="Leave as an empty string to use the default message.",
+                id="django_auth_recovery_codes.W002",
+            )
+        )
+
+    return errors
+
 @register
 def check_ttl_setting(app_configs: Optional[List[AppConfig]], **kwargs: Any) -> List[CheckMessage]:
     """
@@ -182,20 +219,19 @@ def check_ttl_setting(app_configs: Optional[List[AppConfig]], **kwargs: Any) -> 
     cache_ttl = settings.DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL
     cache_min = settings.DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN
     cache_max = settings.DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX
-    errors: List[CheckMessage] = []
+    errors = []
 
     # Check for zero or negative values
     if cache_min <= 0 or cache_max <= 0 or cache_ttl <= 0:
         errors.append(
             Error(
                 "One or more cache settings is zero or negative.",
+                "All cache settings must be positive as they determine how long "
+                "recovery codes remain in the cache.",
                 hint=(
-                    "All cache settings must be positive as they determine how long "
-                    "recovery codes remain in the cache. "
                     f"Current values: TTL={cache_ttl}, MIN={cache_min}, MAX={cache_max}. "
                     "Consider setting them to positive integers, e.g., TTL=300, MIN=60, MAX=600."
-                ),
-                id="django_auth_recovery_codes.E001",
+                )
             )
         )
         return errors
@@ -205,11 +241,11 @@ def check_ttl_setting(app_configs: Optional[List[AppConfig]], **kwargs: Any) -> 
         errors.append(
             Error(
                 "CACHE_MIN cannot be greater than CACHE_MAX.",
+                "The minimum cache duration must not exceed the maximum.",
                 hint=(
                     f"Current values: MIN={cache_min}, MAX={cache_max}, TTL={cache_ttl}. "
                     "Swap the values or adjust them so that MIN <= MAX."
-                ),
-                id="django_auth_recovery_codes.E002",
+                )
             )
         )
 
@@ -218,11 +254,11 @@ def check_ttl_setting(app_configs: Optional[List[AppConfig]], **kwargs: Any) -> 
         errors.append(
             Error(
                 "CACHE_TTL is outside the min-max range.",
+                "The TTL should be between CACHE_MIN and CACHE_MAX to ensure proper caching behaviour.",
                 hint=(
                     f"Current values: TTL={cache_ttl}, MIN={cache_min}, MAX={cache_max}. "
                     "Adjust TTL to fall within the range defined by MIN and MAX."
-                ),
-                id="django_auth_recovery_codes.E003",
+                )
             )
         )
 
