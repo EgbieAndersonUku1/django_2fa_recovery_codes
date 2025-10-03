@@ -134,7 +134,9 @@ export async function handleButtonAlertClickHelper(e, buttonElementID, buttonSpi
 
         } 
         if (resp) {
-          
+            
+            buttonElement.classList.add("scaleDown");
+
             toggleProcessMessage(true);
            
             if (func) {
@@ -145,8 +147,15 @@ export async function handleButtonAlertClickHelper(e, buttonElementID, buttonSpi
         return resp;
 
     } finally {
+      
+        const TICK_DURATION = 200; // 0.2 seconds
+
         toggleSpinner(buttonSpinnerElement, false);
         toggleButtonDisabled(buttonElement, false);
+
+        setTimeout(() => {
+            buttonElement.classList.remove("scaleDown");
+        }, TICK_DURATION);
        
       
     }
