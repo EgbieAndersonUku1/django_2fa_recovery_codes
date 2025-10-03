@@ -1098,7 +1098,7 @@ button {
     width: 100%;
 }
 
-#button:hover {
+button:hover {
     transform: scale(0.9);
     opacity: 0.8;
 }
