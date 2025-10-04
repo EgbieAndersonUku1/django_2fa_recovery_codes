@@ -1098,8 +1098,15 @@ button {
     width: 100%;
 }
 
+button:hover {
+    transform: scale(0.93);
+    opacity: 0.8;
+}
 
 
+button.scaleDown {
+    transform: scale(0.7);
+}
 
 /* ------------------------------------------ */
 /*               SPINNER (LOADER)             */

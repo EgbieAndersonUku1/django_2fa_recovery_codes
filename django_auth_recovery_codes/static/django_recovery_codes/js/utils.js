@@ -373,7 +373,11 @@ export function sleep(ms) {
  *   prependChild(parent, newDiv);
  */
 export function prependChild(parent, newChild) {
-
+  
+  if (!(parent && checkIfHTMLElement(parent, "Pareent Element"))) {
+      warnError("PrependChild",  "The element couldn't be found");
+      return;
+  }
   
   if (typeof parent.prepend === "function") {
     // Modern browsers
@@ -474,7 +478,11 @@ export function exceedsPaginatorLimit(parentElement, pageLimit) {
         );
         return false;
     }
-    return parentElement.children.length >= pageLimit;
+
+    if (parentElement && checkIfHTMLElement(parentElement, "Parent element Batch")) {
+          return parentElement.children.length >= pageLimit;
+    }
+  
 }
 
 

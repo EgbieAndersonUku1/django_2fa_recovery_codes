@@ -51,9 +51,6 @@
 import appStateManager from "./state/appStateManager.js";
 import { toggleElement,checkIfHTMLElement } from "./utils.js";
 
-// Messages & notifications
-import EnqueuedMessages from "./messages/enqueueMessages.js";
-
 
 // Code setup & test verification
 import { handleTestCodeVerificationSetupClick, loadTestVerificationElements } from "./codesSetupVerifcation/handleTestSetup.js";
@@ -125,9 +122,6 @@ const DELETE_CURRENT_CODE_BUTTON_ID       = "delete-current-code-btn";
 const DELETE_ALL_CODES_BUTTON_ID          = "delete-all-code-btn"
 const OPEN_NAV_BAR_HAMBURGERR_ICON        = "open-hamburger-nav-icon";
 const EXCLUDE_EXPIRY_CHECKBOX_ID          = "exclude_expiry"
-
-
-const enqueuedMessages = new EnqueuedMessages();
 
 
 
