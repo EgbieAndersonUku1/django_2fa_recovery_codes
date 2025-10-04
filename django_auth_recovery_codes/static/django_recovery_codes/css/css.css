@@ -1099,7 +1099,7 @@ button {
 }
 
 button:hover {
-    transform: scale(0.9);
+    transform: scale(0.93);
     opacity: 0.8;
 }
 
