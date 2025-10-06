@@ -2301,8 +2301,8 @@ class LoginRateLimiter(AbstractCooldownPeriod, AbstractBaseModel):
 
         if not LoginRateLimiter.has_login_rate_limiter(user):  
               
-            LoginRateLimiter.get_by_user_or_create(user)  
-            set_cache_with_retry(cache_key, True, ttl=ttl)  
+            login_rate_limiter = LoginRateLimiter.get_by_user_or_create(user)  
+            set_cache_with_retry(cache_key, login_rate_limiter, ttl=ttl)  
             default_logger.debug(f"LoginRateLimiter created and cached for user {user.email}")
         else:
                 
