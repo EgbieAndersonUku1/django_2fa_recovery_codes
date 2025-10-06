@@ -2,6 +2,7 @@ from django.conf import settings
 from django_email_sender.email_logger import EmailSenderLogger
 from django_email_sender.email_sender import EmailSender
 from django_email_sender.email_logger import LoggerType
+from django_email_sender.email_sender_constants import EmailSenderConstants
 from django.utils import timezone
 
 from django_q.models import Task, Schedule
@@ -204,7 +205,14 @@ def hook_email_purge_report(task):
             .send()
         )
 
+        
         email_logger.info("Purge summary email sent successfully")
+
+        # exclude the context and header from being logged since they contain crucial information
+        # e.g recovery raw codes within the context
+        email_sender_logger.exclude_fields_from_logging(EmailSenderConstants.Fields.CONTEXT.value,
+                                                        EmailSenderConstants.Fields.HEADERS.value,
+                                                        )
 
         RecoveryCodeCleanUpScheduler.objects.filter(
             name=schedule_name
