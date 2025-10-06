@@ -26,7 +26,13 @@ from django_auth_recovery_codes.utils.errors.error_messages import construct_rai
 def send_recovery_codes_email(sender_email, user, codes, subject= "Your account recovery codes"):
     
     email_sender_logger = EmailSenderLogger.create()
+    use_logger          =  settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER
+
     _store_user_email_log(email_sender_logger)
+
+    # exclude the context and header from being logged since they contain crucial information
+    # e.g recovery raw codes within the context
+    _if_set_to_true_use_logger(use_logger, email_sender_logger, log_context_and_header=False)
 
     try:
         ( 
@@ -138,7 +144,7 @@ def clean_up_old_audits_task():
     return deleted
 
 
-def _if_set_to_true_use_logger(use_logger: bool, email_sender_logger: EmailSenderLogger) -> None:
+def _if_set_to_true_use_logger(use_logger: bool, email_sender_logger: EmailSenderLogger, log_context_and_header: bool = True) -> None:
     """
     Decides if a logger should be turned on for a given scheduled action.
 
@@ -162,7 +168,17 @@ def _if_set_to_true_use_logger(use_logger: bool, email_sender_logger: EmailSende
             "Sending email with logger turned on. All actions will be logged."
         )
         email_sender_logger.config_logger(email_logger, log_level=LoggerType.INFO)
+
+       
         email_sender_logger.start_logging_session()
+
+
+        if not log_context_and_header:
+            purge_code_logger.debug("The context and headers haven't be logged")
+            email_sender_logger.exclude_fields_from_logging(EmailSenderConstants.Fields.CONTEXT.value,
+                                                            EmailSenderConstants.Fields.HEADERS.value,
+                                                            )
+      
     else:
         purge_email_logger.info(
             "Sending email with logger turned off. No actions will be logged."
@@ -185,6 +201,8 @@ def hook_email_purge_report(task):
     email_sender_logger = EmailSenderLogger.create()
 
     try:
+
+        # show the ontext and header since they don't include sensitive information
         _if_set_to_true_use_logger(use_with_logger, email_sender_logger)
 
         subject, html, text = _get_email_attribrutes(reports)
@@ -208,11 +226,7 @@ def hook_email_purge_report(task):
         
         email_logger.info("Purge summary email sent successfully")
 
-        # exclude the context and header from being logged since they contain crucial information
-        # e.g recovery raw codes within the context
-        email_sender_logger.exclude_fields_from_logging(EmailSenderConstants.Fields.CONTEXT.value,
-                                                        EmailSenderConstants.Fields.HEADERS.value,
-                                                        )
+       
 
         RecoveryCodeCleanUpScheduler.objects.filter(
             name=schedule_name
