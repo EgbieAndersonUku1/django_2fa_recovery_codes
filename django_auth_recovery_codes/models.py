@@ -280,13 +280,25 @@ class RecoveryCodesBatchHistory(AbstractRecoveryCodesBatch):
         verbose_name_plural = "Recovery Code Batch Histories"
 
     def __str__(self):
+        """Returns a string representation of the class"""
         return f"History for batch {self.batch_id} (user={self.user})"
     
     
     @classmethod
     @enforce_types()
-    def get_by_batch_id(cls, batch_id: uuid.UUID):
-        """"""
+    def get_by_batch_id(cls, batch_id: uuid.UUID) -> Optional["cls"]:
+        """
+        Returns a batch record for the given batch_id.
+
+        Args:
+            batch_id (uuid.UUID): The UUID of the batch to retrieve.
+        
+        Returns:
+            Optional[cls]: The batch record if found, else None.
+
+        Raises:
+            TypeError: If batch_id is not a uuid.UUID (enforced by @enforce_types).
+        """
         try:
             return cls.objects.get(batch_id=batch_id)
         except cls.DoesNotExist:
@@ -294,7 +306,21 @@ class RecoveryCodesBatchHistory(AbstractRecoveryCodesBatch):
     
     @classmethod
     def _create_batch_history(cls, batch: RecoveryCodesBatch):
-        """"""
+        """
+        Creates a new batch history record from a given RecoveryCodesBatch instance.
+
+        Args:
+            batch (RecoveryCodesBatch): The RecoveryCodesBatch object from which
+                the history record will be created.
+
+        Returns:
+            cls: The newly created batch history model instance.
+        
+        Notes:
+            - This method copies all relevant fields from the provided batch.
+            - The method is intended for internal use (hence the leading underscore).
+            
+        """
         return  cls.objects.create(
                     batch_id=batch.id,
                     number_issued=batch.number_issued,
@@ -315,22 +341,42 @@ class RecoveryCodesBatchHistory(AbstractRecoveryCodesBatch):
     
     @classmethod
     def _update_batch_history(cls, batch: RecoveryCodesBatch):
-        """"""
+        """
+        Updates an existing batch history record with data from a given RecoveryCodesBatch.
+
+        Args:
+            batch (RecoveryCodesBatch): The RecoveryCodesBatch instance containing
+                updated information.
+
+        Returns:
+            None
+
+        Notes:
+            - This method looks up the existing batch history by `batch.id`.
+            - If a matching record is found, all relevant fields are updated and saved.
+            - If no matching record exists, nothing happens.
+            - Intended for internal use (leading underscore).
+            - Since the argument (batch) is passed into `get_by_batch_id` and the
+              method checks the parameter using @enforce_types, there is no need
+              to check if the batch is a valid instance again.
+        """
         recovery_batch_history = cls.get_by_batch_id(batch.id)
+
         if recovery_batch_history:
             
-            recovery_batch_history.number_issued=batch.number_issued,
-            recovery_batch_history.number_removed=batch.number_removed,
-            recovery_batch_history.number_used=batch.number_used,
-            recovery_batch_history.status=batch.status,
-            recovery_batch_history.deleted_at=batch.deleted_at,
-            recovery_batch_history.deleted_by=batch.deleted_by,
-            recovery_batch_history.viewed=batch.viewed,
-            recovery_batch_history.downloaded=batch.downloaded,
-            recovery_batch_history.emailed=batch.emailed,
-            recovery_batch_history.generated=batch.generated
+            recovery_batch_history.number_issued       = batch.number_issued,
+            recovery_batch_history.number_removed      = batch.number_removed,
+            recovery_batch_history.number_used         = batch.number_used,
+            recovery_batch_history.status              = batch.status,
+            recovery_batch_history.deleted_at          = batch.deleted_at,
+            recovery_batch_history.deleted_by          = batch.deleted_by,
+            recovery_batch_history.viewed              = batch.viewed,
+            recovery_batch_history.downloaded          = batch.downloaded,
+            recovery_batch_history.emailed             = batch.emailed,
+            recovery_batch_history.generated           = batch.generated
             recovery_batch_history.deleted_by_username = batch.user.username
-            recovery_batch_history.user = batch.user
+            recovery_batch_history.user                = batch.user
+            recovery_batch_history.save()
 
     @classmethod
     def log_action(cls, batch: RecoveryCodesBatch, action: str = Status.CREATE):
@@ -339,39 +385,96 @@ class RecoveryCodesBatchHistory(AbstractRecoveryCodesBatch):
             case cls.Status.CREATE:
                 return cls._create_batch_history(batch)
             case cls.Status.UPDATE:
-                default_logger.debug(f"Update batch history with id {batch.id}")
                 return cls._update_batch_history(batch)
             case _:
                 default_logger.warning(f"Unknown action '{action}' for batch {batch.id}")
                 return None
 
-
     @classmethod
     @enforce_types()
     def update_viewed(cls, batch: RecoveryCodesBatch):
-        """"""
+        """
+        Marks the given batch as viewed.
+
+        Args:
+            batch (RecoveryCodesBatch): The batch instance to update.
+
+        Notes:
+            - Updates the `VIEWED_FLAG` and `MODIFIED_AT_FIELD` using `_update_field`.
+            - Intended for internal use; batch type is enforced by @enforce_types.
+        """
         cls._update_field(batch, fields_list=[cls.VIEWED_FLAG, cls.MODIFIED_AT_FIELD], action_tag=cls.VIEWED_FLAG)
-        
-    
+
+
     @classmethod
     @enforce_types()
     def update_download(cls, batch: RecoveryCodesBatch):
-        cls._update_field(batch, fields_list=[cls.GENERATED_FLAG, cls.MODIFIED_AT_FIELD], action_tag=cls.GENERATED_FLAG)
+        """
+        Marks the given batch as downloaded.
 
-    
+        Args:
+            batch (RecoveryCodesBatch): The batch instance to update.
+
+        Notes:
+            - Updates the `DOWNLOADED_FLAG` and `MODIFIED_AT_FIELD` using `_update_field`.
+            - Intended for internal use; batch type is enforced by @enforce_types.
+        """
+        cls._update_field(batch, fields_list=[cls.DOWNLOADED_FLAG, cls.MODIFIED_AT_FIELD], action_tag=cls.DOWNLOADED_FLAG)
+
     @classmethod
     @enforce_types()
     def update_email(cls, batch: RecoveryCodesBatch):
+        """
+        Marks the given batch as emailed.
+
+        Args:
+            batch (RecoveryCodesBatch): The batch instance to update.
+
+        Notes:
+            - Updates the `EMAILED_FLAG` and `MODIFIED_AT_FIELD` using `_update_field`.
+            - Intended for internal use; batch type is enforced by @enforce_types.
+        """
         cls._update_field(batch, fields_list=[cls.EMAILED_FLAG, cls.MODIFIED_AT_FIELD], action_tag=cls.EMAILED_FLAG)
-    
+
     @classmethod
     @enforce_types()
-    def update_generated(cls, batch:RecoveryCodesBatch):
-        cls._update_field(batch, fields_list=[cls.GENERATED_FLAG, cls.MODIFIED_AT_FIELD], action_tag=cls.VIEWED_FLAG)
-    
+    def update_generated(cls, batch: RecoveryCodesBatch):
+        """
+        Marks the given batch as generated.
+
+        Args:
+            batch (RecoveryCodesBatch): The batch instance to update.
+
+        Notes:
+            - Updates the `GENERATED_FLAG` and `MODIFIED_AT_FIELD` using `_update_field`.
+            - Intended for internal use; batch type is enforced by @enforce_types.
+        """
+        cls._update_field(batch, fields_list=[cls.GENERATED_FLAG, cls.MODIFIED_AT_FIELD], action_tag=cls.GENERATED_FLAG)
+
     @classmethod
     def _update_field(cls, batch: RecoveryCodesBatch, fields_list: list, action_tag: str):
-        """"""
+        """
+        Updates a specific flag on a batch history record and saves the specified fields.
+
+        Args:
+            batch (RecoveryCodesBatch): The batch instance whose history record is to be updated.
+            fields_list (list): List of field names to update in the database.
+            action_tag (str): The name of the boolean field to set to True.
+                              Since the method is quite abstract it tells the 
+                              RecoveryCodeBatchHistory which field to set.
+                              Without this class would have no idea which field
+                              to update.
+
+        Returns:
+            bool: True if the batch record was found and updated, False if no record exists.
+
+        Notes:
+            - Retrieves the batch history using `get_by_batch_id`.
+            - Sets the `action_tag` attribute to True and saves only the fields in `fields_list`.
+            - Intended for internal use (leading underscore).
+            - The method assumes `batch` is a valid RecoveryCodesBatch instance; type checking can be
+            handled externally if using @enforce_types.
+        """
         batch  = cls.get_by_batch_id(batch.id)
        
         if batch:
@@ -382,10 +485,15 @@ class RecoveryCodesBatchHistory(AbstractRecoveryCodesBatch):
     
         
 
-        
-
 class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
-    """"""
+    """
+    Represents a batch of recovery codes associated with a user.
+
+    This model tracks the lifecycle of a recovery code batch, including 
+    generation, download, email distribution, usage, and deletion. It also
+    supports automatic removal of expired or deleted batches.
+
+    """
 
     CACHE_KEYS = ["generated", "downloaded", "emailed", "viewed", "number_used"]
     JSON_KEYS  = ["id", "number_issued", "number_removed", "number_invalidated", "number_used", "created_at",
@@ -417,6 +525,20 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
 
     @property
     def status_css_class(self):
+        """
+        Returns a CSS class string corresponding to the current status of the batch.
+
+        Maps the batch's `status` field to a CSS class for frontend display.
+
+        Returns:
+            str: The CSS class representing the batch status. Defaults to "text-gray-500"
+                if the status is unrecognized.
+
+        Example:
+            - Status.ACTIVE -> "text-green"
+            - Status.INVALIDATE -> "text-red"
+            - Status.PENDING_DELETE -> "text-yellow-600"
+        """
         return {
             Status.ACTIVE: "text-green",
             Status.INVALIDATE: "text-red",
@@ -476,6 +598,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
         attempt_guard = AttemptGuard[RecoveryCodesBatch](instance=cls, instance_attempt_field_name=cls.REQUEST_ATTEMPT_FIELD)
         return attempt_guard.can_proceed(user=user, action="recovery_code")
 
+    @enforce_types()
     def _get_expired_recovery_codes_qs(self, retention_days: int = None) -> QuerySet[RecoveryCode]:
         """
         Return a queryset of recovery codes eligible for automatic removal with two extra conditions.
@@ -607,6 +730,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
             purge_code_logger.debug(f"There is nothing to delete in the batch. Batch has {number_to_delete} to delete")
         return deleted_count
 
+    @enforce_types(non_null=False)
     def purge_expired_codes(self, retention_days: int = 1, delete_empty_batch: bool = True, batch_size: int | None = 500):
         """
         Hard-delete recovery codes in this batch marked for deletion or invalidated,
@@ -1614,6 +1738,7 @@ class RecoveryCode(models.Model):
         return check_password(plaintext_code.strip(), self.hash_code)
 
     @classmethod
+    @enforce_types()
     def get_by_code_and_user(cls, plaintext_code: str, user: User) -> RecoveryCode | None:
         """
         Retrieve a RecoveryCode instance for a user by plaintext code.
@@ -1630,7 +1755,10 @@ class RecoveryCode(models.Model):
         Args:
             user (User): The user who owns the recovery code.
             code (str):  The plaintext recovery code entered by the user.
-         
+        
+        Raises:
+            Raises an error if parameter has incorrect type.
+            Raised through the decorators `enforce_types()`
         Returns:
 
         RecoveryCode or None
@@ -1653,11 +1781,9 @@ class RecoveryCode(models.Model):
         >>> if recovery_code:
         >>>     print("Code verified!", recovery_code.batch)
         """
-        if not isinstance(plaintext_code, str):
-            raise ValueError(f"The code parameter is not a string. Expected a string but got an object with type {type(code)}")
-        
+
         plaintext_code = plaintext_code.replace("-", "").strip()
-        lookup = make_lookup_hash(plaintext_code.strip())
+        lookup         = make_lookup_hash(plaintext_code.strip())
 
         try:
             # Use lookup_hash to narrow down the correct recovery code.
@@ -1716,10 +1842,20 @@ class RecoveryCode(models.Model):
 
 
 
-
 class RecoveryCodeEmailLog(EmailBaseLog):
-    pass
+    """
+    Stores logs of recovery code emails sent to users.
 
+    This model records the user's email when they request a recovery code
+    to be sent. Whether the log is saved in the database depends on the
+    setting `DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG`:
+        - True: store the log in the database.
+        - False: do not store the log.
+
+    Inherits from:
+        EmailBaseLog: Provides basic email logging functionality.
+    """
+    pass
 
 
 class LoginRateLimterAudit(AbstractBaseModel):
@@ -1744,6 +1880,7 @@ class LoginRateLimterAudit(AbstractBaseModel):
     login_attempts = models.PositiveSmallIntegerField(default=0)
 
     def __str__(self):
+        """A string representaton of the model"""
         return f"{self.user} with {self.login_attempts} login attempt(s)"
 
     @classmethod
@@ -1797,10 +1934,29 @@ class LoginRateLimiter(AbstractCooldownPeriod, AbstractBaseModel):
     LAST_ATTEMPT_FIELD       = "last_attempt"
 
     def __str__(self):
+        """A string representation of the model"""
         return f"User {self.user}, login attempts {self.login_attempts}"
 
     def record_failed_attempt(self):
-        """"""
+        """
+        Records a failed attempt to use a recovery code.
+
+        The method chooses the storage mechanism based on the
+        `DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE` setting:
+            - If True, failed attempts are recorded using the cache first.
+            - If False, failed attempts are recorded directly in the database.
+
+        What this means?
+
+        If the database is used all failed attempts are checked and pulled from
+        the database, and if the cache is used computes the failed attempts within
+        the cache first before going to the database.
+
+        Notes:
+            - Delegates to `_record_failed_attempts_using_cache_first` or
+            `_record_failed_attempts_db_only` depending on configuration.
+            `Record the failed attempts in a model for historical record
+        """
         use_with_cache = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE", False)
 
         if use_with_cache:

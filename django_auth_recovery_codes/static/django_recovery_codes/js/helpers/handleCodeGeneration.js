@@ -367,7 +367,8 @@ function handleCanGenerateCodeSuccessUI(resp) {
 
     toggleElement(generaterecoveryBatchSectionElement);
     toggleElement(codeActionButtons);
-    const isPopulated = populateTableWithUserCodes(resp.CODES);
+
+    const isPopulated   = populateTableWithUserCodes(resp.CODES);
     const MILLI_SECONDS = 1000;
   
     if (isPopulated) {
@@ -525,7 +526,6 @@ async function handleRecoveryCodesAction({ e,
     url,
     daysToExpiry = null
 }) {
-    const MILLI_SECONDS = 5000;
     const body = {};
 
     if (daysToExpiry !== null && typeof daysToExpiry === "number") {

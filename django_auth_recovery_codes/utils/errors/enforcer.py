@@ -25,6 +25,18 @@ def _is_instance_of(value, expected_type) -> bool:
     return isinstance(value, origin)
 
 
+def get_cache_hints_from_cache_or_compute(cached_hints, func):
+    """"""
+    if cached_hints is None:
+        try:
+            # Try resolving annotations
+            cached_hints = get_type_hints(func)
+        except Exception:
+            # Fall back to raw __annotations__ if resolution fails
+            cached_hints = func.__annotations__
+    return cached_hints
+
+
 def enforce_types(non_null: bool = True):
     """
     Runtime type checker for function parameters.
@@ -40,15 +52,10 @@ def enforce_types(non_null: bool = True):
         @wraps(func)
         def wrapper(*args, **kwargs):
             nonlocal cached_hints
-            if cached_hints is None:
-                try:
-                    # Try resolving annotations
-                    cached_hints = get_type_hints(func)
-                except Exception:
-                    # Fall back to raw __annotations__ if resolution fails
-                    cached_hints = func.__annotations__
 
-            bound_args = sig.bind_partial(*args, **kwargs)
+            cached_hints = get_cache_hints_from_cache_or_compute(cached_hints, func)
+            bound_args   = sig.bind_partial(*args, **kwargs)
+
             bound_args.apply_defaults()
 
             for arg_name, expected_type in cached_hints.items():

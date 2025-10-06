@@ -50,7 +50,8 @@ import { toggleSpinner,
        getNthChildNested, 
        checkIfHTMLElement, 
        addChildWithPaginatorLimit,
-       getOrFetchElement }                  from "../utils.js";
+       getOrFetchElement, 
+       toggleElement}                  from "../utils.js";
 import { generateRecoveryCodesSummaryCard } from "../generateBatchHistoryCard.js";
 import { markCardAsDeleted }                from "./markCardAsDeleted.js";
 import { getCardFieldElements }             from "./batchCardUtils.js";
@@ -207,6 +208,8 @@ export function updateBatchHistorySection(sectionElement,
     }
  
     addChildWithPaginatorLimit(sectionElement, newBatchCard, batchPerPage);
+
+    toggleElement(sectionElement, false);
     setTimeout(() => {
        
         previousBatchCard = getNthChildNested(

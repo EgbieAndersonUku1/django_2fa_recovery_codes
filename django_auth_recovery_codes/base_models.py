@@ -293,7 +293,6 @@ class AbstractRecoveryCodesBatch(AbstractBaseModel):
     status              = models.CharField(choices=Status, max_length=1, default=Status.ACTIVE, db_index=True)
     expiry_date         = models.DateField(blank=True, null=True, db_index=True)
     deleted_at          = models.DateTimeField(null=True, blank=True)
-    deleted_by          = models.CharField(max_length=60)
     deleted_by          = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
    
 
@@ -326,10 +325,10 @@ class AbstractRecoveryCodesBatch(AbstractBaseModel):
 
         All other statuses use their default TextChoices label.
         """
-        frontend_flags = {
-            Status.PENDING_DELETE: "Deleted???????",  # override PENDING_DELETE
-            Status.ACTIVE: "Active",           # optional, can leave as default
+        override_flags = {
+            Status.PENDING_DELETE: "Deleted",  # override PENDING_DELETE
+            Status.ACTIVE: "Active",          
         }
 
         # Use overridden value if present, else default label
-        return frontend_flags.get(Status(self.status), Status(self.status).label)
+        return override_flags.get(Status(self.status), Status(self.status).label)
