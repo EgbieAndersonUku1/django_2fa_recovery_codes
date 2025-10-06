@@ -1,19 +1,19 @@
 <!-- pagination -->
 
-{% if recovery_batches  %}
+{% if recovery_batches_histories  %}
 <section id="pagination" class="flex flex-end margin-bottom-xlg margin-top-lg">
 
-    {% if recovery_batches.has_previous %}
-         <a href="?page={{ recovery_batches.previous_page_number }}" class="pagination-link">previous</a>
+    {% if recovery_batches_histories.has_previous %}
+         <a href="?page={{ recovery_batches_histories.previous_page_number }}" class="pagination-link">previous</a>
     {% endif %}
 
     
     <span class="current pagination-link">
-        Page {{ recovery_batches.number }} of {{ recovery_batches.paginator.num_pages }}.
+        Page {{ recovery_batches_histories.number }} of {{ recovery_batches_histories.paginator.num_pages }}.
     </span>
 
-     {% if recovery_batches.has_next %}
-            <a href="?page={{  recovery_batches.next_page_number }}" class="pagination-link">next</a>
+     {% if recovery_batches_histories.has_next %}
+            <a href="?page={{  recovery_batches_histories.next_page_number }}" class="pagination-link">next</a>
     {% endif %}
     
 

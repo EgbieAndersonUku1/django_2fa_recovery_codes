@@ -27,7 +27,7 @@ const batchKeysMapping = {
   EXPIRY_DATE: "Expiry date",
   GENERATED: "Has generated code batch",
   MODIFIED_AT: "Date modified",
-  STATUS: "Status",
+  STATUS: "Batch Status",
   USERNAME: "User",
   VIEWED: "Has viewed code batch"
 };

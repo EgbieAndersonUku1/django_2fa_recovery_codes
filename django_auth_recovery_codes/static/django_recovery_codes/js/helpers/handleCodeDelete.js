@@ -298,9 +298,7 @@ export async function handleDeleteAllCodeButtonClick(e,  deleteAllCodesButtonID)
                         alertAttributes,
                         handleDeleteAllCodesApiRequest,
                     )
-
-    console.log(resp);
-    
+   
     if (!resp) {
         handleBadRequestFromServer();
         return;

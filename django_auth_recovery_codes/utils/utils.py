@@ -1,9 +1,9 @@
 import uuid
-import logging
 from datetime import timedelta
 from django.utils import timezone
 from django_q.models import Schedule, Task
-from django.conf import settings
+
+from django_auth_recovery_codes.loggers.loggers import default_logger
 
 
 def schedule_future_date(days: int = 0, hours: int = 0, minutes: int = 0):
@@ -94,9 +94,9 @@ def cleanup_old_django_q_task(func_substring: str):
     # Delete queued/failed tasks
     tasks_deleted, _ = Task.objects.filter(func__contains=func_substring).delete()
 
-    print(
-        f"Deleted {schedules_deleted} scheduled tasks and {tasks_deleted} queued tasks "
-        f"matching '{func_substring}'"
+    default_logger.debug(
+         f"Deleted {schedules_deleted} scheduled tasks and {tasks_deleted} queued tasks "
+         f"matching '{func_substring}'"
     )
 
 

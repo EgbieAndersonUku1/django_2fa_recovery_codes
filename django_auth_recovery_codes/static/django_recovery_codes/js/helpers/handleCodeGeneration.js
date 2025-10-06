@@ -134,7 +134,6 @@ function resetButtonsHelper(buttonElement, buttonID, buttonNewState, buttonMsg) 
     buttonElement = getOrFetchElement(buttonElement, buttonID);
     if (!buttonElement) return;
 
-    console.log(buttonNewState);
     
     // Check that the config is valid
     if (!buttonNewState || !buttonNewState.button || !buttonNewState.button.buttonClassList) {
@@ -367,8 +366,9 @@ function handleGenerateCodeWithExpiryFormSubmission(e) {
 function handleCanGenerateCodeSuccessUI(resp) {
 
     toggleElement(generaterecoveryBatchSectionElement);
+    toggleElement(codeActionButtons);
 
-    const isPopulated = populateTableWithUserCodes(resp.CODES);
+    const isPopulated   = populateTableWithUserCodes(resp.CODES);
     const MILLI_SECONDS = 1000;
   
     if (isPopulated) {
@@ -376,9 +376,8 @@ function handleCanGenerateCodeSuccessUI(resp) {
         sendPostFetchWithoutBody("/auth/recovery-codes/viewed/", "Failed to mark code as viewed ");
         updateBatchHistorySection(recoveryBatchSectionElement, resp.BATCH, resp.ITEM_PER_PAGE);
 
-     
         if (appStateManager.isRequestCodeGenerationActive()) {           
-            toggleElement(codeActionButtons, false);
+          
             setTimeout(() => {
                 resetEmailButton();
                 resetDownloadButton();
@@ -527,7 +526,6 @@ async function handleRecoveryCodesAction({ e,
     url,
     daysToExpiry = null
 }) {
-    const MILLI_SECONDS = 5000;
     const body = {};
 
     if (daysToExpiry !== null && typeof daysToExpiry === "number") {
@@ -537,8 +535,6 @@ async function handleRecoveryCodesAction({ e,
     body.forceUpdate = true;
 
     toggleElement(generaterecoveryBatchSectionElement);
-
-    console.log(appStateManager.isRequestCodeGenerationActive())
     toggleElement(codeActionButtons);
 
     const handleGenerateCodeFetchApi = async () => {

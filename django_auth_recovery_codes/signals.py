@@ -2,18 +2,23 @@ import logging
 
 from django.db.models.signals import post_save, pre_save, post_delete, post_migrate
 from django_auth_recovery_codes.utils.schedulers import schedule_recovery_code_cleanup, schedule_cleanup_audit
-
+from django.conf import settings
 from django.dispatch import receiver
 from django_auth_recovery_codes.models import (RecoveryCodeCleanUpScheduler, 
                                                RecoveryCodeSetup,
                                                RecoveryCodeAuditScheduler,
+                                               RecoveryCodesBatchHistory,
+                                               RecoveryCodesBatch,
+                                             
                                             )
 from django_q.tasks import schedule, Schedule
 from django.core.exceptions import ValidationError
+
+from django_auth_recovery_codes.views_dashboard_helper import RECOVERY_CODES_BATCH_HISTORY_KEY
 from django_auth_recovery_codes.tasks import unschedule_task, clear_queued_tasks
 from django_auth_recovery_codes.utils.utils import create_unique_string
-from django_auth_recovery_codes.utils.cache.safe_cache import get_cache_with_retry, set_cache_with_retry
-from django.conf import settings
+from django_auth_recovery_codes.utils.cache.safe_cache import get_cache_with_retry, set_cache_with_retry, delete_cache_with_retry
+
 
 logger = logging.getLogger("app.singal_logger")
 
@@ -101,6 +106,18 @@ def validate_next_run_scheduler_value(sender, instance, **kwargs):
             instance.use_with_logger = settings.DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER
     
 
+
+
+@receiver(post_delete, sender=RecoveryCodesBatchHistory)
+def handle_post_recovery_batch_history_cache_deleted(sender, instance, **kwargs):
+    """"""
+    if instance:
+        CACHE_KEY = RECOVERY_CODES_BATCH_HISTORY_KEY.format(instance.user.id)
+        delete_cache_with_retry(CACHE_KEY)
+
+
+
+
 @receiver(post_delete, sender=RecoveryCodeSetup)
 def handle_post_delete_recovery_setup(sender, instance, **kwargs):
     """
@@ -116,6 +133,7 @@ def handle_post_delete_recovery_setup(sender, instance, **kwargs):
         if cache_data:
             cache_data[SETUP_FLAG] = False
             set_cache_with_retry(CACHE_KEY, cache_data)
+
 
 
 @receiver(post_migrate)

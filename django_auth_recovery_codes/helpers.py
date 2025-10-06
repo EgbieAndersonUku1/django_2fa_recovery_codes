@@ -1,8 +1,7 @@
 import logging
-import uuid
 
 from django_auth_recovery_codes.models import RecoveryCodesBatch
-from django_auth_recovery_codes.utils.errors.error_messages import construct_raised_error_msg
+from django_auth_recovery_codes.utils.errors.enforcer import enforce_types
 
 
 class PurgedStatsCollector:
@@ -12,7 +11,7 @@ class PurgedStatsCollector:
     This helper class tracks the results of purging recovery code batches,
     including how many codes were removed, how many batches were affected,
     and which batches were skipped. It also generates lightweight reports
-    for each processed batch.
+    for each processed batch. that will be sent to the admin
 
     Typical usage example:
         collector = PurgeStatsCollector()
@@ -32,7 +31,7 @@ class PurgedStatsCollector:
 
    
     """
-    def __init__(self, logger):
+    def __init__(self, logger: logging.Logger):
         self.total_purged   = 0
         self.total_batches  = 0
         self.batches_report = []
@@ -41,15 +40,30 @@ class PurgedStatsCollector:
 
         if not isinstance(self.logger, logging.Logger):
             raise TypeError("logger", logging.Logger, logging)
-       
+    
+    @enforce_types()
     def process_batch(self, 
                       batch: RecoveryCodesBatch, 
                       purged_count: int, 
                       is_empty: bool, 
                       batch_id: str,
                       use_with_logger: bool = True):
+        """
+        Processes a single recovery code batch during a purge operation.
 
-        self._is_purged_attribrutes_valid(batch, purged_count, is_empty, batch_id)
+        This method updates internal counters based on whether any codes were purged,
+        generates a JSON report for the process batche, and logs information if enabled.
+
+        Args:
+            batch (RecoveryCodesBatch): The batch being processed.
+            purged_count (int): Number of recovery codes purged from the batch.
+            is_empty (bool): Whether the batch was empty after the purge.
+            batch_id (str): The unique identifier of the batch.
+            use_with_logger (bool, optional): If True, logs purge information. Defaults to True.
+
+        Notes:
+            - Type validation is enforced through the `@enforce_types` decorator.
+        """
 
         if purged_count > 0:
 
@@ -63,7 +77,28 @@ class PurgedStatsCollector:
         self._log_purge_info(purged_count, batch, is_empty, log_information=use_with_logger)
 
 
-    def _log_purge_info(self, purged_count, batch, is_empty, log_information = True):
+    def _log_purge_info(self, purged_count: int, batch: RecoveryCodesBatch, is_empty: bool, log_information: bool = True):
+        """
+        Logs information about the purge process for a given recovery code batch.
+
+        Depending on whether any codes were purged, this method logs either an 
+        informational or debug message. Logging can be disabled via the 
+        `log_information` flag.
+
+        Args:
+            purged_count (int): Number of recovery codes purged from the batch.
+            batch (RecoveryCodesBatch): The batch being processed.
+            is_empty (bool): Whether the batch was empty after the purge.
+            log_information (bool, optional): If False, disables logging. Defaults to True.
+
+        Notes:
+            - Logs an INFO message when codes are purged.
+            - Logs a DEBUG message when no codes are purged (i.e., batch skipped).
+            - Intended for internal use within the purge process (leading underscore).
+            - Since this method is called from the public `process_batch` method,
+                and type checking is already enforced there, parameter validation is
+                not repeated here to avoid redundant checks.
+        """
 
         if not log_information:
             return
@@ -165,19 +200,5 @@ class PurgedStatsCollector:
         self.batches_report.append(purged_batch_info)
         return purged_batch_info
     
-    def _is_purged_attribrutes_valid(self, batch: RecoveryCodesBatch, purged_count: int, is_empty: bool, batch_id: str):
-        
-        if not isinstance(batch, RecoveryCodesBatch):
-            raise TypeError(construct_raised_error_msg("batch", RecoveryCodesBatch, batch))
-
-        if not isinstance(purged_count, int):
-            raise TypeError(construct_raised_error_msg("purged_count", int, purged_count))
-
-        if not isinstance(is_empty, bool):
-            raise TypeError(construct_raised_error_msg("is_empty", bool, is_empty))
-
-        if not isinstance(batch_id, (str, uuid.UUID)):
-            raise TypeError(
-               construct_raised_error_msg("batch_id", "str | uuid.UUID", batch_id)
-            )
+ 
  

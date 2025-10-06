@@ -1,4 +1,4 @@
-{% if is_generated %}
+{% if recovery_batches_histories %}
 <h1 class="margin-top-lg pb-sm medium-title" id="batch-details-history">Code Batch details History</h1>
 <hr class="dividor">
 {% endif %}
@@ -6,19 +6,16 @@
 
 
 
-<!-- {% if request.session.show_batch %} -->
-
 <section id="view-batch-history" class="margin-top-xlg">
       <div class="center">
         <span span class="loader" id="dynamic-batch-loader"></span>
     </div>
     <div class="container">
-
         <div class="history-cards">
             <div class="cards" id="static-batch-cards-history">
 
 
-                {% for recovery_batch in recovery_batches %}
+                {% for recovery_batch in recovery_batches_histories %}
                 <div class="card">
 
                     <div class="card-head">
@@ -35,16 +32,15 @@
 
                         <div class="info-box">
                             <div class="label">
-                                <p>Expiry info</p>
+                                <p>Batch Status</p>
                             </div>
 
                             <div class="value">
 
-                                <p
-                                    class="expiry_date status recovery_status {% if recovery_batch.status == Status.ACTIVE %} text-green {% else %} text-red {% endif %}">
+                                <p class="expiry_date status recovery_status {{ recovery_batch.status_css_class }}">
                                     {{ recovery_batch.frontend_status }}
-
                                 </p>
+
 
                             </div>
                         </div>
@@ -54,7 +50,7 @@
                             </div>
 
                             <div class="value">
-                                <p class="username">{{ recovery_batch.user.username | title }} </p>
+                                <p class="username">{{ recovery_batch.deleted_by_username |title }} </p>
                             </div>
                         </div>
 
@@ -195,7 +191,7 @@
                             <div class="value">
 
                                 <p class="emailed">
-                                    {{ recovery_batch.emailed }}
+                                    {{ recovery_batch.emailed|lower }}
                                 </p>
 
                             </div>
@@ -224,4 +220,3 @@
 
 <hr class="dividor margin-top-md margin-bottom-md">
 
-<!-- {% endif %} -->
