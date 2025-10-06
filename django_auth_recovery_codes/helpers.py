@@ -1,4 +1,5 @@
 import logging
+from uuid import UUID
 
 from django_auth_recovery_codes.models import RecoveryCodesBatch
 from django_auth_recovery_codes.utils.errors.enforcer import enforce_types
@@ -46,7 +47,7 @@ class PurgedStatsCollector:
                       batch: RecoveryCodesBatch, 
                       purged_count: int, 
                       is_empty: bool, 
-                      batch_id: str,
+                      batch_id: UUID,
                       use_with_logger: bool = True):
         """
         Processes a single recovery code batch during a purge operation.
@@ -114,7 +115,7 @@ class PurgedStatsCollector:
                                             )
 
 
-    def _generate_purged_batch_code_json_report(self, batch: RecoveryCodesBatch, purged_count: int, is_empty: bool, batch_id: str) -> dict:
+    def _generate_purged_batch_code_json_report(self, batch: RecoveryCodesBatch, purged_count: int, is_empty: bool, batch_id: UUID) -> dict:
         """
         Creates a JSON report for a purged batch of 2FA recovery codes.
 
