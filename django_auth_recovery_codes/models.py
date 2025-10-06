@@ -730,8 +730,8 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
             purge_code_logger.debug(f"There is nothing to delete in the batch. Batch has {number_to_delete} to delete")
         return deleted_count
 
-    @enforce_types(non_null=False)
-    def purge_expired_codes(self, retention_days: int = 1, delete_empty_batch: bool = True, batch_size: int | None = 500):
+    @enforce_types()
+    def purge_expired_codes(self, retention_days: int = 1, delete_empty_batch: bool = True, batch_size: int = 500):
         """
         Hard-delete recovery codes in this batch marked for deletion or invalidated,
         optionally logging per code or in bulk. Deletes batch if empty.
