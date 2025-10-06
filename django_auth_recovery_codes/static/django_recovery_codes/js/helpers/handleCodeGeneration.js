@@ -70,6 +70,9 @@ import { handleButtonAlertClickHelper } from "./handleButtonAlertClicker.js";
 import { handleFormSubmissionHelper } from "./formUtils.js";
 import { populateTableWithUserCodes } from "./tableUtils.js";
 import { generaterecoveryBatchSectionElement, recoveryBatchSectionElement } from "../batchCardsHistory/batchCardElements.js";
+import { markCurrentCardBatchAsViewed } from "../batchCardsHistory/updateBatchHistorySection.js";
+
+
 
 // The elemnts are not checked
 const daysToExpiryGroupWrapperElement = document.getElementById("days-to-expiry-group");
@@ -363,7 +366,7 @@ function handleGenerateCodeWithExpiryFormSubmission(e) {
  * 6. Optionally shows the verification form if the user has not completed setup.
  * 7. Hides the process message after a predefined delay.
  */
-function handleCanGenerateCodeSuccessUI(resp) {
+async function handleCanGenerateCodeSuccessUI(resp) {
 
     toggleElement(generaterecoveryBatchSectionElement);
     toggleElement(codeActionButtons);
@@ -373,7 +376,11 @@ function handleCanGenerateCodeSuccessUI(resp) {
   
     if (isPopulated) {
 
-        sendPostFetchWithoutBody("/auth/recovery-codes/viewed/", "Failed to mark code as viewed ");
+        const resp = await sendPostFetchWithoutBody("/auth/recovery-codes/viewed/", "Failed to mark code as viewed ");
+        if (resp && resp.SUCCESS) {
+            markCurrentCardBatchAsViewed();
+        }
+     
         updateBatchHistorySection(recoveryBatchSectionElement, resp.BATCH, resp.ITEM_PER_PAGE);
 
         if (appStateManager.isRequestCodeGenerationActive()) {           

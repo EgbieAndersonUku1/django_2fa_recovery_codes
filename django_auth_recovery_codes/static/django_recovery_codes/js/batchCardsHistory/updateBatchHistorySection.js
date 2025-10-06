@@ -287,6 +287,18 @@ export function markCurrentCardBatchAsEmailed() {
     markCardFieldHelper(getCurrentCard(), "emailed", "True");
 }
 
+
+/**
+ * Marks the current card batch as Active
+ */
 export function markCurrentCardAsActive() {
     markCardFieldHelper(getCurrentCard(), "status", "Active");
+}
+
+
+/**
+ * Marks the current card batch as viewed
+ */
+export function markCurrentCardBatchAsViewed() {
+    markCardFieldHelper(getCurrentCard(), "viewed", "True")
 }
