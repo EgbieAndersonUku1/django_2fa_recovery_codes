@@ -21,7 +21,7 @@ export function markCardAsDeleted(cardElement) {
 
     if (!fieldElements.length) return;
 
-    markCardFieldHelper("status", "Deleted", "text-red");
+    markCardFieldHelper(cardElement,"status", "Deleted", "text-red");
 
 
 }

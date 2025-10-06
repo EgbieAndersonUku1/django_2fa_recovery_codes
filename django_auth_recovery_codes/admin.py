@@ -11,17 +11,36 @@ from .models import (RecoveryCode,
                      RecoveryCodeSetup,
                      LoginRateLimiter,
                      LoginRateLimterAudit,
+                     RecoveryCodesBatchHistory,
                      )
-
-
-
-class LoginRateLimiterAdmin(admin.ModelAdmin):
-    list_display    = ["id", "user", "login_attempts", "max_login_attempts", "last_attempt", "created_at", "modified_at"]
-    readonly_fields = ["id", "user", "login_attempts", "max_login_attempts", "last_attempt", "created_at", "modified_at"]
 
 
 class BaseAdmin(admin.ModelAdmin):
     list_per_page = 25
+
+
+class RecoveryCodesBatchHistoryAdmin(BaseAdmin):
+    """"""
+    list_display          = ["batch_id", "number_issued",  "status", "number_removed", "expiry_date", "created_at", "modified_at"]
+    list_display_links    = ["batch_id"]
+    readonly_fields       = ["id", "batch_id", "created_at", "modified_at", "number_removed", 
+                             "number_used", 
+                             "number_issued",
+                             "viewed",
+                             "downloaded",
+                             "emailed",
+                             "generated",
+                             "user",
+                             "deleted_at",
+                             "deleted_by",
+                             "expiry_date",
+                             "status",
+                             ]
+    
+
+class LoginRateLimiterAdmin(admin.ModelAdmin):
+    list_display    = ["id", "user", "login_attempts", "max_login_attempts", "last_attempt", "created_at", "modified_at"]
+    readonly_fields = ["id", "user", "login_attempts", "max_login_attempts", "last_attempt", "created_at", "modified_at"]
 
 
 class LoginRateLimterAuditAdmin(BaseAdmin):
@@ -147,7 +166,6 @@ class RecoveryCodesBatchAdmin(BaseAdmin):
     """
     list_display          = ["id", "user", "number_issued", "last_attempt", "status", "number_removed", "created_at", "modified_at"]
     list_display_links    = ["id", "user"]
-    list_per_page         = 25
     readonly_fields       = ["id", "created_at", "modified_at", "number_removed", 
                              "number_used", "requested_attempt", "number_issued",
                              "expiry_date",
@@ -239,3 +257,4 @@ admin.site.register(RecoveryCodeEmailLog, RecoveryCodeEmailLogAdmin)
 admin.site.register(RecoveryCodeSetup, RecoveryCodeSetupAdmin)
 admin.site.register(LoginRateLimiter, LoginRateLimiterAdmin)
 admin.site.register(LoginRateLimterAudit, LoginRateLimterAuditAdmin)
+admin.site.register(RecoveryCodesBatchHistory, RecoveryCodesBatchHistoryAdmin)

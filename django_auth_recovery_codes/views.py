@@ -31,7 +31,7 @@ from django_auth_recovery_codes.models           import (
                                                         )
 
 from django_auth_recovery_codes.utils.cache.safe_cache    import delete_cache_with_retry
-
+from django_auth_recovery_codes.models                    import RecoveryCodesBatchHistory
 from django_auth_recovery_codes.views_helper              import set_setup_flag_if_missing_and_add_to_cache
 from django_auth_recovery_codes.views_dashboard_helper    import get_recovery_batches_context
 from django_auth_recovery_codes.views_code_handler_helper import  (generate_recovery_code_fetch_helper, 
@@ -48,7 +48,7 @@ from django_auth_recovery_codes.tasks                           import send_reco
 from django_auth_recovery_codes.views_download_helper           import format_recovery_codes_for_download
 from django_auth_recovery_codes.utils.errors.error_messages     import construct_raised_error_msg
 from django_auth_recovery_codes.utils.errors.enforcer           import enforce_types
-
+from django_auth_recovery_codes.models                          import RecoveryCodesBatchHistory
 
 CACHE_KEY            = 'recovery_codes_generated_{}'
 MINUTES_IN_SECONDS   = 600
@@ -130,8 +130,7 @@ def delete_recovery_code(request):
         messages or errors.
     """
 
-    @enforce_types()
-    def delete_code(recovery_code: RecoveryCode) -> Tuple[bool, dict]:
+    def delete_code(recovery_code: RecoveryCode) -> dict:
         """
         Delete a RecoveryCode instance and update its batch counts.
 
@@ -145,6 +144,7 @@ def delete_recovery_code(request):
             Tuple[bool, dict]: A tuple containing a success flag and a dictionary
             with operation messages.
         """
+
         recovery_code.delete_code()
         recovery_code_batch = recovery_code.batch
         recovery_code_batch.update_delete_code_count(save=True)
@@ -154,7 +154,8 @@ def delete_recovery_code(request):
             "OPERATION_SUCCESS": True,
             "TITLE": "Code deleted",
             "MESSAGE": "The code has been successfully deleted.",
-            "ALERT_TEXT": "Code successfully deleted"
+            "ALERT_TEXT": "Code successfully deleted",
+            "ERROR": "",
         }
 
         
@@ -463,9 +464,8 @@ def marked_code_as_viewed(request):
 
     if recovery_batch:
         recovery_batch = recovery_batch.mark_as_viewed()
-      
+       
         if recovery_batch and recovery_batch.viewed:
-           
             set_cache(CACHE_KEY.format(user.id),
                     value=recovery_batch.get_cache_values()
                     )
@@ -584,29 +584,32 @@ def recovery_dashboard(request):
         HttpResponse: The rendered recovery dashboard page.
     """
     
-    user                   = request.user
-    cache_key              = CACHE_KEY.format(user.id)
-    user_data              =  get_cache_with_retry(cache_key)
-    context                = {}
-    recovery_batch_context = get_recovery_batches_context(request)
-    HAS_USER_SET_UP_KEY    = "user_has_done_setup"
+    user                           = request.user
+    cache_key                      = CACHE_KEY.format(user.id)
+    user_data                      =  get_cache_with_retry(cache_key)
+    context                        = {}
+    recovery_batch_context         = get_recovery_batches_context(request)
+    HAS_USER_SET_UP_KEY            = "user_has_done_setup"
+    cache_key_login_rate_limiter   = "login_rate_limiter_{}".format(user.id)
       
     if user_data is None:
 
         view_logger.debug("The cache has expired. Pulling data from db and rewriting to the cache")
 
         # cache has expired, get data and re-add to cache
-        recovery_batch = RecoveryCodesBatch.get_by_user(user)
-      
-
+        recovery_batch  = RecoveryCodesBatch.get_by_user(user)
+     
         if recovery_batch:
             user_data                        = recovery_batch.get_cache_values()
             user_data[HAS_USER_SET_UP_KEY]   = RecoveryCodeSetup.has_first_time_setup_occurred(user)
-
-            view_logger.debug("Data retrieved are: is_generated=%s, is_email=%s, is_viewed=%s, is_downloaded=%s, user_has_done_setup=%s",
-                               user_data.get("generated"), user_data.get("emailed"), user_data.get("viewed"),
-                               user_data.get("downloaded"), user_data.get("user_has_done_setup"),
-                               user_data.get("number_used")
+            view_logger.debug(
+                        f"Data retrieved are: "
+                        f"is_generated={user_data.get('generated')}, "
+                        f"is_email={user_data.get('emailed')}, "
+                        f"is_viewed={user_data.get('viewed')}, "
+                        f"is_downloaded={user_data.get('downloaded')}, "
+                        f"user_has_done_setup={user_data.get('user_has_done_setup')}, "
+                        f"number_used={user_data.get('number_used')}"
                     )
 
             set_cache_with_retry(cache_key, user_data)
@@ -628,13 +631,14 @@ def recovery_dashboard(request):
                 "number_used": user_data.get("number_used"),
                
             })
-        
+
     
+
     if not isinstance(recovery_batch_context, dict):
         raise TypeError(construct_raised_error_msg("Context dictionary", dict, recovery_batch))
 
     context.update(recovery_batch_context)
-    
+    LoginRateLimiter.ensure_exists_or_create_and_cache(user, cache_key_login_rate_limiter)
     return render(request, "django_auth_recovery_codes/dashboard.html", context)
 
 

@@ -17,7 +17,7 @@ from django.conf import settings
 
 from django.core.paginator                             import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib.auth                               import get_user_model
-from django_auth_recovery_codes.models                 import RecoveryCodesBatch, Status
+from django_auth_recovery_codes.models                 import RecoveryCodesBatchHistory, Status
 from django_auth_recovery_codes.utils.cache.safe_cache import set_cache_with_retry, get_cache_with_retry, delete_cache_with_retry
 
 
@@ -57,7 +57,7 @@ def get_recovery_batches_context(request):
   
     if recovery_batch_history is None:
         recovery_batch_history = list(
-            RecoveryCodesBatch.objects.filter(user=user).order_by("-created_at")[:PAGE_SIZE]
+            RecoveryCodesBatchHistory.objects.filter(user=user).order_by("-created_at")[:PAGE_SIZE]
         )
         set_cache_with_retry(recovery_cache_key, value=recovery_batch_history)
 
@@ -74,8 +74,8 @@ def get_recovery_batches_context(request):
     except EmptyPage:
         recovery_batches = paginator.page(paginator.num_pages)
 
-    context["recovery_batches"] = recovery_batches
-    context["Status"]           = Status
 
+    context["recovery_batches_histories"] = recovery_batches
+   
     return context
 

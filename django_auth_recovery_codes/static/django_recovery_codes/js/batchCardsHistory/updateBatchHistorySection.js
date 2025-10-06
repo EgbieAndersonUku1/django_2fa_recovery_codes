@@ -60,6 +60,7 @@ import { recoveryBatchSectionElement }      from "./batchCardElements.js";
 
 
 const DYNAMIC_BATCH_LOADER_ID    = "dynamic-batch-loader";
+const allAcardsElements          = "#static-batch-cards-history .card";          
 let dynamicBatchSpinnerElement   = document.getElementById(DYNAMIC_BATCH_LOADER_ID);
 
 
@@ -190,9 +191,11 @@ export function updateBatchHistorySection(sectionElement,
                                          milliSeconds = 7000,
                                          tagName="div",
                                          classSelector="card-head",
-                                         batchNumberToUpdate = 2,
+                                         batchNumberToUpdate = 3,
 
                                         ) {
+
+                   
     const newBatchCard = generateRecoveryCodesSummaryCard(batch);
     
     let previousBatchCard;
@@ -203,17 +206,18 @@ export function updateBatchHistorySection(sectionElement,
             toggleSpinner(dynamicBatchSpinnerElement);
     }
  
-
+    addChildWithPaginatorLimit(sectionElement, newBatchCard, batchPerPage);
     setTimeout(() => {
-        addChildWithPaginatorLimit(sectionElement, newBatchCard, batchPerPage);
+       
         previousBatchCard = getNthChildNested(
             sectionElement,
             batchNumberToUpdate,
             tagName,
             classSelector,
         );
-        markCardAsDeleted(previousBatchCard);
-
+        
+        //  markCardAsDeleted(previousBatchCard)
+        markOnlyTopCardAsActive();
         toggleSpinner(dynamicBatchSpinnerElement, false);
     }, milliSeconds);
 }
@@ -228,9 +232,9 @@ export function updateBatchHistorySection(sectionElement,
  * @param {string} value - New value to assign to the field.
  * @param {string} [classColourSelector="text-green"] - CSS class applied for styling.
  */
-export function markCardFieldHelper(className, value, classColourSelector = "text-green") {
+export function markCardFieldHelper(cardEement, className, value, classColourSelector = "text-green") {
     
-    const fieldElements = getCardFieldElements(getCurrentCard());
+    const fieldElements = getCardFieldElements(cardEement);
 
     if (!fieldElements.length) return;
 
@@ -244,11 +248,32 @@ export function markCardFieldHelper(className, value, classColourSelector = "tex
 }
 
 
+
+/**
+ * Marks only the top card as active.
+ *
+ * This function selects all card elements that are visible in the DOM/UI
+ *  and  marks all cards as deleted but then marks the current (top) card as active.
+ *
+ * Dependencies:
+ * - markCardAsDeleted(cardElement): marks a given card as deleted.
+ * - markCurrentCardAsActive(): marks the current card as active.
+ */
+function markOnlyTopCardAsActive() {
+    const cardsElement = Array.from(document.querySelectorAll(allAcardsElements));
+    
+    if (cardsElement.length === 0) return;
+
+    cardsElement.forEach((cardElement) => markCardAsDeleted(cardElement));
+    markCurrentCardAsActive();
+}
+
+
 /**
  * Marks the current card batch as downloaded.
  */
 export function markCurrentCardBatchAsDownload() {
-    markCardFieldHelper("downloaded", "True");
+    markCardFieldHelper(getCurrentCard(), "downloaded", "True");
 }
 
 
@@ -256,5 +281,9 @@ export function markCurrentCardBatchAsDownload() {
  * Marks the current card batch as emailed.
  */
 export function markCurrentCardBatchAsEmailed() {
-    markCardFieldHelper("emailed", "True");
+    markCardFieldHelper(getCurrentCard(), "emailed", "True");
+}
+
+export function markCurrentCardAsActive() {
+    markCardFieldHelper(getCurrentCard(), "status", "Active");
 }

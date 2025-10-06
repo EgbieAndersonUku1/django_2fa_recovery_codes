@@ -425,16 +425,20 @@ export function getNthChildFast(parent, n, tagName) {
  * efficient for dynamic dashboards.
  *
  * @param {HTMLElement} parent - The parent element.
- * @param {number} n - 1-based index of the child (1 = first child).
+ * @param {number} number - 1-based index of the child (1 = first child).
  * @param {string} [tagName] - Optional tag name to filter by (e.g., "div").
  * @param {string} [nestedClass] - Optional class name to get a nested child of the nth child.
  * @returns {HTMLElement|null} The element found or null if not found.
  */
-export function getNthChildNested(parent, n, tagName, nestedClass) {
+export function getNthChildNested(parent, number, tagName, nestedClass) {
     
-  const nthChild = getNthChildFast(parent, n, tagName);
+  const nthChild = getNthChildFast(parent, number, tagName);
 
   if (!nthChild) return null;
+  if (!number && !Number.isInteger(number)){
+    throw new Error(`Expected an int but got a value with type ${typeof number}`)
+  }
+
 
   if (nestedClass) {
     // Find the first direct child with the specified class
@@ -501,7 +505,7 @@ export function exceedsPaginatorLimit(parentElement, pageLimit) {
  *
  * @description
  * This function ensures that adding new elements to a container never exceeds the 
- * parent’s paginator limit. It performs the following checks:
+ * parent’s paginator limit set by the backend. It performs the following checks:
  *   - Validates that `parentElement` and `elementToAdd` are valid HTML elements.
  *   - Validates that `appendToTop` is a boolean.
  *   - Removes the last child elements if the container exceeds the `pageLimit`.
@@ -556,7 +560,7 @@ export function addChildWithPaginatorLimit(parentElement, elementToAdd, pageLimi
 export function toggleElement(element, hide = true) {
 
     if (!element || element === undefined || element === null) {
-        console.log("there is no elemnent")
+        console.log("there is no elemnent");
         return;
     }
 

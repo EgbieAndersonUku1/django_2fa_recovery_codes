@@ -18,11 +18,13 @@ from django.utils                import timezone
 from django_email_sender.models  import EmailBaseLog
 
 
+from django_auth_recovery_codes.models_choices import Status
 from django_auth_recovery_codes.app_settings import default_max_login_attempts
 from django_auth_recovery_codes.base_models import (
     AbstractBaseModel,
     AbstractCleanUpScheduler,
     AbstractCooldownPeriod,
+    AbstractRecoveryCodesBatch,
     flush_cache_and_write_attempts_to_db,
 )
 from django_auth_recovery_codes.enums import (
@@ -51,7 +53,7 @@ from django_auth_recovery_codes.utils.utils              import (
 from django_auth_recovery_codes.utils.attempt_guard          import AttemptGuard
 from django_auth_recovery_codes.utils.errors.error_messages  import construct_raised_error_msg
 from django_auth_recovery_codes.utils.errors.enforcer        import enforce_types
-
+from django_auth_recovery_codes.loggers.loggers              import default_logger
 
 User   = get_user_model()
 logger = logging.getLogger("auth_recovery_codes")
@@ -240,14 +242,6 @@ class RecoveryCodePurgeHistory(models.Model):
         return f"Purge on {self.timestamp}: {self.total_codes_purged} codes from {self.total_batches_purged} batches"
     
 
-class Status(models.TextChoices):
-    """Choices representing the status of a recovery code."""
-
-    ACTIVE         = "a", "Active"
-    INVALIDATE     = "i", "Invalidate"
-    PENDING_DELETE = "p", "Pending Delete"
-
-
 class RecoveryCodeCleanUpScheduler(AbstractCleanUpScheduler):
     """Schedules cleanup tasks for expired recovery codes, including bulk deletion and empty batch removal."""
 
@@ -263,50 +257,153 @@ class RecoveryCodeAuditScheduler(AbstractCleanUpScheduler):
      name         = models.CharField(max_length=180, default=create_unique_string("Remove Recovery code audit"), unique=True)
 
 
-class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
-    """Schedules cleanup tasks for recovery code audit logs."""
+
+
+class RecoveryCodesBatchHistory(AbstractRecoveryCodesBatch):
+    """
+    Immutable audit log for recovery code batches.
+    Unlike RecoveryCodesBatch, this is never deleted during cleanup.
+    It provides a historical record for user-facing history and admin audits.
+    """
+    batch_id            = models.UUIDField()  
+    deleted_by_username = models.CharField(max_length=60, blank=True)
+    user                = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name="recovery_batches_history")
+    
+    class Status(models.TextChoices):
+        CREATE = "C", "CREATE"
+        UPDATE = "U", "UPDATE"
+        DELETE = "D", "DELETE"
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Recovery Code Batch History"
+        verbose_name_plural = "Recovery Code Batch Histories"
+
+    def __str__(self):
+        return f"History for batch {self.batch_id} (user={self.user})"
+    
+    
+    @classmethod
+    @enforce_types()
+    def get_by_batch_id(cls, batch_id: uuid.UUID):
+        """"""
+        try:
+            return cls.objects.get(batch_id=batch_id)
+        except cls.DoesNotExist:
+            return None
+    
+    @classmethod
+    def _create_batch_history(cls, batch: RecoveryCodesBatch):
+        """"""
+        return  cls.objects.create(
+                    batch_id=batch.id,
+                    number_issued=batch.number_issued,
+                    number_removed=batch.number_removed,
+                    number_used=batch.number_used,
+                    status=batch.status,
+                    deleted_at=batch.deleted_at,
+                    deleted_by=batch.deleted_by,
+                    viewed=batch.viewed,
+                    downloaded=batch.downloaded,
+                    emailed=batch.emailed,
+                    expiry_date=batch.expiry_date,
+                    generated=batch.generated,
+                    deleted_by_username=batch.user.username,
+                    user=batch.user,
+                    
+            )
+    
+    @classmethod
+    def _update_batch_history(cls, batch: RecoveryCodesBatch):
+        """"""
+        recovery_batch_history = cls.get_by_batch_id(batch.id)
+        if recovery_batch_history:
+            
+            recovery_batch_history.number_issued=batch.number_issued,
+            recovery_batch_history.number_removed=batch.number_removed,
+            recovery_batch_history.number_used=batch.number_used,
+            recovery_batch_history.status=batch.status,
+            recovery_batch_history.deleted_at=batch.deleted_at,
+            recovery_batch_history.deleted_by=batch.deleted_by,
+            recovery_batch_history.viewed=batch.viewed,
+            recovery_batch_history.downloaded=batch.downloaded,
+            recovery_batch_history.emailed=batch.emailed,
+            recovery_batch_history.generated=batch.generated
+            recovery_batch_history.deleted_by_username = batch.user.username
+            recovery_batch_history.user = batch.user
+
+    @classmethod
+    def log_action(cls, batch: RecoveryCodesBatch, action: str = Status.CREATE):
+        """Logs an action (CREATE, UPDATE, or DELETE) in the batch history."""
+        match action:
+            case cls.Status.CREATE:
+                return cls._create_batch_history(batch)
+            case cls.Status.UPDATE:
+                default_logger.debug(f"Update batch history with id {batch.id}")
+                return cls._update_batch_history(batch)
+            case _:
+                default_logger.warning(f"Unknown action '{action}' for batch {batch.id}")
+                return None
+
+
+    @classmethod
+    @enforce_types()
+    def update_viewed(cls, batch: RecoveryCodesBatch):
+        """"""
+        cls._update_field(batch, fields_list=[cls.VIEWED_FLAG, cls.MODIFIED_AT_FIELD], action_tag=cls.VIEWED_FLAG)
+        
+    
+    @classmethod
+    @enforce_types()
+    def update_download(cls, batch: RecoveryCodesBatch):
+        cls._update_field(batch, fields_list=[cls.GENERATED_FLAG, cls.MODIFIED_AT_FIELD], action_tag=cls.GENERATED_FLAG)
+
+    
+    @classmethod
+    @enforce_types()
+    def update_email(cls, batch: RecoveryCodesBatch):
+        cls._update_field(batch, fields_list=[cls.EMAILED_FLAG, cls.MODIFIED_AT_FIELD], action_tag=cls.EMAILED_FLAG)
+    
+    @classmethod
+    @enforce_types()
+    def update_generated(cls, batch:RecoveryCodesBatch):
+        cls._update_field(batch, fields_list=[cls.GENERATED_FLAG, cls.MODIFIED_AT_FIELD], action_tag=cls.VIEWED_FLAG)
+    
+    @classmethod
+    def _update_field(cls, batch: RecoveryCodesBatch, fields_list: list, action_tag: str):
+        """"""
+        batch  = cls.get_by_batch_id(batch.id)
+       
+        if batch:
+            setattr(batch, action_tag, True)
+            batch.save(update_fields=fields_list)
+            return True 
+        return False
+    
+        
+
+        
+
+class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
+    """"""
 
     CACHE_KEYS = ["generated", "downloaded", "emailed", "viewed", "number_used"]
     JSON_KEYS  = ["id", "number_issued", "number_removed", "number_invalidated", "number_used", "created_at",
                   "modified_at", "expiry_date", "deleted_at", "deleted_by", "viewed", "downloaded",
                   "emailed", "generated", 
                   ]
-
-    id                 = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True, db_index=True)
-    number_issued      = models.PositiveSmallIntegerField(default=10)
-    number_removed     = models.PositiveSmallIntegerField(default=0)
-    number_invalidated = models.PositiveSmallIntegerField(default=0)
-    number_used        = models.PositiveSmallIntegerField(default=0)
-    user               = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name="recovery_batches")
-    created_at         = models.DateTimeField(auto_now_add=True)
-    modified_at        = models.DateTimeField(auto_now=True)
-    status             = models.CharField(choices=Status, max_length=1, default=Status.ACTIVE, db_index=True)
+    
     automatic_removal  = models.BooleanField(default=True)
-    expiry_date        = models.DateTimeField(blank=True, null=True, db_index=True)
-    deleted_at         = models.DateTimeField(null=True, blank=True)
-    deleted_by         = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name="deleted_batches")
     requested_attempt  = models.PositiveSmallIntegerField(default=0)
-
-     # Action tracking
-    viewed            = models.BooleanField(default=False)
-    downloaded        = models.BooleanField(default=False)
-    emailed           = models.BooleanField(default=False)
-    generated         = models.BooleanField(default=False)
+    user               = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, related_name="recovery_batches")
 
     # constant field
     STATUS_FIELD             = "status"
     MARK_FOR_DELETION_FIELD  = "mark_for_deletion"
-    MODIFIED_AT_FIELD        = "modified_at"
     DELETED_AT_FIELD         = "deleted_at"
     DELETED_BY_FIELD         = "deleted_by"
     REQUEST_ATTEMPT_FIELD    = "requested_attempt"
     NUMBER_USED_FIELD        = "number_used"
-
-    # constant flags
-    VIEWED_FLAG              = "viewed"
-    DOWNLOADED_FLAG          = "downloaded"
-    EMAILED_FLAG             = "emailed"
-    GENERATED_FLAG           = "generated"
     
     class Meta:
         ordering             = ["-created_at"]
@@ -318,6 +415,14 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
 
         return f"Batch {self.id} for {self.user or 'Deleted User'}"
 
+    @property
+    def status_css_class(self):
+        return {
+            Status.ACTIVE: "text-green",
+            Status.INVALIDATE: "text-red",
+            Status.PENDING_DELETE: "text-yellow-600",
+        }.get(self.status, "text-gray-500")
+    
     @property
     def active_codes_remaining(self):
         """Returns the active code still remaining"""
@@ -496,6 +601,8 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
                     number_issued=self.number_issued,
                     reason="Batch of expired or invalidated codes removed by scheduler",
                 )
+            
+            
         else:
             purge_code_logger.debug(f"There is nothing to delete in the batch. Batch has {number_to_delete} to delete")
         return deleted_count
@@ -578,21 +685,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         """Statuses meaning the batch is no longer valid."""
         return [Status.PENDING_DELETE, Status.INVALIDATE]
 
-    @property
-    def frontend_status(self):
-        """
-        Returns a human-readable status for frontend display.
-
-        Overrides certain internal statuses with custom labels for clarity.
-        For example:
-        - Status.PENDING_DELETE is shown as "Deleted"
-
-        All other statuses use their default TextChoices label.
-        """
-        overrides = {Status.PENDING_DELETE: "Deleted"}
-        return overrides.get(Status(self.status), Status(self.status).label)
- 
-    def update_used_code_count(self, save = False) -> "RecoveryCode":
+    def update_used_code_count(self, save = False) -> RecoveryCode:
         """
         Increment the count of used codes by 1.
 
@@ -641,7 +734,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         self._update_field_counter(self.NUMBER_USED_FIELD, save=save, atomic=True)
         return self
     
-    def update_invalidate_code_count(self, save = False) -> "RecoveryCode":
+    def update_invalidate_code_count(self, save = False) -> RecoveryCode:
         """
         Increment the count of invalidated codes by 1.
 
@@ -694,7 +787,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
         self._update_field_counter("number_invalidated", save=save, atomic=True)
         return self
     
-    def update_delete_code_count(self, save: bool = False) -> "RecoveryCode":
+    def update_delete_code_count(self, save: bool = False) -> RecoveryCode:
         """
         Increment the count of deleted (removed) codes by 1.
 
@@ -787,6 +880,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
 
             # DB-level increment (avoids race conditions)
             self.__class__.objects.filter(pk=self.pk).update(**{field_name: F(field_name) + 1})
+            RecoveryCodesBatchHistory.objects.filter(batch_id=self.id).update(**{field_name: F(field_name) + 1})
             return self.refresh_from_db()
 
         # In-memory increment (not concurrency-safe) especially if the user tries to update the valuse using multiple tabs
@@ -840,7 +934,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
             TypeError if the save is not a boolean raised through the update_field_helper
         """
         self.viewed = True
-        return self._update_field_helper(fields_list=[self.VIEWED_FLAG, self.MODIFIED_AT_FIELD], save=save)
+        return self._update_field_helper(action_flag=self.VIEWED_FLAG, fields_list=[self.VIEWED_FLAG, self.MODIFIED_AT_FIELD], save=save)
 
     def mark_as_downloaded(self, save : bool = True):
         """
@@ -856,7 +950,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
             TypeError if the save is not a boolean raised through the `_update_field_helper`
         """
         self.downloaded = True
-        return self._update_field_helper(fields_list=[self.DOWNLOADED_FLAG, self.MODIFIED_AT_FIELD], save=save)
+        return self._update_field_helper(action_flag=self.DOWNLOADED_FLAG, fields_list=[self.DOWNLOADED_FLAG, self.MODIFIED_AT_FIELD], save=save)
 
     def mark_as_emailed(self, save: bool = True):
         """
@@ -872,7 +966,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
             TypeError if the save is not a boolean
         """
         self.emailed = True
-        return self._update_field_helper(fields_list=[self.EMAILED_FLAG, self.MODIFIED_AT_FIELD], save=save)
+        return self._update_field_helper(action_flag=self.EMAILED_FLAG, fields_list=[self.EMAILED_FLAG, self.MODIFIED_AT_FIELD], save=save)
     
     def mark_as_generated(self, save: bool = True):
         """
@@ -888,31 +982,50 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
             TypeError if the save is not a boolean raised through the update_field_helper
         """
         self.generated = True
-        self._update_field_helper(fields_list=[self.GENERATED_FLAG, self.MODIFIED_AT_FIELD], save=save)
+        self._update_field_helper(action_flag=self.GENERATED_FLAG, fields_list=[self.GENERATED_FLAG, self.MODIFIED_AT_FIELD], save=save)
     
     @enforce_types()
-    def _update_field_helper(self, fields_list: list, save : bool = True) -> Any:
+    def _update_field_helper(self, action_flag: str,  fields_list: list, save : bool = True) -> Any:
         """
         Update specified fields of the model instance and optionally save it.
 
+        This helper method also updates the corresponding record history
+        entry based on the provided action flag (e.g., viewed, downloaded).
+
         Args:
+            action_flag (str): The name of the action flag indicating which
+                record history update should be triggered.
             fields_list (list): A list of field names to update.
             save (bool, optional): Whether to save the instance after updating.
                 Defaults to True.
 
         Returns:
-            bool: Returns the instance itself if saved, otherwise False.
+            self | bool: Returns the updated instance if saved successfully,
+            otherwise False.
 
         Raises:
-            TypeError: Raised automatically by the `enforce_types()` decorator
-                if `fields_list` is not a list or `save` is not a boolean.
-        
+            TypeError: Automatically raised by the `enforce_types()` decorator
+                if `fields_list` or `save` have invalid types.
+
         Notes:
             This helper is intended for internal use and relies on the 
             `enforce_types()` decorator to perform runtime type checking.
         """
         if save:
-            self.save(update_fields=fields_list)
+            
+            with transaction.atomic():
+                self.save(update_fields=fields_list)
+
+                match action_flag:
+                    case self.VIEWED_FLAG:
+                        RecoveryCodesBatchHistory.update_viewed(batch=self)
+                    case self.DOWNLOADED_FLAG:
+                        RecoveryCodesBatchHistory.update_download(batch=self)
+                    case self.GENERATED_FLAG:
+                        RecoveryCodesBatchHistory.update_generated(batch=self)
+                    case self.EMAILED_FLAG:
+                        RecoveryCodesBatchHistory.update_email(batch=self)
+
             return self
         return False
     
@@ -954,18 +1067,15 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
             RecoveryCodeSetup.create_for_user(user)
 
     @classmethod
-    def create_recovery_batch(cls, user, days_to_expire: int = 0, batch_number: int = 10):
+    @enforce_types()
+    def create_recovery_batch(cls, user: User, days_to_expire: int = 0, batch_number: int = 10):
         """
         Creates a batch of recovery codes for a user, efficiently handling large batches.
         Uses async bulk_create if supported by the database.
 
         Returns a list of raw recovery codes.
         """
-        cls.is_user_valid(user)
-        if not isinstance(batch_number, int):
-            raise TypeError(f"Expected int for batch_number, got {type(batch_number).__name__}")
-        if days_to_expire and not isinstance(days_to_expire, int):
-            raise TypeError(f"Expected int for days_to_expire, got {type(days_to_expire).__name__}")
+
         if days_to_expire and days_to_expire < 0:
             raise ValueError("daysToExpiry must be a positive integer")
 
@@ -983,15 +1093,21 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
          # if one fails none is created and the changes are rolled back
         with transaction.atomic(): 
             
+        
             batch_instance = cls(user=user, number_issued=batch_number)
+           
 
             if days_to_expire:
                 batch_instance.expiry_date = schedule_future_date(days=days_to_expire)
+
             batch_instance.last_attempt = timezone.now()
             batch_instance.mark_as_generated()
 
+            RecoveryCodesBatchHistory.log_action(batch_instance, RecoveryCodesBatchHistory.Status.CREATE)
+
             cls._deactivate_all_batches_except_current(batch_instance)
             cache_key = CAN_GENERATE_CODE_CACHE_KEY.format(user.id)
+
             flush_cache_and_write_attempts_to_db(instance=batch_instance, field_name=cls.REQUEST_ATTEMPT_FIELD, cache_key=cache_key, logger=purge_code_logger)
           
             for _ in range(batch_number):
@@ -1130,16 +1246,20 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
             recovery_batch.save()
 
             delete_cache_with_retry(CAN_GENERATE_CODE_CACHE_KEY.format(user.id))
-        
-            RecoveryCodeAudit.log_action(  user_issued_to=recovery_batch.user,
-                                            action=RecoveryCodeAudit.Action.BATCH_PURGED,
-                                            deleted_by=user,
-                                            batch=recovery_batch,
-                                            number_deleted=1,
-                                            number_issued=recovery_batch.number_issued,
-                                            reason="The entire batch is being deleted by the user",
-                                         )
             
+
+            with transaction.atomic():
+                RecoveryCodeAudit.log_action(  user_issued_to=recovery_batch.user,
+                                                action=RecoveryCodeAudit.Action.BATCH_PURGED,
+                                                deleted_by=user,
+                                                batch=recovery_batch,
+                                                number_deleted=1,
+                                                number_issued=recovery_batch.number_issued,
+                                                reason="The entire batch is being deleted by the user",
+                                            )
+              
+               
+
                                                 
         return recovery_batch
     
@@ -1170,27 +1290,33 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractBaseModel):
             return None
     
     @classmethod
+    @enforce_types()
     def _deactivate_all_batches_except_current(cls, current_batch: RecoveryCodesBatch):
         """
         Deactivates all active batches for the given user except the current one.
         """
-        if not isinstance(current_batch, cls):
-            raise TypeError(
-                f"Expected a {cls.__name__} instance, got {type(current_batch).__name__}"
-            )
+        with transaction.atomic():
 
-        cls.objects.filter(
-            user=current_batch.user, 
-            status=Status.ACTIVE,
-        ).exclude(id=current_batch.id).update(status=Status.PENDING_DELETE)
+            cls.objects.filter(
+                user=current_batch.user,
+                status=Status.ACTIVE,
+            ).exclude(id=current_batch.id).update(status=Status.PENDING_DELETE)
 
-        RecoveryCode.objects.filter(
-                    user=current_batch.user,
-                    status=Status.ACTIVE
-                ).update(status=Status.PENDING_DELETE, mark_for_deletion=True, is_deactivated=True)
+            RecoveryCodesBatchHistory.objects.filter(
+                user=current_batch.user,
+                status=Status.ACTIVE
+            ).exclude(batch_id=current_batch.id).update(status=Status.DELETED)
 
+            RecoveryCode.objects.filter(
+                user=current_batch.user,
+                status=Status.ACTIVE
+            ).update(
+                status=Status.PENDING_DELETE,
+                mark_for_deletion=True,
+                is_deactivated=True
+            ) 
+       
   
-
 
 class RecoveryCode(models.Model):
     """
@@ -1290,17 +1416,22 @@ class RecoveryCode(models.Model):
         self.is_used        = True
         self.status         = Status.PENDING_DELETE
         self.is_deactivated = True
+
         self.mark_code_for_deletion(save=False)
         self.batch.update_used_code_count()
       
         if save:
-            self.save(update_fields=[self.MARK_FOR_DELETION_FIELD, 
-                                     self.IS_USED_FIELD,
-                                     self.MODIFIED_AT_FIELD,
-                                     self.STATUS_FIELD, 
-                                     self.IS_DEACTIVATED_FIELD,
+            with transaction.atomic():
+                self.save(update_fields=[
+                    self.MARK_FOR_DELETION_FIELD,
+                    self.IS_USED_FIELD,
+                    self.MODIFIED_AT_FIELD,
+                    self.STATUS_FIELD,
+                    self.IS_DEACTIVATED_FIELD,
+                ])
 
-                                     ])
+              
+          
         return True
 
     @enforce_types()
@@ -1329,11 +1460,14 @@ class RecoveryCode(models.Model):
         """
         self.mark_for_deletion = True
         if save:
-            self.save(update_fields=[self.MARK_FOR_DELETION_FIELD, self.MODIFIED_AT_FIELD])
+            with transaction.atomic():
+                self.save(update_fields=[self.MARK_FOR_DELETION_FIELD, self.MODIFIED_AT_FIELD])
+               
+                                                            
         return True
 
     @enforce_types()
-    def invalidate_code(self, save: bool = True):
+    def invalidate_code(self, save: bool = True) -> RecoveryCode:
         """
         Marks this recovery code as in-active.
 
@@ -1365,26 +1499,31 @@ class RecoveryCode(models.Model):
         self.is_deactivated  = True
         self.deleted_by      = self.user
         self.deleted_at      = timezone.now()
-       
-        RecoveryCodeAudit.log_action(user_issued_to=self.user,
-                                    action=RecoveryCodeAudit.Action.BATCH_PURGED,
-                                    deleted_by=self.user,
-                                    batch=self.batch,
-                                    number_deleted=1,
-                                    number_issued=self.batch.number_issued,
-                                    reason="The code has been invalidated by the user",
-                                     )
+        
+
         if save:
-            self.save(update_fields=[self.STATUS_FIELD, 
+           
+            with transaction.atomic():
+                self.save(update_fields=[self.STATUS_FIELD, 
                                      self.IS_DEACTIVATED_FIELD, 
                                      self.DELETED_BY_FIELD, 
                                      self.DELETED_AT_FIELD,
                                      self.USER_FIELD
                                      ])
+                
+                RecoveryCodeAudit.log_action(user_issued_to=self.user,
+                                            action=RecoveryCodeAudit.Action.BATCH_PURGED,
+                                            deleted_by=self.user,
+                                            batch=self.batch,
+                                            number_deleted=1,
+                                            number_issued=self.batch.number_issued,
+                                            reason="The code has been invalidated by the user",
+                                            )
+
+          
         return True
 
-    @enforce_types()
-    def delete_code(self, save: bool = True) -> "RecoveryCode":
+    def delete_code(self, save: bool = True) -> RecoveryCode:
         """
         Marks this recovery code pending to be deleed.
 
@@ -1413,26 +1552,31 @@ class RecoveryCode(models.Model):
         self.is_deactivated    = True
         self.deleted_by        = self.user
         
+      
         if save:
-            self.save(update_fields=[self.STATUS_FIELD,
-                                     self.MARK_FOR_DELETION_FIELD,
-                                     self.IS_DEACTIVATED_FIELD,
-                                     self.MODIFIED_AT_FIELD,
-                                     self.DELETED_AT_FIELD,
-                                     self.DELETED_BY_FIELD
-                                      ])
-          
-        
-        RecoveryCodeAudit.log_action( user_issued_to=self.user,
-                                    action=RecoveryCodeAudit.Action.BATCH_PURGED,
-                                    deleted_by=self.user,
-                                    batch=self.batch,
-                                    number_deleted=1,
-                                    number_issued=self.batch.number_issued,
-                                    reason="The code was deleted by the userr"
+           
+            with transaction.atomic():
 
-                                     )
-        return self
+                self.save(update_fields=[self.STATUS_FIELD,
+                                            self.MARK_FOR_DELETION_FIELD,
+                                            self.IS_DEACTIVATED_FIELD,
+                                            self.MODIFIED_AT_FIELD,
+                                            self.DELETED_AT_FIELD,
+                                            self.DELETED_BY_FIELD
+                                            ])
+                
+                RecoveryCodeAudit.log_action( user_issued_to=self.user,
+                                            action=RecoveryCodeAudit.Action.BATCH_PURGED,
+                                            deleted_by=self.user,
+                                            batch=self.batch,
+                                            number_deleted=1,
+                                            number_issued=self.batch.number_issued,
+                                            reason="The code was deleted by the userr"
+
+                                            )
+              
+
+        return True
     
     @enforce_types()
     def _verify_recovery_code(self, plaintext_code: str) -> bool:
@@ -1620,7 +1764,7 @@ class LoginRateLimterAudit(AbstractBaseModel):
         """
         cls.is_user_valid(user)
         if not cls.objects.filter(user=user).exists():
-            cls.objects.get_or_create(user=user, login_attempts=login_attempts)
+            return cls.objects.get_or_create(user=user, login_attempts=login_attempts)
 
 
 
@@ -1831,11 +1975,13 @@ class LoginRateLimiter(AbstractCooldownPeriod, AbstractBaseModel):
             Exception:
                 If resetting attempts, audit logging, or cache deletion fails.
         """
-        login_rate_limiter.reset_attempts()
+      
         LoginRateLimterAudit.create_record_login_audit(
             user=user, 
             login_attempts=login_rate_limiter.login_attempts
         )    
+        
+        login_rate_limiter.reset_attempts()
         delete_cache_with_retry(cache_key)
         return True, 0
     
@@ -1885,3 +2031,126 @@ class LoginRateLimiter(AbstractCooldownPeriod, AbstractBaseModel):
             return can_login, wait_time   
         
         return cls._unlock_user(login_rate_limiter, user, cache_key)
+
+    @classmethod
+    def has_login_rate_limiter(cls, user: User) -> bool:
+        """
+        Returns True if the user already has a login rate limiter, else False.
+        """
+        cls.is_user_valid(user)
+        return cls.objects.filter(user=user).exists()
+    
+    @classmethod
+    @enforce_types()
+    def ensure_exists_or_create_and_cache(cls, user: User, cache_key: str, ttl: int = 86400) -> bool:
+        """
+        Ensure a LoginRateLimiter exists for a user, creating and caching it if necessary 
+        to prevent repeated database queries on page refresh.
+
+        This method creates a LoginRateLimiter for a user if one doesn't already exist,
+        and caches a `True` value indicating it has been created. This avoids repeated
+        database queries within the TTL and prevents unnecessary database checks.
+
+        Why caching is necessary:
+
+        In Django, a view function (or class-based view) is executed **every time
+        a page is requested**. In simpler terms, you can think of a view as a page. 
+        Without caching, even if a LoginRateLimiter already exists, the database would 
+        be queried on every page load or refresh just to check its existence.
+
+        Standard projects often create a User and a related Profile (or similar
+        model) at the same time, either in the registration view or using a
+        signal (`post_save` on User). In those cases, the related model is always
+        available immediately after the user is created, and no extra checks are
+        needed.
+
+        This app, however, is designed as a reusable, plug-and-play component.
+        We cannot assume control over user creation, nor can we create the
+        LoginRateLimiter at the same time as the User. All we know is that the User 
+        already exists, since you must be authenticated to use the app. The app may 
+        be installed in a project without any custom signals or registration logic, 
+        and we cannot force the user of the app to create a `LoginRateLimiter`.
+        Therefore, the LoginRateLimiter must be created within
+        the view context, but only **once**.
+
+        The problem with creating it within a view (dashboard page) is that we 
+        need to do a few things first:
+
+        1. Check if it exists.
+        2. If it doesn't exist, create it.
+
+        This process is repeated every time the user refreshes the page. Even if step 2 
+        is never executed because the limiter already exists, we still hit the database 
+        on each refresh just to check existence, and this is where caching becomes crucial.
+
+        The caching strategy works as follows:
+
+            Cache Key: login_rate_limiter_user_<id>
+            TTL: 24 hours (default)
+
+            On page refresh:
+                       |
+                ┌──────────────────┐_
+                │ Check cache      │
+                └────────┬─────────┘
+                         │ Exists -> skip DB, limiter already present
+                        │
+                        
+                Cache missing -> Check database
+                        │
+            ┌──────────┴──────────┐
+            │ Limiter exists?      │
+            └───────┬─────────────┘
+                    │ Yes -> do nothing, store True in cache
+                    │ No  -> create limiter, store True in cache
+
+        Args:
+            user (User): The user to check.
+            cache_key (str): Cache key for the login rate limiter.
+            ttl (int): Time-to-live for the cache in seconds. Default is 24 hours.
+
+        Returns:
+            bool: True if a new limiter was created, False otherwise.
+
+        Note:
+            Without a LoginRateLimiter already available, the app will crash when
+            the user tries to log in.
+        """
+
+        is_created = get_cache_with_retry(cache_key)  
+
+        if not is_created: 
+           cls._ensure_exists_or_create_helper(user, cache_key, ttl)
+        else:
+            default_logger.debug(f"Cache hit for user {user.email}, skipping DB check entirely")
+
+    @classmethod
+    def _ensure_exists_or_create_helper(cls, user: User, cache_key: str, ttl: int):
+        """
+        A helper method to help the `ensure_exists_or_create_and_cache` method create
+        tbe cache and the LoginRateLimiter model. This advoids a nested if-statement
+        inside the `ensure_exists_or_create_and_cache` method.
+
+        Note the method is only intended to be used with `ensure_exists_or_create_and_cache`.
+        
+        Args:
+            user (User): The user to check.
+            cache_key (str): Cache key for the login rate limiter.
+            ttl (int): Time-to-live for the cache in seconds. Default is 24 hours.
+
+        Returns:
+            bool: True if a new limiter was created, False otherwise.
+        """
+        default_logger.debug(f"Cache miss for user {user.email}, checking DB")
+
+        if not LoginRateLimiter.has_login_rate_limiter(user):  
+              
+            LoginRateLimiter.get_by_user_or_create(user)  
+            set_cache_with_retry(cache_key, True, ttl=ttl)  
+            default_logger.debug(f"LoginRateLimiter created and cached for user {user.email}")
+        else:
+                
+            default_logger.debug(f"Limiter exists in DB for user {user.email}, no creation needed")
+        return True
+
+    

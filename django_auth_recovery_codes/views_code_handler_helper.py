@@ -13,7 +13,7 @@
 # - Functions here are intended to work only with the views.
 # - Can be expanded in the future with more view-specific helpers.
 # """
-
+from __future__ import annotations
 
 import json
 from django.http           import JsonResponse
@@ -27,15 +27,16 @@ from typing                import TypedDict
 
 
 from django_auth_recovery_codes.utils.converter              import SecondsToTime
-from django_auth_recovery_codes.models                       import RecoveryCode, RecoveryCodesBatch, Status
+from django_auth_recovery_codes.models                       import RecoveryCode, RecoveryCodesBatch, RecoveryCodesBatchHistory, Status
 from django_auth_recovery_codes.utils.cache.safe_cache       import set_cache_with_retry, get_cache_with_retry, delete_cache_with_retry
 from django_auth_recovery_codes.loggers.loggers              import view_logger, purge_code_logger
 from django_auth_recovery_codes.utils.errors.enforcer        import enforce_types
 from django_auth_recovery_codes.utils.errors.error_messages  import construct_raised_error_msg
 from django_auth_recovery_codes.views_helper                 import set_setup_flag_if_missing_and_add_to_cache
-
+from django_auth_recovery_codes.utils.requests               import get_request_data
 
 User = get_user_model()
+
 
 CACHE_KEY                        = 'recovery_codes_generated_{}'
 RECOVERY_CODES_BATCH_HISTORY_KEY = 'recovery_codes_batch_history_{}'
@@ -81,7 +82,7 @@ def _can_codes_be_generated_yet(user):
 def _generate_recovery_codes_with_expiry_date_helper(
     request: HttpRequest,
     user: "User"
-) -> Tuple[List[str], "RecoveryCodesBatch"]:
+) -> Tuple[List[str], RecoveryCodesBatch]:
     """
     Generate a batch of 2FA recovery codes for a user, with an expiry date.
 
@@ -136,7 +137,7 @@ def _generate_code_batch(request, generate_with_expiry_date):
     return raw_codes, batch_instance
 
 
-@enforce_types(non_null=False)
+@enforce_types()
 def generate_recovery_code_fetch_helper(request: HttpRequest, 
                                         cache_key: str,  
                                         generate_with_expiry_date: bool = False,
@@ -343,21 +344,22 @@ def recovery_code_operation_helper(
     response_data = {'SUCCESS': False, "OPERATION_SUCCESS": False, "MESSAGE": ""}
 
     try:
-        data = json.loads(request.body.decode("utf-8"))
-    
+
+        data = get_request_data(request)
+     
     except json.JSONDecodeError:
         response_data["ERROR"] = "Invalid JSON body"
         return JsonResponse(response_data, status=400)
 
-    plaintext_code = data.get("code")
-
+    plaintext_code = data.get("code").strip()
+   
     if not plaintext_code:
         response_data["MESSAGE"] = "The plaintext code wasn't found in the JSON body"
         return JsonResponse(response_data, status=400)
 
     if not callable(func):
         raise ValueError("The function must be callable and take one parameter: (str)")
-    
+  
     try:
         # The returned response_data from `func` returns a dictionary if successful, unmodified by the `_process_recovery_code_response` function
         #  return True, {
@@ -371,7 +373,7 @@ def recovery_code_operation_helper(
         # however, if invalid, invalidated, used, deleted, the `_process_recovery_code_response` returns the exact same keys
         # but with with messages explaining the current state for consistent frontend behaviour, e.g code has already been invalidated,
         response_data = _process_recovery_code_response(plaintext_code, request, func)
-
+  
         if not isinstance(response_data, dict):
             view_logger.log(f"Expected a dictionary object to be returned but got {type(response_data).__name__} is {response_data}")
             raise ValueError(construct_raised_error_msg(data,expected_types=dict, value=response_data))
@@ -385,8 +387,8 @@ def recovery_code_operation_helper(
     except Exception as e:
         response_data["ERROR"] = str(e)
         response_data["SUCCESS"] = False
-   
 
+  
     return JsonResponse(response_data, status=201 if response_data["SUCCESS"] else 400)
 
 
@@ -413,17 +415,15 @@ def _process_recovery_code_response(plaintext_code: str, request: HttpRequest, f
         dict: A response dictionary containing keys such as SUCCESS,
               OPERATION_SUCCESS, TITLE, MESSAGE, and ALERT_TEXT.
     """
-  
     recovery_code      = RecoveryCode.get_by_code_and_user(plaintext_code, request.user)
     REQUIRED_FUNC_KEYS = {"delete", "deactivate"}
-
+    
     if recovery_code is None:
         response_data =  _make_response(
             title="Invalid code",
             message="The code is invalid or no longer exists.",
             alert_text="Invalid code"
         )
-      
     elif recovery_code.is_used:
         response_data =  _make_response(
             title="Code already used",
@@ -436,24 +436,17 @@ def _process_recovery_code_response(plaintext_code: str, request: HttpRequest, f
             message="The code has already been deactivated.",
             alert_text="Code already deactivated"
         )
+
     elif recovery_code.mark_for_deletion:
          response_data = _make_response(
             title="Code already deleted",
             message="The code has already been deleted.",
             alert_text="Code already deleted"
         )
+
     else:
         request.session["force_update"]  = True  # force update to tell app not to use the cache, get from db and then update cache
         response_data = func(recovery_code)      # call and run the function e.g delete_code, or invalidate_code located in the views.py
-
-    invalid_operation = func.operation_name if func else "None"
-
-    if func is None or invalid_operation.lower() not in REQUIRED_FUNC_KEYS:
-        response_data = _make_response(
-            title="Invalid operation",
-            message=f"The operation '{invalid_operation}' entered is invalid.",
-            alert_text="Could not proceed: received an invalid operation"
-        )
 
     return response_data
 
@@ -465,7 +458,7 @@ def _make_response(title: str, message: str, alert_text: str, success: bool = Tr
     Abstract:
         Returns a ResponseDict containing success flags and messages 
         formatted for frontend use (e.g., SweetAlert2) to indicate
-        whether an operation succeeded or failed.
+        whether an operation succeeded or failed.   
 
     Args:
         title (str): Short title describing the outcome, e.g., "Failed to delete code".
@@ -537,7 +530,7 @@ def get_recovery_batches_context(request):
   
     if recovery_batch_history is None:
         recovery_batch_history = list(
-            RecoveryCodesBatch.objects.filter(user=user).order_by("-created_at")[:PAGE_SIZE]
+            RecoveryCodesBatchHistory.objects.filter(user=user).order_by("-created_at")[:PAGE_SIZE]
         )
         set_cache_with_retry(recovery_cache_key, value=recovery_batch_history)
 

@@ -7,6 +7,7 @@
 # but extended by concrete models.
 # 
 
+import uuid
 import logging
 from typing import Self
 from datetime import timedelta
@@ -17,6 +18,7 @@ from django.contrib.auth import get_user_model
 from django_auth_recovery_codes.utils.cache.safe_cache import delete_cache_with_retry, get_cache_with_retry
 from django_auth_recovery_codes.app_settings import default_cooldown_seconds, default_multiplier
 from django_auth_recovery_codes.utils.errors.error_messages import construct_raised_error_msg
+from django_auth_recovery_codes.models_choices import Status
 
 
 User  = get_user_model()
@@ -277,5 +279,57 @@ def flush_cache_and_write_attempts_to_db(instance, field_name, cache_key: str, l
         raise RuntimeError("Error while performing risky operation") from e
     
 
+
+
+class AbstractRecoveryCodesBatch(AbstractBaseModel):
+    """"""
+    id                  = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False, unique=True, db_index=True)
+    number_issued       = models.PositiveSmallIntegerField(default=10)
+    number_removed      = models.PositiveSmallIntegerField(default=0)
+    number_invalidated  = models.PositiveSmallIntegerField(default=0)
+    number_used         = models.PositiveSmallIntegerField(default=0)
+    created_at          = models.DateTimeField(auto_now_add=True)
+    modified_at         = models.DateTimeField(auto_now=True)
+    status              = models.CharField(choices=Status, max_length=1, default=Status.ACTIVE, db_index=True)
+    expiry_date         = models.DateField(blank=True, null=True, db_index=True)
+    deleted_at          = models.DateTimeField(null=True, blank=True)
+    deleted_by          = models.CharField(max_length=60)
+    deleted_by          = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL)
    
 
+    # Action tracking
+    viewed            = models.BooleanField(default=False)
+    downloaded        = models.BooleanField(default=False)
+    emailed           = models.BooleanField(default=False)
+    generated         = models.BooleanField(default=False)
+
+    # constant flags
+    VIEWED_FLAG       = "viewed"
+    DOWNLOADED_FLAG   = "downloaded"
+    EMAILED_FLAG      = "emailed"
+    GENERATED_FLAG    = "generated"
+
+    # constant model fields
+    MODIFIED_AT_FIELD  = "modified_at"
+    
+    class Meta:
+        abstract = True
+    
+    @property
+    def frontend_status(self):
+        """
+        Returns a human-readable status for frontend display.
+
+        Overrides certain internal statuses with custom labels for clarity.
+        For example:
+        - Status.PENDING_DELETE is shown as "Deleted"
+
+        All other statuses use their default TextChoices label.
+        """
+        frontend_flags = {
+            Status.PENDING_DELETE: "Deleted???????",  # override PENDING_DELETE
+            Status.ACTIVE: "Active",           # optional, can leave as default
+        }
+
+        # Use overridden value if present, else default label
+        return frontend_flags.get(Status(self.status), Status(self.status).label)
