@@ -1585,6 +1585,12 @@ pip install django
 pip install django_auth_recovery_codes
 ```
 
+You can install the package with:
+
+[`pip install django-auth-recovery-codes`](https://pypi.org/project/django-auth-recovery-codes/1.0.0/)
+
+
+
 ### 6. Verify installation
 
 ```bash
