@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="django-auth-recovery-codes",
-    version="1.0.0",
+    version="1.0.1",
     packages=find_packages(),
     include_package_data=True,
     description="A reusable Django app that extends any app allowing it to use 2FA recovery codes as backup to login.",

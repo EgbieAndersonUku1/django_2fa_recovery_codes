@@ -2589,7 +2589,7 @@ DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT = "txt"
 # ===========================
 
 DJANGO_AUTH_RECOVERY_CODES_SITE_NAME = "This is a demo tutorial page"
-DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT = "home"  # redirect to a different page
+DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT = "logout_user"  # redirect to a different page
 
 # ===========================
 # 💬 Recovery Code Email Success Message
@@ -2701,7 +2701,7 @@ Here are a few examples of how you can configure different flags in the applicat
 
 ```bash
 DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE = 20
-DJANGO_AUTH_RECOVERY_CODE_PER_PAGE = 1
+DJANGO_AUTH_RECOVERY_CODE_PER_PAGE = 5
 ````
 
 * You can also customise the message displayed after a user emails themselves a copy of their recovery codes:

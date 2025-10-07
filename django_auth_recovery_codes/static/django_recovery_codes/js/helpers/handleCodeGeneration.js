@@ -375,11 +375,12 @@ async function handleCanGenerateCodeSuccessUI(resp) {
     const MILLI_SECONDS = 1000;
   
     if (isPopulated) {
-
-        const resp = await sendPostFetchWithoutBody("/auth/recovery-codes/viewed/", "Failed to mark code as viewed ");
-        if (resp && resp.SUCCESS) {
+        
+        const postResp = await sendPostFetchWithoutBody("/auth/recovery-codes/viewed/", "Failed to mark code as viewed ");
+        if (postResp && postResp.SUCCESS) {
             markCurrentCardBatchAsViewed();
         }
+       
      
         updateBatchHistorySection(recoveryBatchSectionElement, resp.BATCH, resp.ITEM_PER_PAGE);
 

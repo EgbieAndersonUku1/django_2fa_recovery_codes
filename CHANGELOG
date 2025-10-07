@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.0.1] - 7/10/25
+Removed if the conversion for native datetime to a string which could potential cause Django-q to choke
+ran 
+```
+python manage.py flush_tasks -all
+```
+to remove all schedulers and ensure no errors
+
+
 ## [1.0.0] - 28/09/2025
 
 ### Added
