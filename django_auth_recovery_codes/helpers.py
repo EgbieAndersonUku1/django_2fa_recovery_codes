@@ -1,4 +1,5 @@
 import logging
+from typing import Any
 from uuid import UUID
 
 from django.utils.timezone import localtime
@@ -116,10 +117,8 @@ class PurgedStatsCollector:
             self.logger.debug( "[RecoveryCodes] Batch skipped | user_id=%s, batch_id=%s, purged_count=%s",
                                                 batch.user.id, batch.id, purged_count
                                             )
-
-
-
-    def _format_datetime(value):
+            
+    def _format_datetime(self, value: Any) -> Any:
         """Return a timezone-aware ISO string for datetime, or None."""
 
         if isinstance(value, datetime):
@@ -128,7 +127,7 @@ class PurgedStatsCollector:
             return value.isoformat()
         return None
     
-    def _to_json_safe(self, value):
+    def _to_json_safe(self, value: Any) -> Any:
         """Convert datetimes and UUIDs into serialisable string forms."""
         if isinstance(value, datetime):
             return self._format_datetime(value)
