@@ -8,11 +8,12 @@
 
 The premises of this resuable application, is that it takes any Django application and extends that application so that it can now use the 2FA recovery codes as a backup login should you lose access.
 
-`django-2fa-recovery-codes` is a Django app that provides a robust system for generating, storing, and managing **2FA recovery codes**. Unlike a full two-factor authentication apps, this package focuses solely on **recovery codes**, although this is a lightweight application it is a very powerful tool, offering fine-grained control and asynchronous management for better UX and performance.
+`django_auth_recovery_codes` is a Django app that provides a robust system for generating, storing, and managing **2FA recovery codes**. Unlike a full two-factor authentication apps, this package focuses solely on **recovery codes**, although this is a lightweight application it is a very powerful tool, offering fine-grained control and asynchronous management for better UX and performance.
 
 ## Table of Contents
 * [Requirements & Key Technologies](#requirements--key-technologies)
 * [Key Features](#key-features)
+* [Quickstart video walkthrough](#quickstart-video-walkthrough)
 * [How it Differs From A Full Two-Factor Authentication Apps](#how-it-differs-from-a-full-two-factor-authentication-apps)
   * [User Interface](#user-ui-interface)
   * [Asynchronous usage](#asynchronous-usage)
@@ -48,14 +49,12 @@ The premises of this resuable application, is that it takes any Django applicati
   * [Using Django Cache Without Configuring a Backend](#using-django-cache-without-configuring-a-backend)
   * [Django-Q vs Celery and why Django Auth Recovery codes use Django-q](#django-q-vs-celery-and-why-django-auth-recovery-codes-use-django-q)
   * [Why this application uses Django-Q](#why-this-application-uses-django-q)
-  * [Using Django-Q with `django-2fa-recovery-codes`](#using-django-q-with-django-2fa-recovery-codes)
+  * [Using Django-Q with `django_auth_recovery_codes`](#using-django-q-with-django-2fa-recovery-codes)
   * [Benefits of using Django-Q](#benefits-of-using-django-q)
   * [Setting up Django-q](#setting-up-django-q)
 * [Django Auth Recovery Settings](#django-auth-recovery-settings)  
 * [Using and setting up Django-q](#using-and-setting-up-django-q)
 * [Django Auth Recovery flag settings](#django-auth-recovery-flag-settings)
-  * [Alphabetical Reference (Easy Copy & Paste)](#alphabetical-reference-easy-copy--paste)
-  * [Alphabetical Reference with defaults variables (Easy Copy & Paste) any thing not added is required](#alphabetical-reference-with-defaults-variables-easy-copy--paste-any-thing-not-added-is-required)
   * [Recovery Code Display Settings](#recovery-code-display-settings)
   * [Cooldown Settings Flags](#cooldown-settings-flags)
   * [Rate Limiting & Caching](#rate-limiting--caching)
@@ -68,8 +67,6 @@ The premises of this resuable application, is that it takes any Django applicati
   * [Default Values & Required Variables](#default-values--required-variables)
   * [Run checks to verify that flags are valid](#run-checks-to-verify-that-flags-are-valid)
 * [Sending Emails and using Logging](#sending-emails-and-using-logging)
-  * [What is SSE?](#what-is-sse)
-  * [Why is the app is using SSE?](#why-is-the-app-is-using-sse)
   * [Using async vs synchronous](#using-async-vs-synchronous)
   * [Configuration settings](#configuration-settings)
   * [Hang on a minute, why can I email myself the code only once, and only if I haven’t logged out after generating it?](#hang-on-a-minute-why-can-i-email-myself-the-code-only-once-and-only-if-i-havent-logged-out-after-generating-it)
@@ -83,7 +80,7 @@ The premises of this resuable application, is that it takes any Django applicati
   * [How downloads work](#how-downloads-work)
   * [Important security notes](#important-security-notes)
   * [Example usage](#example-usage)
-* [Quickstart and Walkthrough](#quickstart-and-walkthrough)
+* [Quickstart and Walkthrough read](#quickstart-and-walkthrough)
   * [Setup](#setup)
   * [Installation (with Virtual Environment)](#installation-with-virtual-environment)
   * [3. Upgrade pip (optional but recommended)](#3-upgrade-pip-optional-but-recommended)
@@ -152,30 +149,20 @@ The project relies on the `match`-`case` syntax, which provides a more readable 
 
 * Generate recovery codes in configurable batches.
 * Track recovery codes individually:
-
   * Mark codes as used, inactive, or scheduled for deletion.
   * User the 2FA code to login which becomes invalid after a single use
-
 * Batch management:
-
   * Track issued and removed codes per batch.
   * Statuses for active, invalidated, or deleted batches.
-
 * Login
-  
   * Login in using your 2FA Recovery Backup code
-
 * Asynchronous cleanup using Django-Q:
-
   * Delete expired or invalid codes without locking the database.
   * Scheduler allows admins to set cleanup intervals (e.g., every 2 days) without touching code.
   * Optional options to email the report to the admin
   * Optional option to store user emails (Whenever the user send themselves a code) in the database
   * Optional scheduler to delete Recovery code Audit model (tracks the users, the number of code issued, time issued, etc)
-
- 
 * Secure storage:
-
   * Codes are hashed before saving; no plaintext storage.
 * Extensible utilities for generating and verifying codes.
 
@@ -183,13 +170,13 @@ The project relies on the `match`-`case` syntax, which provides a more readable 
 
 ### How It Differs From A Full Two-Factor Authentication Apps?
 
-`django-2fa-recovery-codes` is designed **solely for recovery codes**, offering fine-grained control, asynchronous management, and admin-friendly batch handling.
+`django_auth_recovery_codes` is designed **solely for recovery codes**, offering fine-grained control, asynchronous management, and admin-friendly batch handling.
 
 * ### User UI interface
    * Dedicated login interface page to enter your email and 2FA recovery code
    * Dashboard that allows the user to:
 	      * Generate a batch of 2FA recovery codes (default=10 generated, configurable via settings flags) with expiry date or doesn't expiry
-        * Regenerate code (Uses brute force rate limiter with a penalty that increases wait time if codes is regenerated within that time window)
+        * Regenerate code (Uses brute force rate limiter with a penalty that increases the wait time if codes is regenerated within that time window)
         * Email, Delete or Download entire codes via the buttons
         * One-time verification code setup form
           * A one-time setup that allows the user to enter a 2FA code after generation (for the first time) to verify that the backend has configured it correctly without marking the code as used. The tests indicate whether the code has been set up correctly.
@@ -204,8 +191,8 @@ The project relies on the `match`-`case` syntax, which provides a more readable 
           | Batch ID                  | 8C2655A1-8F14-4B56-AEC8-7DDA72F887A4 |
           | Expiry info               | Active                               |
           | User                      | Egbie                                |
-          | Date issued               | 23 Sept. 2025, 16:21                 |
-          | Date modified             | 23 Sept. 2025, 16:31                 |
+          | Date issued               | 23 Sept. 2025,                  |
+          | Date modified             | 23 Sept. 2025,                |
           | Number of codes issued    | 10                                   |
           | Number of codes used      | 0                                    |
           | Number of deactivated     | 0                                    |
@@ -224,7 +211,7 @@ The project relies on the `match`-`case` syntax, which provides a more readable 
 
   * Built with **asynchronous usage** using Django-Q:
   * Automatically deletes expired or invalid codes when uses with scheduler.
-  * On a successful delete scheduler generates an audit report of the number of deleted codes and sends it to admin via email. The sending of the email is optional.
+  * On a successful delete scheduler generates an audit report of the number of deleted codes and sends it to admin via email.
   * Email sending can be configured to run **asynchronous or synchronous** depending on your environment:
     * `DEBUG = True` : uses synchronous sending (easy for development or testing).  
     * `DEBUG = False` : uses asynchronous sending (recommended for production; doesn’t block the application while sending in the background).
@@ -264,34 +251,46 @@ The project relies on the `match`-`case` syntax, which provides a more readable 
      #### Configuration flags settings for the Django Auth Recovery code app
 
       ```python
-        * DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL
-      * DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER
-      * DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME
-      * DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP
-      * DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS
-      * DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE
-      * DJANGO_AUTH_RECOVERY_CODE_PER_PAGE
-      * DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS
-      * DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER
-      * DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT
-      * DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG
-      * DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE
-      * DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN
-      * DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE
-      * DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX
-      * DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN
-      * DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL
-      * DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT
-      * DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER
-      * DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME
-      * DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT
-      * DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS
-      * DJANGO_AUTH_RECOVERY_KEY 
-      * DJANGO_AUTH_RECOVERY_CODES_SITE_NAME
-      * DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN
+      DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL = 
+      DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER = 
+      DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME = 
+      DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG = 
+
+      DJANGO_AUTH_RECOVERY_KEY = 
+
+      DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP = 
+      DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS = 
+      DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS = 
+      DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER = 
+
+      DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE = 
+      DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN = 
+      DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT = 
+      DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER = 
+      DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS = 
+
+      DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX = 
+      DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN = 
+      DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL = 
+
+      DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE = 
+      DJANGO_AUTH_RECOVERY_CODE_PER_PAGE = 
+      DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE = 
+      DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN = 
+
+      DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME = 
+      DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT = 
+
+      DJANGO_AUTH_RECOVERY_CODES_SITE_NAME = 
+      DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT = 
+
+      DJANGO_AUTH_RECOVERY_CODE_EMAIL_SUCCESS_MSG = 
+
        
       ```
+[⬆ Back to Top](#top)
 
+--- 
 
 ## Django 2FA Recovery Code Generator
 
@@ -382,7 +381,7 @@ Even with a supercomputer that tests codes extremely quickly, brute-forcing a va
 
 > You can trust these recovery codes to keep your account safe even against attackers with enormous computational power.
 
-
+[⬆ Back to Top](#top)
 
 ---
 
@@ -420,6 +419,8 @@ Years to crack: 1.043e+45
 * Even with a supercomputer, cracking a single code would take **trillions of times longer than the age of the universe**
 * With **rate limiting**, brute-force becomes completely infeasible
 
+[⬆ Back to Top](#top)
+
 ---
 
 #### Use Cases
@@ -429,12 +430,14 @@ Years to crack: 1.043e+45
 * Admin-friendly management of recovery codes, including scheduling cleanups without developer intervention.
 * Systems requiring secure, hashed storage of recovery codes while retaining full control over their lifecycle.
 
+[⬆ Back to Top](#top)
+
 ---
 
 ## Installation
 
 ```bash
-pip install django-2fa-recovery-codes
+pip install django_auth_recovery_codes
 ```
 
 ```python
@@ -590,6 +593,9 @@ Key points:
 
 In short: the app is **built to use caching by default**, but if no backend is configured it automatically falls back to an in-memory cache. However, because it is an in-memory when the Django sever restarts it **resets the cache**. For production, a persistent backend like Redis is recommended.
 
+[⬆ Back to Top](#top)
+
+---
 
 ## Using and setting up Django-q
 
@@ -665,9 +671,9 @@ Both Django-Q and Celery are task queues, but they differ in complexity and use 
 
 ---
 
-## Why this application uses Django-Q
+## Why does this application use Django-Q?
 
-`django-2fa-recovery-codes` uses Django-Q to handle background tasks such as:
+`django_auth_recovery_codes` uses Django-Q to handle background tasks such as:
 
 1. When the user email themselves a copy of their plaintext code
 2. When the admin runs or sets up scheduler (once, daily, weekly, etc) to delete invalid or expired codes, a report is also generated and sent to the admin via email 
@@ -682,7 +688,7 @@ Without using Django-q whenever a user deletes their code or sends a copy of the
 
 Even though expired codes are deleted asynchronously, deleting **millions of codes at once** can still cause performance issues such as long transactions or database locks.
 
-To avoid this, `django-2fa-recovery-codes` supports **batch deletion** via the configurable setting:
+To avoid this, `django_auth_recovery_codes` supports **batch deletion** via the configurable setting:
 
 ```python
 # settings.py
@@ -692,10 +698,13 @@ Django Auth Recovery Codes_BATCH_DELETE_SIZE = 1000
 * If set, expired codes will be deleted in **chunks of this size** (e.g. 1000 at a time).
 * If not set, all expired codes are deleted in a single query.
 
+
+[⬆ Back to Top](#top)
+
 ---
 
 
-### Using Django-Q with `django-2fa-recovery-codes`
+### Using Django-Q with `django_auth_recovery_codes`
 
 Django Auth Recovery Codes provides a utility task to clean up expired recovery codes, but since this is a reusable app, the scheduling of this task is **left up to you**, depending on your project’s needs and dataset size.
 
@@ -711,9 +720,9 @@ See the [Django-Q scheduling docs](https://django-q.readthedocs.io/en/latest/sch
 
 ---
 
-### How does Django-Q delete codes if the user deletes them from the frontend
+### How does Django-Q delete codes if the user deletes them from the frontend?
 
-`django-2fa-recovery-codes` does **not** immediately delete a code when the user deletes it from the frontend. Instead, it performs a **soft delete**, the code is marked as invalid and can no longer be used. From the user’s perspective, the code is “gone,” but the actual row still exists in the database until the cleanup task runs.
+`django_auth_recovery_codes` does **not** immediately delete a code when the user deletes it from the frontend. Instead, it performs a **soft delete**, the code is marked as invalid and can no longer be used. From the user’s perspective, the code is “gone,” but the actual row still exists in the database until the cleanup task runs.
 
 When the Django-Q scheduler task runs (either automatically or triggered by the admin), any codes marked for deletion are permanently removed in the background (in batches).
 
@@ -721,10 +730,10 @@ When the Django-Q scheduler task runs (either automatically or triggered by the 
 
 ### Why not delete the code immediately?
 
-Since this is a **reusable app** that can be plugged into Django projects of any size (small apps or large-scale environments), immediate deletion is avoided for two key reasons:
+Since this is a **reusable app** that can be plugged into any Django projects of any size (small apps or large-scale environments), immediate deletion is avoided for two key reasons:
 
 1. **Database contention**
-   In environments with thousands of users, many codes could be deleted at the same time. Deleting them synchronously could lock rows or put heavy strain on the database.
+   In environments with thousands of users, potential many codes could be deleted at the same time. Deleting them synchronously could lock rows or put heavy strain on the database.
 
 2. **User experience**
    Immediate deletion happens in the request/response cycle. If many users delete codes at once, their requests would take longer, and the frontend might “freeze” while deletions are processed leading to a poor UX.
@@ -751,11 +760,11 @@ By offloading deletion to Django-Q:
 
 ### Batch deletion configuration
 
-For projects with very large datasets, batch deletion can be enabled via the `Django Auth Recovery Codes_BATCH_DELETE_SIZE` setting:
+For projects with very large datasets, batch deletion can be enabled via the `DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE` setting flag:
 
 ```python
 # settings.py
-Django Auth Recovery Codes_BATCH_DELETE_SIZE = 1000
+DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE = 1000
 ```
 
 * If set, expired or soft-deleted codes will be removed in chunks of this size.
@@ -768,7 +777,7 @@ This approach provides flexibility,  small apps can use one-shot deletes, while 
 
 ## Setting up Django-Q
 
-The `django-2fa-recovery-codes` library uses **Django-Q** internally. You don’t need to install it separately, but you must configure it in your Django project to ensure background tasks run properly.
+The `django_auth_recovery_codes` library uses **Django-Q** internally. You don’t need to install it separately, but you must configure it in your Django project to ensure background tasks run properly.
 
 ---
 
@@ -816,6 +825,8 @@ Don’t forget to start the Django-Q worker cluster so scheduled tasks actually 
 python manage.py qcluster
 ```
 
+[⬆ Back to Top](#top)
+
 ---
 
 ## Django Auth Recovery flag settings 
@@ -838,74 +849,6 @@ These environment variables configure the **Django Auth Recovery** system, contr
 
 ---
 
-### **Alphabetical Reference (Easy Copy & Paste)**
-
-```
-DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL=
-DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER=
-DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME=
-DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP=
-DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS=
-DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE=
-DJANGO_AUTH_RECOVERY_CODE_PER_PAGE=
-DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS=
-DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER=
-DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT=
-DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG=
-DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE=
-DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN=
-DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE=
-DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX=
-DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN=
-DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL=
-DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT=
-DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER=
-DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME=
-DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT=
-DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS=
-DJANGO_AUTH_RECOVERY_KEY=
-DJANGO_AUTH_RECOVERY_CODES_SITE_NAME=
-DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN=
-
-```
-
-> Developers can **copy and paste** the flags directly into a `settings.py` file.
-<br>
-**Note**
-
-Do not place the flags in the `.env` file if their values are not strings. This is because `.env` files cast all values to strings, which is fine for flags that are already strings. However, if a value is meant to be an int, it will raise an error because the system checks expect an integer.
-
-Additionally, there is no need to place these values in an `.env` file since they are not sensitive. Only place sensitive information e.ge `DJANGO_AUTH_RECOVERY_KEY`
-
-
-
-### **Alphabetical Reference with defaults variables (Easy Copy & Paste) any thing not added is required **
-
-```
-
-DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP=True
-DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS=30
-DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE=20
-DJANGO_AUTH_RECOVERY_CODE_PER_PAGE=5
-DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS=30
-DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER=True
-DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT=recovery_dashboard
-DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE=True
-DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN=2
-DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE=400
-DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX=3600
-DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN=0
-DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL=3600
-DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT=3600
-DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER=2
-DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME=recovery_codes
-DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT=txt
-DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS=5
-DJANGO_AUTH_RECOVERY_CODES_SITE_NAME="2FA Recovery site"
-DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN=0
-```
-
-> Developers can **copy and paste** directly into their `settings.py` file.
 
 
 ## Email & Admin Settings Flags
@@ -1082,7 +1025,7 @@ These settings control how recovery codes are managed, including deletion, expor
 | `DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT`                    | Default export format for recovery codes. Options: `'txt'`, `'csv'`, `'pdf'`.|
 | `DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS`                | Maximum allowed login attempts using recovery codes.                         |
 | `DJANGO_AUTH_RECOVERY_KEY`                                     | Secret key used for recovery code validation.                                |
-| `DJANGO_AUTH_RECOVERY_CODES_PURGE_MAX_DELETIONS_PER_RUN`       | Maximum number of expired codes to delete in a single scheduler run.  If unset (`-1`), deletion is unlimited.  If set to `0`, no codes will be deleted (mainly for testing/debugging purposes). |
+| `DJANGO_AUTH_RECOVERY_CODES_PURGE_MAX_DELETIONS_PER_RUN`       | Maximum number of expired codes to delete in a single scheduler run.  If unset (`-1`), deletion is unlimited.  |
 
 
 
@@ -1275,7 +1218,7 @@ This ensures cleanup is spread across multiple runs, preventing excessive lockin
 
 ### Q: Can I monitor cleanup performance?  
 
-A: Yes, you can monitor through the Django-q admin interface.  
+A: Yes, you can monitor through the Django-q admin interface or use `python manage.py qmonitor`.  
 Because deletions are chunked, monitoring helps you fine-tune batch size and per-run caps for optimal efficiency.
 
 
@@ -1294,6 +1237,32 @@ Suppose the setting is:
 - `DJANGO_AUTH_RECOVERY_CODES_SITE_NAME = "My Awesome Site"`
 
 Then recovery emails and notifications will display the site name "My Awesome Site" to the user, helping them identify the source of the email and also display on the site dashboard and login page.
+
+
+
+## Custom Email Message Flags
+
+| Variable                                  | Description                                                                                       |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `DJANGO_AUTH_RECOVERY_CODE_EMAIL_SUCCESS_MSG` | The message displayed to the user when recovery codes are successfully sent via email. Admins can customise this message. |
+
+### Example Usage
+
+Suppose the setting is:
+
+- `DJANGO_AUTH_RECOVERY_CODE_EMAIL_SUCCESS_MSG = "Your recovery codes email has been successfully delivered."`
+
+Then when a user requests recovery codes, they will see the message:
+
+> "Your recovery codes email has been successfully delivered."
+
+Admins can change this message to anything they want, for example:
+
+```python
+DJANGO_AUTH_RECOVERY_CODE_EMAIL_SUCCESS_MSG = "Check your inbox! Your recovery codes are on their way."
+
+```
+[⬆ Back to Top](#top)
 
 --- 
 
@@ -1319,25 +1288,11 @@ DJANGO_AUTH_RECOVERY_KEY=supersecretkey
 DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN=400
 ```
 
-### settings.py
-
-```python
-import os
-
-ADMIN_EMAIL = os.getenv("DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL")
-ADMIN_USERNAME = os.getenv("DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME")
-AUDIT_RETENTION_DAYS = int(os.getenv("DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS", 30))
-MAX_VISIBLE = int(os.getenv("DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE", 20))
-COOLDOWN_BASE = int(os.getenv("DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN", 60))
-EXPORT_FORMAT = os.getenv("DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT", "txt")
-SECRET_KEY = os.getenv("DJANGO_AUTH_RECOVERY_KEY")
-```
-
 ---
 
 ## Best Practices for Managing Environment Variables
 
-1. **Use a `.env` file for local development**  Keep secret keys and credentials out of source control.
+1. **Use a `.env` file  to keep secret keys and credentials out of source control.
 
 ---
 
@@ -1345,39 +1300,39 @@ SECRET_KEY = os.getenv("DJANGO_AUTH_RECOVERY_KEY")
 
 | Variable                                                      | Required | Default Value        | Notes                                                                            |
 | ------------------------------------------------------------- | -------- | -------------------- | -------------------------------------------------------------------------------- |
-| `DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL`                       | ✅ Yes    | –                    | Email used to send recovery codes. Must be valid.                                |
-| `DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER`             | ✅ Yes    | –                    | SMTP or host email account. Required for sending emails.                         |
-| `DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME`                    | ✅ Yes    | –                    | Admin username associated with the email.                                        |
-| `DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP`         | ❌ No     | `False`              | Automatically clean up audit logs if True.                                       |
-| `DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS`              | ❌ No     | `30`                 | Number of days to retain audit logs.                                             |
-| `DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE`                       | ❌ No     | `20`                  | Maximum number of expired batches plus the current active batch the user can view under their history section                                       |
-| `DJANGO_AUTH_RECOVERY_CODE_PER_PAGE`                          | ❌ No     | `10`                 | Pagination setting for code lists.                                               |
-| `DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS`       | ❌ No     | `90`                 | Days before expired codes are deleted.                                           |
-| `DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER` | ❌ No     | `False`              | Enable scheduler logging for purge operations.                                   |
-| `DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT`                     | ❌ No     | `/`                  | URL to redirect users after code actions.                                        |
-| `DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG`                   | ❌ No     | `False`              | Log sent recovery emails.                                                        |
-| `DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE`      | ❌ No     | `True`               | Use cache for rate limiting.                                                     |
-| `DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN`                    | ❌ No     | `60`                 | Base cooldown interval in seconds.                                               |
-| `DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE`                | ❌ No     | `50`                 | Number of codes deleted per batch.                                               |
-| `DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX`                        | ❌ No     | `1000`               | Maximum value for cache-based limiter.                                           |
-| `DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN`                        | ❌ No     | `0`                  | Minimum value for cache-based limiter.                                           |
-| `DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL`                        | ❌ No     | `3600`               | Cache expiration in seconds.                                                     |
-| `DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT`            | ❌ No     | `3600`               | Maximum cooldown threshold in seconds.                                           |
-| `DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER`              | ❌ No     | `2`                  | Multiplier for repeated attempts cooldown.                                       |
-| `DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME`                | ❌ No     | `recovery_codes` | Default file name for exported codes.                                            |
-| `DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT`                   | ❌ No     | `txt`                | Default format for exporting recovery codes. Options: `'txt'`, `'csv'`, `'pdf'`. |
-| `DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS`               | ❌ No     |   `5` | Maximum login attempts using recovery codes. |
-| `DJANGO_AUTH_RECOVERY_KEY` | ✅ Yes | – | Secret key for recovery code validation. Must be kept safe. |
-| `DJANGO_AUTH_RECOVERY_CODES_PURGE_MAX_DELETIONS_PER_RUN`               | ❌ No     |   1000 | Caps the maximum number of deletions in one scheduler run. |
-| `DJANGO_AUTH_RECOVERY_KEY` | ✅ Yes | – | Secret key for recovery code validation. Must be kept safe. |
+| `DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL`              | ✅ Yes  | –                    | Email used to send recovery codes. Must be valid.                                |
+| `DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER`            | ✅ Yes  | –                    | SMTP or host email account. Required for sending emails.                         |
+| `DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME`                   | ✅ Yes  | –                    | Admin username associated with the email.                                        |
+| `DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP`        | ❌ No   | `False`              | Automatically clean up audit logs if True.                                       |
+| `DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS`             | ❌ No   | `30`                 | Number of days to retain audit logs.                                             |
+| `DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE`                      | ❌ No   | `20`                 | Maximum number of expired batches plus the current active batch the user can view under their history section |
+| `DJANGO_AUTH_RECOVERY_CODE_PER_PAGE`                         | ❌ No   | `10`                 | Pagination setting for code lists.                                               |
+| `DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS`      | ❌ No   | `90`                 | Days before expired codes are deleted.                                           |
+| `DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER` | ❌ No | `False`              | Enable scheduler logging for purge operations.                                   |
+| `DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT`       | ❌ No   | `/`                  | URL to redirect users after code actions.                                        |
+| `DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG`                  | ❌ No   | `False`              | Log sent recovery emails.                                                        |
+| `DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE`     | ❌ No   | `True`               | Use cache for rate limiting.                                                     |
+| `DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN`                   | ❌ No   | `60`                 | Base cooldown interval in seconds.                                               |
+| `DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE`               | ❌ No   | `50`                 | Number of codes deleted per batch.                                               |
+| `DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX`                       | ❌ No   | `1000`               | Maximum value for cache-based limiter.                                           |
+| `DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN`                       | ❌ No   | `0`                  | Minimum value for cache-based limiter.                                           |
+| `DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL`                       | ❌ No   | `3600`               | Cache expiration in seconds.                                                     |
+| `DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT`           | ❌ No   | `3600`               | Maximum cooldown threshold in seconds.                                           |
+| `DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER`             | ❌ No   | `2`                  | Multiplier for repeated attempts cooldown.                                       |
+| `DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME`               | ❌ No   | `recovery_codes`     | Default file name for exported codes.                                            |
+| `DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT`                  | ❌ No   | `txt`                | Default format for exporting recovery codes. Options: `'txt'`, `'csv'`, `'pdf'`. |
+| `DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS`              | ❌ No   | `5`                  | Maximum login attempts using recovery codes.                                     |
+| `DJANGO_AUTH_RECOVERY_KEY`                                    | ✅ Yes  | –                    | Secret key for recovery code validation. Must be kept safe.                      |
+| `DJANGO_AUTH_RECOVERY_CODES_PURGE_MAX_DELETIONS_PER_RUN`    | ❌ No   | `1000`               | Caps the maximum number of deletions in one scheduler run.                        |
+| `DJANGO_AUTH_RECOVERY_CODE_EMAIL_SUCCESS_MSG`               | ❌ No   | `"Your recovery codes email has been successfully delivered."` | Custom message displayed to users after recovery codes are sent. Admins can change this message. |
+
 
 
 ---
 
-
 ## Run checks to verify that flags are valid
 
-To ensure that all configurations and flags are correct, run the following command before starting the application:
+To ensure that all configurations and flags are correct after adding them to the settings.py file, run the following command before starting the application:
 ```
 
 ```python
@@ -1397,34 +1352,13 @@ python manage.py qcluster
 ```
 
 
-## Sending Emails and using Logging
+## Sending Emails, logging emails to the model, and using Logging for purging codes via Django-q
 
 Django Auth 2FA Recovery provides the ability to email yourself a copy of your raw recovery codes and can only be done once for a given batch, and only if you haven't logged out after generating the code. This is achieved using a lightweight yet powerful library called **`EmailSender`**, which is responsible for delivering the message.
 
-In addition to sending, the process can be logged for developers through a companion model named **`EmailSenderLogger`**. Together, these ensure that not only are emails dispatched, but the details of each operation can also be recorded for auditing, debugging, or monitoring purposes. 
+In addition to sending, the process can be logged for developers through a companion model named **`EmailSenderLogger`**. Together, these ensure that not only are emails dispatched, but the details of each operation can also be recorded for auditing, debugging, or monitoring purposes.  N
 
-The application uses **SSE (Server-Sent Events)** to notify the user when an email has been sent.
-
-### What is SSE?
----
-
-SSE is a way for a **server to push real-time updates to a client** over HTTP. Unlike WebSockets, which allow **two-way communication**, SSE is **one-way**: the server sends messages to the client, but the client cannot send messages back over the same connection.
-
-It’s commonly used for:
-
-* Live notifications
-* Stock tickers
-* Chat message feeds
-* Real-time monitoring dashboards
-
-In this application, SSE is used for live notifications when an email is sent.
-
-### Why is the app is using SSE?
----
-
-The app uses SSE because emails are sent asynchronously using **Django-Q**. This ensures that sending an email does not block the request/response cycle which simply means the user's screen doesn't lock while the email is sending. Emails are placed in a task queue and may be sent immediately or after a short delay, depending on the queue load.
-
-Without SSE, the user would have to constantly check their email inbox to know if the codes have been sent. With SSE, the user can continue using the app normally and receive a notification popup **as soon as the email is processed and sent**, providing a better real-time experience.
+Note for security purpose, the logger doesn't log `context` or the `header` in the logging file because the context contains the `raw plain code` that is passed to the `EmailSender` and therefore `EmailSenderLogger`. Allowing the `context` to be logged would expose a security risk where the anyone with access to the log files could reconstruct the raw codes, and that paired with the email would give them unauthorised access to the person account.
 
 
 ### Using async vs synchronous
@@ -1452,11 +1386,16 @@ Whether emails are logged is determined by a configuration flag in your project�
 ```python
 # settings.py
 
-# Enable or disable logging of sent emails
-DJANGO_AUTH_RECOVERY_CODES_EMAIL_SENDER_LOGGING = True  # Logs the email process
-DJANGO_AUTH_RECOVERY_CODES_EMAIL_SENDER_LOGGING = False  # Disables logging
+# Storing user emails in the model
+DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG  = True  # store in database
+DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG  = False  # Don't store in the database
 ```
 
+```python
+
+# using logger while purging code
+DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER
+```
 * **`True`**: The application records details of the email process via `EmailSenderLogger`.
 * **`False`**: No logging takes place.
 
@@ -1473,7 +1412,7 @@ A **hash** is a one-way function: it takes an input, applies a hashing algorithm
 
 Since the generated codes are stored as hashes, the system cannot send you the hash (as it is meaningless to you) and it cannot retrieve the original plain text version (because it was never stored in the database).  
 
-To work around this, the application temporarily stores a copy of the plain text codes in your **backend session** when they are first generated. This session is unique to your login and user account. Because it is session-based, the codes are removed once you log out.  
+To work around this, the application temporarily stores a copy of the plain text codes in your **backend session** when they are first generated. This session is unique to your login and user account and cannot be accessed by anyone or any other account. Because it is session-based, the codes are removed once you log out.  
 
 ### What happens if I refresh the page, can I still email myself the code?  
 ---
@@ -1495,7 +1434,7 @@ Yes. Generating a new batch creates a new set of plain text codes, which are aga
 ### Using Logging with the Application  
 ---
 
-`django-2fa-recovery-codes` includes a built-in logging configuration, so you do not need to create your own in `settings.py`. This reduces the risk of misconfiguration.  
+`django_auth_recovery_codes` includes a built-in logging configuration, so you do not need to create your own in `settings.py`. This reduces the risk of misconfiguration.  
 
 Because the application uses `django-q` (an asynchronous task manager), the logger is already set up to work with it. Conveniently, everything is preconfigured for you. All you need to do is import the logging configuration and assign it to Django’s `LOGGING` variable.  
 
@@ -1522,15 +1461,16 @@ If you already have a logging configuration and prefer not to overwrite it, you 
 LOGGING = {**LOGGING, **DJANGO_AUTH_RECOVERY_CODES_LOGGING}
 ```
 
-This approach allows you to keep your existing logging settings intact but still allow you to add support for `django-2fa-recovery-codes`.
+This approach allows you to keep your existing logging settings intact but still allow you to add support for `django_auth_recovery_codes`.
 
+[⬆ Back to Top](#top)
 
 ---
 
 ## Downloading Recovery Codes  
 ---
 
-In addition to emailing your recovery codes, `django-2fa-recovery-codes` also allows you to **download them directly**. This gives you flexibility in how you choose to back up your codes.  
+In addition to emailing your recovery codes, `django_auth_recovery_codes` also allows you to **download them directly**. This gives you flexibility in how you choose to back up your codes.  
 
 ### How downloads work  
 ---
@@ -1577,6 +1517,8 @@ When generating recovery codes in the application, you will be presented with op
 - **Download a copy** (also retrieves codes from `request.session`)  
 
 Both options use the same temporary storage mechanism, which ensures your plain text recovery codes are only ever available for the current session and cannot be recovered after logout.  
+
+[⬆ Back to Top](#top)
 
 ---
 
@@ -1745,37 +1687,113 @@ urlpatterns = [
 
 ```python
 
-# Required values, customise for your project
-DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL    = "your-email-address"
-DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER  = "main-smtp-email"
-DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME         = "username"
-DJANGO_AUTH_RECOVERY_KEY                         = "add-some-key"
-DJANGO_AUTH_RECOVERY_CODES_SITE_NAME             = "some site name"
 
+# setting up the flags
+# ===========================
+# 📧 Email / Admin
+# ===========================
+DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL = "your-email-address-here"
+DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER = "your-host-email-address-here"
+DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME = "username here"
+DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG = False
 
-# Default values (can be left as-is or overridden)
-DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP         = True
-DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS              = 30
-DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE                       = 20
-DJANGO_AUTH_RECOVERY_CODE_PER_PAGE                          = 5
-DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS       = 30
+# ===========================
+# 🔑 Security / Keys
+# ===========================
+DJANGO_AUTH_RECOVERY_KEY = "add-recovery-key-here"
+
+# ===========================
+# 📜 Audit / Retention
+# ===========================
+DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP = True
+DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS = 30
+DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS = 30
 DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER = True
-DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT        = "login_user"  # redirect to any page e.g. found in url
-DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG                   = True
-DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE      = True
-DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN                    = 3600
-DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE                = 1000
-DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX                        = 3600
-DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN                        = 1
-DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL                        = 300
-DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT            = 3600
-DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER              = 2
-DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME                = "recovery_codes"
-DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT                   = "txt"
-DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS               = 3
-DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN           = -1
+
+# ===========================
+# ⏳ Rate Limiting / Cooldowns
+# ===========================
+DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE = True
+DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN = 100  # five minutes minutes lock down
+DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT = 3600
+DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER = 2
+DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS = 5
+
+# ===========================
+# 📦 Caching
+# ===========================
+DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX = 3600
+DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN = 1
+DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL = 3600
+
+# ===========================
+# 📊 Pagination / Limits
+# ===========================
+DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE = 20
+DJANGO_AUTH_RECOVERY_CODE_PER_PAGE = 5
+DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE = 400
+DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN = -1
+
+# ===========================
+# 📂 Files / Naming
+# ===========================
+DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME = "recovery_codes"
+DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT = "txt"
+
+# ===========================
+# 🌍 Site / Redirects
+# ===========================
+DJANGO_AUTH_RECOVERY_CODES_SITE_NAME = "This is a demo tutorial"
+DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT = "logout_user"
 
 
+
+# ===========================
+# 🌍 REcovery code email sucess message
+# ===========================
+DJANGO_AUTH_RECOVERY_CODE_EMAIL_SUCCESS_MSG = "Your recovery codes email has been successfully delivered."
+
+
+# add the email backend testing
+EMAIL_BACKEND = "django.core.mail.backends.filebased.EmailBackend"
+EMAIL_FILE_PATH = BASE_DIR / "sent_emails"
+Path(EMAIL_FILE_PATH).mkdir(parents=True, exist_ok=True)
+
+
+# Add the Q_CLUSTER for django-1
+
+Q_CLUSTER = {
+    'name': 'recovery_codes',
+    'workers': 2,
+    'timeout': 300,   # 5 minutes max per task
+    'retry': 600,     # retry after 10 minutes if task fails (retry must be greater than timeout)
+    'recycle': 500,
+    'compress': True,
+    'cpu_affinity': 1,
+    'save_limit': 250,
+    'queue_limit': 500,
+    'orm': 'default',
+}
+
+
+# we need to tell EmailSender where to find the templates dir
+
+import django_auth_recovery_codes
+from pathlib import Path
+
+# Get the path to the installed package
+PACKAGE_DIR = Path(django_auth_recovery_codes.__file__).parent
+
+# Define the templates directory within the package
+MYAPP_TEMPLATES_DIR = PACKAGE_DIR / "templates" / "django_auth_recovery_codes"
+
+
+# we need to add in the logging
+
+from django_auth_recovery_codes.loggers.logger_config import DJANGO_AUTH_RECOVERY_CODES_LOGGING
+
+
+LOGGING = DJANGO_AUTH_RECOVERY_CODES_LOGGING
 ```
 
 ### Add a Q_CLUSTER 
@@ -2372,7 +2390,342 @@ If you want to delete all codes **without waiting for the scheduler**, delete th
 1. Mark individual codes as **invalid** or **for deletion** in the admin interface, do **not manually delete** them.
 2. To delete all codes immediately, delete the **parent batch**, this is safer and ensures proper cleanup.
 
+
 ---
+
+
+## Django-Q Flush Tasks Command
+
+A custom Django management command to safely clear Django-Q tasks and scheduler entries.
+
+- This command allows you to remove **failed tasks**, **scheduler entries**, or **all tasks** from the Django-Q queue.
+- This management command allows you to safely flush Django-Q tasks and scheduler entries directly from the command line, with confirmation prompts to prevent accidental data loss.
+
+Why is this needed?
+
+Flushing tasks via the command line allows you to clear all tasks in the queue useful if an error occurs,  or if you want to remove invalid or outdated schedulers and start fresh and quickly without going through the UI.
+
+
+## Usage
+
+Run the command using `manage.py`:
+
+```bash
+python manage.py flush_tasks 
+````
+
+### Options
+
+* `--failed` : Clear only the failed tasks.
+* `--scheduler` : Clear only the scheduler entries.
+* `--all` : Clear all tasks (failed and scheduled).
+* `--yes` : Skip confirmation prompts (use with caution).
+* `--noinput` : Supress the confirmation prompt
+
+### Confirmation Prompt
+
+By default, the command asks for confirmation before performing the flush. Example:
+
+```bash
+python manage.py flush_tasks --all
+Are you sure you want to clear all tasks? [y/N]: yes
+Cleared 5 task(s).
+```
+
+If you answer `N` or press Enter, the operation is cancelled.
+
+---
+
+## Quick Start Examples
+
+* **Clear failed tasks only:**
+
+```bash
+python manage.py flush_tasks --failed
+Are you sure you want to clear failed tasks? [y/N]: yes
+Cleared 3 failed task(s).
+```
+
+* **Clear scheduler entries only:**
+
+```bash
+python manage.py flush_tasks --scheduler
+Are you sure you want to clear scheduler tasks? [y/N]: yes
+Cleared 2 scheduler task(s).
+```
+
+* **Clear all tasks:**
+
+```bash
+python manage.py flush_tasks --all
+Are you sure you want to clear all tasks? [y/N]: yes
+Cleared 5 task(s).
+```
+
+---
+
+## Automated Use (No Confirmation)
+
+If you need to flush tasks automatically (e.g., in scripts, cron jobs, or CI/CD pipelines), use the `--yes` flag to bypass the confirmation prompt:
+
+```bash
+python manage.py flush_tasks --all --noinput
+Cleared 5 task(s).
+```
+
+## Using without
+* `--noinput` can be combined with any of the options (`--failed`, `--scheduler`, `--all`).
+* Use this with caution, as tasks will be removed without user confirmation.
+
+---
+
+## Notes
+
+* Only the management command file is required for command-line usage.
+* Helper functions can be included in the same file or imported from a `utils/` folder if preferred.
+* Use the `--yes` flag carefully in production environments.
+* This tool is particularly useful to remove old, stuck, or failed tasks that could interfere with Django-Q operation.
+
+---
+
+
+5. **Django-Q not installed**
+
+   * Install via pip:
+
+```bash
+pip install django-q
+```
+
+* Ensure `django_q` is included in `INSTALLED_APPS` and configured in `settings.py`.
+
+## Notes
+
+* This command works for Django-Q tasks only. It does not affect other background jobs or Celery tasks.
+* Always use the confirmation prompt when clearing all tasks to avoid accidental data loss.
+* Keep the `flush_tasks.py` file in `management/commands` for command-line use.
+
+-
+
+[⬆ Back to Top](#top)
+
+---
+
+
+## Quickstart Video Walkthrough
+
+The following flags were used in the demo.  
+You can **copy and paste** them into your `settings.py` file and modify them for your own use.
+
+```python
+# =======================================
+# Adding the flags needed for the app
+# =======================================
+
+# ===========================
+# 📧 Email / Admin
+# ===========================
+
+DJANGO_AUTH_RECOVERY_CODES_ADMIN_SENDER_EMAIL = "your-email-here"
+DJANGO_AUTH_RECOVERY_CODE_ADMIN_EMAIL_HOST_USER = "your host email here"
+DJANGO_AUTH_RECOVERY_CODE_ADMIN_USERNAME = "your name"
+DJANGO_AUTH_RECOVERY_CODE_STORE_EMAIL_LOG = False
+
+# ===========================
+# 🔑 Security / Keys
+# ===========================
+DJANGO_AUTH_RECOVERY_KEY = 'Recovery-key-here'
+
+# ===========================
+# 📜 Audit / Retention
+# ===========================
+DJANGO_AUTH_RECOVERY_CODE_AUDIT_ENABLE_AUTO_CLEANUP = True
+DJANGO_AUTH_RECOVERY_CODE_AUDIT_RETENTION_DAYS = 30
+DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_RETENTION_DAYS = 30
+DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER = True
+
+# ===========================
+# ⏳ Rate Limiting / Cooldowns
+# ===========================
+
+DJANGO_AUTH_RECOVERY_CODES_AUTH_RATE_LIMITER_USE_CACHE = True
+DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN = 300  # 5-minute lock down
+DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT = 3600
+DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER = 2
+DJANGO_AUTH_RECOVERY_CODES_MAX_LOGIN_ATTEMPTS = 5
+
+# ===========================
+# 📦 Caching
+# ===========================
+
+DJANGO_AUTH_RECOVERY_CODES_CACHE_MAX = 3600
+DJANGO_AUTH_RECOVERY_CODES_CACHE_MIN = 1
+DJANGO_AUTH_RECOVERY_CODES_CACHE_TTL = 3600
+
+# ===========================
+# 📊 Pagination / Limits
+# ===========================
+
+DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE = 20
+DJANGO_AUTH_RECOVERY_CODE_PER_PAGE = 1
+DJANGO_AUTH_RECOVERY_CODES_BATCH_DELETE_SIZE = 400
+DJANGO_AUTH_RECOVERY_CODES_MAX_DELETIONS_PER_RUN = -1
+
+# ===========================
+# 📂 Files / Naming
+# ===========================
+
+DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FILE_NAME = "recovery_codes"
+DJANGO_AUTH_RECOVERY_CODES_DEFAULT_FORMAT = "txt"
+
+# ===========================
+# 🌍 Site / Redirects
+# ===========================
+
+DJANGO_AUTH_RECOVERY_CODES_SITE_NAME = "This is a demo tutorial page"
+DJANGO_AUTH_RECOVERY_CODE_REDIRECT_VIEW_AFTER_LOGOUT = "home"  # redirect to a different page
+
+# ===========================
+# 💬 Recovery Code Email Success Message
+# ===========================
+
+DJANGO_AUTH_RECOVERY_CODE_EMAIL_SUCCESS_MSG = "Hey, what's up? Your recovery codes have been sent to your email!"
+
+# ===========================
+# 🧪 Email Backend (for testing)
+# ===========================
+
+# Use Django's file-based email backend for testing purposes
+
+EMAIL_BACKEND = "django.core.mail.backends.filebased.EmailBackend"
+EMAIL_FILE_PATH = BASE_DIR / "sent_emails"
+Path(EMAIL_FILE_PATH).mkdir(parents=True, exist_ok=True)
+
+# ===========================
+# ⚙️ Django-Q Configuration
+# ===========================
+
+# Add the Q Cluster needed for Django-Q task scheduling
+
+Q_CLUSTER = {
+    'name': 'recovery_codes',
+    'workers': 2,
+    'timeout': 300,   # 5 minutes max per task
+    'retry': 600,     # retry after 10 minutes if a task fails (retry must be greater than timeout)
+    'recycle': 500,
+    'compress': True,
+    'cpu_affinity': 1,
+    'save_limit': 250,
+    'queue_limit': 500,
+    'orm': 'default',
+}
+
+# ===========================
+# 🧭 Template Paths
+# ===========================
+# Add the path templates so that EmailSender knows where to look for the templates
+
+import django_auth_recovery_codes
+from pathlib import Path
+
+# Get the path to the installed package
+PACKAGE_DIR = Path(django_auth_recovery_codes.__file__).parent
+
+# Define the templates directory within the package
+MYAPP_TEMPLATES_DIR = PACKAGE_DIR / "templates" / "django_auth_recovery_codes"
+
+
+
+# ===========================
+# 🪵 Logging
+# ===========================
+# Add logging configuration to capture and log errors
+from django_auth_recovery_codes.loggers.logger_config import DJANGO_AUTH_RECOVERY_CODES_LOGGING
+LOGGING = DJANGO_AUTH_RECOVERY_CODES_LOGGING
+```
+
+### Setup
+
+Let’s get started! For this tutorial, we’ll install the package directly from GitHub since it hasn’t been published to PyPI yet:
+
+```bash
+pip install git+https://github.cUku1/django_2fa_recovery_codes.git
+````
+
+> 💡 **Note:** By the time this video goes live, the package will be available on PyPI. Then you can install it the usual way with:
+>
+> ```bash
+> pip install django_auth_recovery_codes
+> ```
+
+After installation, you’re ready to follow along with the rest of the walkthrough.
+
+[Watch the setup walkthrough here](https://www.loom.com/share/c85010766fc84f3481a9d720b5cbeb3e?sid=8c6263bb-cc7d-4b45-a9e9-da7eb92abbf5)
+
+
+### App Demonstration Walkthrough
+
+Check out the app in action in the video below:
+
+[▶ Watch the app demonstration walkthrough](https://www.loom.com/share/fe73afdd93de413aad934de594446ace?sid=9de90a08-d920-4bd4-9443-cb61caf3c7e9)
+
+
+
+### View How Emails Are Displayed to the User (Backend)
+
+> **Note:** For demonstration purposes, we are sending the emails to the backend. This means there is no styling applied here. In your own email inbox, they will appear fully styled.
+
+[📧 View how the emails are sent to the user](https://www.loom.com/share/f762e0967f154f2b8dc0dc3bbcafeebd?sid=936405f8-c16f-4edf-9e2f-4b4039229724)
+
+
+### Add Django-Q to Schedule Task Deletion
+
+This section provides a walkthrough on how to set up **Django-Q** to automatically delete tasks after completion.
+
+[⚙️ Watch how to use Django-Q to delete tasks](https://www.loom.com/share/afb9b7a4073844f6b5e03fbdfda19bec?sid=b1e08b43-99aa-40aa-aa9e-85e835294f44)
+
+
+
+### Some Flag Demonstrations
+
+Here are a few examples of how you can configure different flags in the application demonstrated in video walkthrought.
+
+- The first flag limits the UI to display **only 20 records** at a time, even if more exist.  
+- The second flag specifies that **only one record is shown per page**, resulting in 20 pages each showing one record, in this example.
+
+```bash
+DJANGO_AUTH_RECOVERY_CODE_MAX_VISIBLE = 20
+DJANGO_AUTH_RECOVERY_CODE_PER_PAGE = 1
+````
+
+* You can also customise the message displayed after a user emails themselves a copy of their recovery codes:
+
+```bash
+DJANGO_AUTH_RECOVERY_CODE_EMAIL_SUCCESS_MSG = "Hey, what's up? Your recovery codes have been sent to your email!"
+```
+
+Plus a few other examples are demonstrated in the video below:
+
+[🎛️ Watch flag demonstrations](https://www.loom.com/share/f9a809d42b4f413dbe8722638592ac44?sid=90d94191-ed56-4379-ab21-2510b0e70a24)
+
+
+### Optional: Add Emails to the Model
+
+You can optionally add emails to the database for enhanced tracking or custom email management.
+
+[📨 Watch how to add emails to the database](https://www.loom.com/share/aa58598b3e7242e4942a43d5fafab2a8?sid=f572ecf4-35fa-4ff3-bcbf-e9dc0f2ff465)
+
+
+
+### Flushing the Tasks
+
+Flushing tasks via the command line allows you to clear all tasks in the queue m useful if an error occurs,  
+or if you want to remove invalid or outdated schedulers and start fresh.
+
+[🧹 Watch how to flush the task scheduler](https://www.loom.com/share/aaf65308a451468dbb38accbeeb648c7?sid=b9bc295b-15dd-41ca-b75c-cd14776ae1bd)
+
+
+
 
 ## Known Issues
 
