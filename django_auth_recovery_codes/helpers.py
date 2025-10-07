@@ -1,6 +1,9 @@
 import logging
 from uuid import UUID
 
+from django.utils.timezone import localtime
+from datetime import date, datetime
+
 from django_auth_recovery_codes.models import RecoveryCodesBatch
 from django_auth_recovery_codes.utils.errors.enforcer import enforce_types
 
@@ -115,6 +118,24 @@ class PurgedStatsCollector:
                                             )
 
 
+
+    def _format_datetime(value):
+        """Return a timezone-aware ISO string for datetime, or None."""
+
+        if isinstance(value, datetime):
+            return localtime(value).isoformat()
+        if isinstance(value, date):
+            return value.isoformat()
+        return None
+    
+    def _to_json_safe(self, value):
+        """Convert datetimes and UUIDs into serialisable string forms."""
+        if isinstance(value, datetime):
+            return self._format_datetime(value)
+        if isinstance(value, UUID):
+            return str(value)
+        return value
+    
     def _generate_purged_batch_code_json_report(self, batch: RecoveryCodesBatch, purged_count: int, is_empty: bool, batch_id: UUID) -> dict:
         """
         Creates a JSON report for a purged batch of 2FA recovery codes.
@@ -180,23 +201,23 @@ class PurgedStatsCollector:
         """
 
         purged_batch_info = {
-                                "id": batch_id,
-                                "number_issued": batch.number_issued,
-                                "number_removed": purged_count,
-                                "is_batch_empty": is_empty,
-                                "number_used": batch.number_used,
-                                "number_remaining_in_batch": batch.active_codes_remaining,
-                                "user_issued_to": batch.user.username,
-                                "batch_creation_date": batch.created_at,
-                                "last_modified": batch.modified_at,
-                                "expiry_date": batch.expiry_date,
-                                "deleted_at": batch.deleted_at,
-                                "deleted_by": batch.deleted_by,
-                                "was_codes_downloaded": batch.downloaded,
-                                "was_codes_viewed": batch.viewed,
-                                "was_codes_email": batch.emailed,
-                                "was_code_generated": batch.generated,
-                }
+            "id": self._to_json_safe(batch_id),
+            "number_issued": batch.number_issued,
+            "number_removed": purged_count,
+            "is_batch_empty": bool(is_empty),
+            "number_used": batch.number_used,
+            "number_remaining_in_batch": batch.active_codes_remaining,
+            "user_issued_to": getattr(batch.user, "username", str(batch.user) if batch.user else None),
+            "batch_creation_date": self._to_json_safe(batch.created_at),
+            "last_modified": self._to_json_safe(batch.modified_at),
+            "expiry_date": self._to_json_safe(batch.expiry_date),
+            "deleted_at": self._to_json_safe(batch.deleted_at),
+            "deleted_by": getattr(batch.deleted_by, "username", str(batch.deleted_by) if batch.deleted_by else None),
+            "was_codes_downloaded": bool(batch.downloaded),
+            "was_codes_viewed": bool(batch.viewed),
+            "was_codes_email": bool(batch.emailed),
+            "was_code_generated": bool(batch.generated),
+        }
 
         self.batches_report.append(purged_batch_info)
         return purged_batch_info
