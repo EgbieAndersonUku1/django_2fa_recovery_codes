@@ -2,6 +2,8 @@
 ![Security](https://img.shields.io/badge/Security-213--bit-brightgreen)
 ![Brute Force](https://img.shields.io/badge/Brute--force-Impractical-red)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
+[![Downloads](https://static.pepy.tech/badge/django-auth-recovery-codes)](https://pepy.tech/project/django-auth-recovery-codes)
+
 
 
 ## 🔐 Django 2FA Recovery Codes
