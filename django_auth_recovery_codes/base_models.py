@@ -51,7 +51,7 @@ class AbstractBaseModel(models.Model):
     def is_user_valid(user):
         """Takes a user and checks if the user instance provided is an instance of User"""
         if not isinstance(user, User):
-            raise TypeError(f"The user instance is not instance of User. Expected user to be an instance of user but got {type(user).__name__}")
+            raise TypeError(construct_raised_error_msg("user", expected_types=User, value=user))
         return True
     
     @classmethod

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+
+## [1.0.1] - 7/10/25
+
+- Fixed an issue where `resp.BATCH` became undefined in `handleCanGenerateCodeSuccessUI` due to variable shadowing.
+  - The response from `sendPostFetchWithoutBody(...)` was previously assigned to `resp`, overwriting the original response.
+  - Now it is assigned to `postResp`, preventing the batch from being shadowed and ensuring `updateBatchHistorySection` works correctly.
+  - This allows when the code is generated the record is also generated at the same time.
+
+
+
 ## [1.0.1] - 7/10/25
 Removed if the conversion for native datetime to a string which could potential cause Django-q to choke
 ran 
