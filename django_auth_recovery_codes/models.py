@@ -5,7 +5,7 @@ import uuid
 
 
 
-from typing                      import Any, Optional, Self, Tuple, Union
+from typing                      import Any, Optional, Self, Tuple
 from datetime                    import datetime
 from datetime                    import timedelta
 from django.contrib.auth         import get_user_model
@@ -76,6 +76,9 @@ class RecoveryCodeSetup(AbstractBaseModel):
     modified_at = models.DateTimeField(auto_now=True)
     success     = models.BooleanField(default=False)
 
+    def __str__(self):
+        return f"User has run first time setup: {self.success}"
+    
     def mark_as_verified(self):
         """Marks the setup as verified (success=True)."""
         self.success = True
