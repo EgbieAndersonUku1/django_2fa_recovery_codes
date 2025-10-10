@@ -72,4 +72,3 @@ class TestRecoveryCodeOneTimeSetupVerificationPostView(TestCase):
             response.content,
             {"SUCCESS": True, "MESSAGE": "", "ERROR": ""}
         )
-
