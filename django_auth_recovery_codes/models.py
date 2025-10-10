@@ -1220,10 +1220,8 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
          # if one fails none is created and the changes are rolled back
         with transaction.atomic(): 
             
-        
             batch_instance = cls(user=user, number_issued=batch_number)
            
-
             if days_to_expire:
                 batch_instance.expiry_date = schedule_future_date(days=days_to_expire)
 
@@ -1269,29 +1267,32 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
         Returns:
             dict: Status of verification, including success and other flags.
         """
-      
+        response_data = {
+                "SUCCESS": False,
+                "CREATED": CreatedStatus.NOT_CREATED.value,
+                "BACKEND_CONFIGURATION": BackendConfigStatus.NOT_CONFIGURED.value,
+                "SETUP_COMPLETE": SetupCompleteStatus.NOT_COMPLETE.value,
+                "IS_VALID": ValidityStatus.INVALID.value,
+                "USAGE": UsageStatus.FAILURE.value,
+                "FAILURE": False,
+                "MESSAGE": "",
+                "ERROR": "",
+            }
         cls.is_user_valid(user)
         
         if not isinstance(plaintext_code, str):
-            raise TypeError(f"Expected the plaintext code to be a string but got object with type {type(plaintext_code).__name__}")
-
-        response_data = {
-            "SUCCESS": True,
-            "CREATED": CreatedStatus.NOT_CREATED.value,
-            "BACKEND_CONFIGURATION": BackendConfigStatus.NOT_CONFIGURED.value,
-            "SETUP_COMPLETE": SetupCompleteStatus.NOT_COMPLETE.value,
-            "IS_VALID": ValidityStatus.INVALID.value,
-            "USAGE": UsageStatus.FAILURE.value,
-            "FAILURE": True,
-        }
-
+            raise TypeError(construct_raised_error_msg("plaintext_code", expected_types=str, value=plaintext_code))
+        
+        response_data.update({
+                "SUCCESS": True,
+            })
         recovery_code_setup = RecoveryCodeSetup.get_by_user(user)
 
         if recovery_code_setup is not None and recovery_code_setup.is_setup():
             response_data.update({
                 "SUCCESS": True,
                 "CREATED": CreatedStatus.ALREADY_CREATED.value,
-                "BACKEND_CONFIGURATION": BackendConfigStatus.CONFIGURED.value,
+                "BACKEND_CONFIGURATION": BackendConfigStatus.ALREADY_CONFIGURED.value,
                 "SETUP_COMPLETE": SetupCompleteStatus.ALREADY_COMPLETE.value,
                 "IS_VALID": ValidityStatus.VALID.value,
                 "USAGE": UsageStatus.SUCCESS.value,
