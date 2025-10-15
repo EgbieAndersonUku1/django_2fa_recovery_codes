@@ -1,6 +1,6 @@
 from django.test import TestCase
 from django.utils import timezone
-from datetime import timedelta
+from datetime import datetime, timedelta
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
@@ -16,6 +16,40 @@ User = get_user_model()
 # ----------------------------------------
 # Generation Helpers
 # ----------------------------------------
+def _assert_update_code_count(
+    test_case,
+    batch_instance,
+    method_name: str,
+    field_name: str
+):
+    """
+    Helper to test batch update count methods.
+
+    - Checks that the count field increments by 1 when `save=True`.
+    - Checks that calling the method without `save` increments in-memory but not in the database.
+
+    Args:
+        test_case: The test instance (self)
+        batch_instance: The RecoveryCodesBatch instance
+        method_name: Name of the update method as string (e.g., 'update_used_code_count')
+        field_name: Name of the count field as string (e.g., 'number_used')
+    """
+    initial_value = getattr(batch_instance, field_name)
+    test_case.assertEqual(initial_value, 0, msg=f"Initial {field_name} should be 0")
+
+    # Increment and save immediately
+    getattr(batch_instance, method_name)(save=True)
+    batch_instance.refresh_from_db()
+    test_case.assertEqual(getattr(batch_instance, field_name), 1,
+                          msg=f"{field_name} should increment to 1 after save=True")
+
+    # Increment without saving (should only update in-memory)
+    getattr(batch_instance, method_name)() # increment the method but without saving
+    batch_instance.refresh_from_db()
+    test_case.assertEqual(getattr(batch_instance, field_name), 2,
+                          msg=f"{field_name} should not increment in DB when save=False")
+
+
 def _recovery_codes_generate(user, use_with_expiry_days: bool = False, days_to_expire: int = None):
     """
     Generates a batch of recovery codes for a given user.
@@ -317,8 +351,6 @@ class RecoveryCodesBatchMethodTest(TestCase):
         # Get the first batch for the user after it has been marked for deletion
         user_batch = RecoveryCodesBatch.objects.prefetch_related("recovery_codes").filter(user=self.user).first()
         _assert_batch_codes_marked_for_deletion(test_case=self, batch=user_batch, should_be_marked=True)
-
-
     def test_mark_as_viewed_method(self):
         """
         GIVEN that the developer sets the model batch method viewed to True
@@ -372,7 +404,6 @@ class RecoveryCodesBatchMethodTest(TestCase):
 
         self.assertTrue(self.batch_instance.emailed)
 
-        
         # check if the others are not marked as True
         self.assertFalse(self.batch_instance.viewed)
         self.assertFalse(self.batch_instance.downloaded)
@@ -380,7 +411,6 @@ class RecoveryCodesBatchMethodTest(TestCase):
         # generated is automatically marked as True when created
         # Check if is not automatically marked as False but still True
         self.assertTrue(self.batch_instance.generated)
-
 
     def test_get_by_user_method(self):
         """
@@ -440,7 +470,131 @@ class RecoveryCodesBatchMethodTest(TestCase):
         cache_values = self.batch_instance.get_cache_values()
         _assert_cache_values_valid(self, cache_values, expect_active=False)
 
+    def test_expiry_threshold_method(self):
+        """
+        Test the `get_expiry_threshold` method of RecoveryCodesBatch.
+
+        - Ensure TypeError is raised if `days` is not an integer or is None.
+        - Ensure the method returns a datetime object representing the threshold in the past.
+        
+        For example, if `days=30` is passed, the method returns a datetime object
+        representing 30 days before the current time. This is used to determine
+        which recovery codes have expired based on the threshold.
+        """
+        expected_error_msg = construct_raised_error_msg("days", expected_types=int, value="one_day")
+        expected_non_error_msg = "Argument `days` cannot be None."
+
+        # Type checks
+        with self.assertRaises(TypeError) as context:
+            self.batch_instance.get_expiry_threshold(days="one_day")
+        self.assertEqual(str(context.exception), expected_error_msg)
+
+        with self.assertRaises(TypeError) as context:
+            self.batch_instance.get_expiry_threshold(days=None)
+        self.assertEqual(str(context.exception), expected_non_error_msg)
+
+        # Valid days value
+        one_day_in_the_past = self.batch_instance.get_expiry_threshold(days=1)
+
+        # Check return type
+        self.assertIsInstance(one_day_in_the_past, datetime)
+
+        # Check that the returned datetime is approximately 1 day in the past
+        expected_datetime = timezone.now() - timedelta(days=1)
+        self.assertAlmostEqual(one_day_in_the_past.timestamp(), expected_datetime.timestamp(), delta=2)
+
+    def test_terminal_status_method(self):
+        """
+        Test whether the method returns `pending delete` and  `invalidate` values. 
+        The is used by the class `RecoveryCodesBatch` to check if the code or codes
+        been removed have actually been marked as `invalid` or `pending deletion`
+        """
+        
+        EXPECTED_LENGTH = 2
+        terminal_status = self.batch_instance.terminal_statuses()
+        self.assertIsNotNone(terminal_status, msg="Expected a list but got none")
+        self.assertIsInstance(terminal_status, list, construct_raised_error_msg("terminal status", expected_types=list, value=terminal_status))
+
+        self.assertEqual(len(terminal_status), EXPECTED_LENGTH)
+
+        self.assertIn(Status.PENDING_DELETE, terminal_status)
+        self.assertIn(Status.INVALIDATE, terminal_status)
+
+    def test_update_used_code_count_method(self):
+        """Test updating number_used count."""
+        _assert_update_code_count(self, self.batch_instance, "update_used_code_count", "number_used")
+
+    def test_update_deleted_code_count_method(self):
+        """Test updating number_removed count."""
+        _assert_update_code_count(self, self.batch_instance, "update_delete_code_count", "number_removed")
+
+    def test_update_invalidate_code_count_method(self):
+        """Test updating number_invalidated count."""
+        _assert_update_code_count(self, self.batch_instance, "update_invalidate_code_count", "number_invalidated")
 
     def tearDown(self):
         RecoveryCodesBatch.objects.filter(user=self.user).delete()
-      
+
+
+
+class TestUpdateFieldCounter(TestCase):
+    """
+    Tests for the internal `_update_field_counter` helper method.
+
+    Although this is a private method and normally wouldn't be tested, however, this
+    is tested directly because it manages the atomic and in-memory update logic for 
+    several public methods:
+
+    - `update_used_code_count`
+    - `update_delete_code_count`
+    - `update_invalidate_code_count`
+
+    Ensuring its correctness prevents subtle regressions in database-level counter behaviour.
+    """
+
+    def setUp(self):
+        self.user = create_user("counter_user", email="counter_user@example.com")
+        self.batch = RecoveryCodesBatch.objects.create(
+            user=self.user,
+            number_used=0,
+            number_removed=0,
+            number_invalidated=0,
+        )
+
+    def test_atomic_increment_persists_to_database(self):
+        """Ensure `atomic=True` performs a DB-level F() increment."""
+        self.batch._update_field_counter("number_removed", atomic=True)
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.number_removed, 1, msg="Atomic increment should persist to DB")
+
+    def test_non_atomic_increment_is_in_memory_only(self):
+        """Ensure `atomic=False` increments only in memory (not saved)."""
+
+        self.batch._update_field_counter("number_invalidated", atomic=False)
+        self.assertEqual(self.batch.number_invalidated, 1, msg="In-memory increment should update instance value")
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.number_invalidated, 0, msg="DB should not update when atomic=False")
+
+    def test_non_atomic_with_save_persists_to_database(self):
+        """Ensure `save=True` with `atomic=False` persists the increment to DB."""
+
+        self.batch._update_field_counter("number_used", atomic=False, save=True)
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.number_used, 1, msg="Save=True should persist in-memory increment")
+
+    def test_invalid_field_name_raises_attribute_error(self):
+        """Ensure AttributeError is raised for invalid or missing fields."""
+
+        with self.assertRaises(AttributeError) as context:
+            self.batch._update_field_counter("invalid_field")
+
+        self.assertIn("has no field 'invalid_field'", str(context.exception))
+
+    def test_none_field_value_raises_value_error(self):
+        """Ensure ValueError is raised when field value is None."""
+
+        self.batch.number_used = None
+        with self.assertRaises(ValueError) as context:
+            self.batch._update_field_counter("number_used", atomic=False)
+
+        self.assertIn("Field 'number_used' is None, cannot increment.", str(context.exception))

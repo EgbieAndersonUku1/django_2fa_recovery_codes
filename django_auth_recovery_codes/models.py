@@ -506,6 +506,8 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
     DELETED_BY_FIELD         = "deleted_by"
     REQUEST_ATTEMPT_FIELD    = "requested_attempt"
     NUMBER_USED_FIELD        = "number_used"
+    NUMBER_REMOVE_FIELD      = "number_removed"
+    NUMBER_INVALIDATE_FIELD  = "number_invalidated"
     
     class Meta:
         ordering             = ["-created_at"]
@@ -793,9 +795,6 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
                 if `fields_list` is not a list or `save` is not a boolean.
             
         """
-        if not (days, int):
-            raise ValueError(f"Days must be an int. Expected an int got {type(int).__name__}")
-        
         return timezone.now() - timedelta(days=days) 
     
     @staticmethod
@@ -902,7 +901,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
         self.status = Status.INVALIDATE
         
         # Increment counter safely (atomic by default)
-        self._update_field_counter("number_invalidated", save=save, atomic=True)
+        self._update_field_counter(self.NUMBER_INVALIDATE_FIELD, save=save, atomic=True)
         return self
     
     def update_delete_code_count(self, save: bool = False) -> RecoveryCode:
@@ -952,7 +951,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
         self.status = Status.INVALIDATE
         
         # Increment counter safely (atomic by default)
-        self._update_field_counter("number_removed", save=save, atomic=True)
+        self._update_field_counter(self.NUMBER_REMOVE_FIELD, save=save, atomic=True)
         return self
        
     @enforce_types()
