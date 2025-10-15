@@ -112,6 +112,7 @@ The premises of this resuable application, is that it takes any Django applicati
   * [Successful Login](#successful-login)
   * [Existing Project Setup](#2-existing-project-setup)
   * [Scheduling a Code Removal Using Django-Q](#scheduling-a-code-removal-using-django-q)
+  * [Running Tests](#running-tests)
   * [Warning ⚠](#warning)
 * [Known Issues](#known-issues)
 * [License](#license)
@@ -2363,6 +2364,12 @@ Configure scheduler:
 ```
 
 You can also run a scheduler to remove the audit reports for `Recovery Code` by using `Recovery code audit schedulers`. The audits are store in the `Recovery code Audit` model. The steps are same as the above steps.
+
+
+### Running Tests
+
+Ensure you have a `settings.py` file with the default configuration flags as shown in the walkthrough. You may use your own variable values, but all flags must exist, otherwise tests will fail.  
+These configurations are required for the app to function correctly.
 
 
 ### Warning

@@ -141,7 +141,8 @@ def _generate_code_batch(request, generate_with_expiry_date):
 def generate_recovery_code_fetch_helper(request: HttpRequest, 
                                         cache_key: str,  
                                         generate_with_expiry_date: bool = False,
-                                        regenerate_code = False):
+                                        regenerate_code = False
+                                        ):
     """
     Generate recovery codes for a user, optionally with an expiry date.
 
