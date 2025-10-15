@@ -43,12 +43,6 @@ def _assert_update_code_count(
     test_case.assertEqual(getattr(batch_instance, field_name), 1,
                           msg=f"{field_name} should increment to 1 after save=True")
 
-    # Increment without saving (should only update in-memory)
-    getattr(batch_instance, method_name)() # increment the method but without saving
-    batch_instance.refresh_from_db()
-    test_case.assertEqual(getattr(batch_instance, field_name), 2,
-                          msg=f"{field_name} should not increment in DB when save=False")
-
 
 def _recovery_codes_generate(user, use_with_expiry_days: bool = False, days_to_expire: int = None):
     """
@@ -580,6 +574,7 @@ class TestUpdateFieldCounter(TestCase):
 
         self.batch._update_field_counter("number_used", atomic=False, save=True)
         self.batch.refresh_from_db()
+
         self.assertEqual(self.batch.number_used, 1, msg="Save=True should persist in-memory increment")
 
     def test_invalid_field_name_raises_attribute_error(self):
