@@ -16,6 +16,22 @@ User = get_user_model()
 # ----------------------------------------
 # Generation Helpers
 # ----------------------------------------
+
+def _assert_count_in_batches_matches_expected_count(test_case: TestCase, 
+                                                    batches: RecoveryCodesBatch, 
+                                                    expected_code_count: int):
+    """
+    Assert that the total number of recovery codes across all given batches matches the expected count.
+
+    GIVEN a collection of RecoveryCodesBatch instances
+    WHEN the recovery codes for each batch are counted and summed
+    THEN the total should equal the expected_code_count value provided
+    """
+
+    code_count =  sum([batch.recovery_codes.count() for batch in batches if batch])
+    test_case.assertEqual(code_count, expected_code_count)
+
+
 def _assert_update_code_count(
     test_case,
     batch_instance,
@@ -525,6 +541,71 @@ class RecoveryCodesBatchMethodTest(TestCase):
     def test_update_invalidate_code_count_method(self):
         """Test updating number_invalidated count."""
         _assert_update_code_count(self, self.batch_instance, "update_invalidate_code_count", "number_invalidated")
+
+    def test_if_create_new_batches_for_the_same_user_deactivates_the_old_batches(self):
+        """
+        GIVEN a user who creates four recovery code batches in succession, each containing five active codes
+        WHEN each new batch is created, the previous ones are automatically marked for deactivation
+        THEN only the most recently created batch remains active, and its codes are valid
+        AND if another user's batch already exists in the database, creating a new batch for the first user should not deactivate it
+
+        """
+
+        EXPECTED_NUMBER_OF_DEACTIVATED_BATCHES = 3
+        EXPECTED_NUMBER_OF_ACTIVE_BATCHES      = 1
+        EXPECTED_NUMBR_OF_BATCHES              = 4
+        EXPECTED_NUMBER_OF_DEACTIVATED_CODES   = 15
+        EXPECTED_NUMBER_OF_ACTIVATE_CODES      = 5
+      
+        test_user          = create_user(username="test_3")
+        another_user       = create_user(username="another_user")
+        batches_to_create  = 4
+
+        RecoveryCodesBatch.create_recovery_batch(user=another_user, num_of_codes_per_batch=5)
+
+        # GIVEN multiple batches exist for the same user
+        # WHEN a new batch is created
+        # THEN the previous batches for that user should be deactivated
+        #
+        # four batches are created 3 batches are now deactivated when  the fourth one is created meaning
+        # 1 batch is active
+        # Each batch has 5 codes that is 20 codes, however 3 batches are deactivated for the user
+        # meaning that the user has 15 codes deactivated codes (5 per batch) and 5 active codes from 
+        # the current active batch
+        for _ in range(batches_to_create):
+            RecoveryCodesBatch.create_recovery_batch(user=test_user, num_of_codes_per_batch=5) 
+      
+
+        # Fetch all batches once, then filter in-memory using the same queryset
+        batches_qs           = RecoveryCodesBatch.objects.prefetch_related("recovery_codes")
+
+        total_batches        = batches_qs.filter(user=test_user).count()
+        deactivated_batches  = batches_qs.filter(user=test_user, status=Status.PENDING_DELETE)
+        active_batches       = batches_qs.filter(user=test_user, status=Status.ACTIVE)
+
+        self.assertEqual(deactivated_batches.count(), EXPECTED_NUMBER_OF_DEACTIVATED_BATCHES)
+        self.assertEqual(active_batches.count(), EXPECTED_NUMBER_OF_ACTIVE_BATCHES)
+        self.assertEqual(total_batches, EXPECTED_NUMBR_OF_BATCHES)
+
+        _assert_count_in_batches_matches_expected_count(test_case=self,
+                                                        batches=deactivated_batches,
+                                                        expected_code_count=EXPECTED_NUMBER_OF_DEACTIVATED_CODES
+                                                        )
+
+        _assert_count_in_batches_matches_expected_count(test_case=self,
+                                                        batches=active_batches,
+                                                        expected_code_count=EXPECTED_NUMBER_OF_ACTIVATE_CODES
+                                                        )
+
+
+        # GIVEN a batch belonging to another user exists
+        # WHEN a new batch is created for the first user
+        # THEN the other user's batch should remain active and unaffected
+        another_user_batch = batches_qs.filter(user=another_user, status=Status.ACTIVE)
+        self.assertTrue(another_user_batch)
+        _assert_count_in_batches_matches_expected_count(test_case=self,
+                                                        batches=another_user_batch,
+                                                         expected_code_count=EXPECTED_NUMBER_OF_ACTIVATE_CODES )
 
     def tearDown(self):
         RecoveryCodesBatch.objects.filter(user=self.user).delete()
