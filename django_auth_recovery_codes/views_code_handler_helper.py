@@ -218,6 +218,7 @@ def generate_recovery_code_fetch_helper(request: HttpRequest,
                     "ITEM_PER_PAGE": settings.DJANGO_AUTH_RECOVERY_CODE_PER_PAGE,
                     "CAN_GENERATE": True,
                     "MESSAGE": "Your recovery code has been generated",
+                    "TOTAL_ISSUED": len(raw_codes)
                 }
             )
             view_logger.info(f"[RecoveryCodes] Generated new codes for user={user.id}, batch_id={batch_instance.id}")
