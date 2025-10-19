@@ -191,6 +191,7 @@ def generate_recovery_code_fetch_helper(request: HttpRequest,
             "MESSAGE": "",
             "CAN_GENERATE": False,
             "HAS_COMPLETED_SETUP": cache_data.get(HAS_SET_UP_FLAG),
+            "NEXT_WAIT_TIME_IN_SECONDS": 0,
             }
 
     try:
@@ -230,6 +231,7 @@ def generate_recovery_code_fetch_helper(request: HttpRequest,
                     "MESSAGE": f"You have to wait {time_to_wait} before you can request a new code",
                     "SUCCESS": True,
                     "CAN_GENERATE": False,
+                     "NEXT_WAIT_TIME_IN_SECONDS": wait_time,
                 }
             )
             view_logger.info(f"[RecoveryCodes] User={user.id} must wait {time_to_wait} before generating a new code")
@@ -418,7 +420,6 @@ def _process_recovery_code_response(plaintext_code: str, request: HttpRequest, f
               OPERATION_SUCCESS, TITLE, MESSAGE, and ALERT_TEXT.
     """
     recovery_code      = RecoveryCode.get_by_code_and_user(plaintext_code, request.user)
-    REQUIRED_FUNC_KEYS = {"delete", "deactivate"}
     
     if recovery_code is None:
         response_data =  _make_response(

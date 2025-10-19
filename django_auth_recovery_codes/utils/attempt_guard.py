@@ -160,8 +160,7 @@ class AttemptGuard(Generic[T]):
         data                       = get_cache_with_retry(cache_key, default={})
         attempts                   = data.get("attempts", 0)
         next_allowed_time          = data.get("remaining_seconds", 0)
-        print(f"next allowed time {next_allowed_time}")
-        
+            
         # Cached cooldown check
         if attempts > 0 and next_allowed_time > 0:
 
