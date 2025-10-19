@@ -1,6 +1,10 @@
+import inspect
+
 from functools import wraps
 from typing import get_type_hints, get_origin, get_args, Union
-import inspect
+
+from django_auth_recovery_codes.utils.errors.error_messages import construct_raised_error_msg
+
 
 def _is_instance_of(value, expected_type) -> bool:
     """
@@ -70,11 +74,8 @@ def enforce_types(non_null: bool = True):
                     continue
 
                 if not _is_instance_of(value, expected_type):
-                    raise TypeError(
-                        f"Argument `{arg_name}` expected type {expected_type}, "
-                        f"got {type(value).__name__}"
-                    )
-
+                    raise TypeError(construct_raised_error_msg(arg_name=arg_name, expected_types=expected_type, value=value))
+                
             return func(*args, **kwargs)
 
         return wrapper

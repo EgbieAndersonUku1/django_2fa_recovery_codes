@@ -141,7 +141,8 @@ def _generate_code_batch(request, generate_with_expiry_date):
 def generate_recovery_code_fetch_helper(request: HttpRequest, 
                                         cache_key: str,  
                                         generate_with_expiry_date: bool = False,
-                                        regenerate_code = False):
+                                        regenerate_code = False
+                                        ):
     """
     Generate recovery codes for a user, optionally with an expiry date.
 
@@ -190,6 +191,7 @@ def generate_recovery_code_fetch_helper(request: HttpRequest,
             "MESSAGE": "",
             "CAN_GENERATE": False,
             "HAS_COMPLETED_SETUP": cache_data.get(HAS_SET_UP_FLAG),
+            "NEXT_WAIT_TIME_IN_SECONDS": 0,
             }
 
     try:
@@ -217,6 +219,7 @@ def generate_recovery_code_fetch_helper(request: HttpRequest,
                     "ITEM_PER_PAGE": settings.DJANGO_AUTH_RECOVERY_CODE_PER_PAGE,
                     "CAN_GENERATE": True,
                     "MESSAGE": "Your recovery code has been generated",
+                    "TOTAL_ISSUED": len(raw_codes)
                 }
             )
             view_logger.info(f"[RecoveryCodes] Generated new codes for user={user.id}, batch_id={batch_instance.id}")
@@ -228,6 +231,7 @@ def generate_recovery_code_fetch_helper(request: HttpRequest,
                     "MESSAGE": f"You have to wait {time_to_wait} before you can request a new code",
                     "SUCCESS": True,
                     "CAN_GENERATE": False,
+                     "NEXT_WAIT_TIME_IN_SECONDS": wait_time,
                 }
             )
             view_logger.info(f"[RecoveryCodes] User={user.id} must wait {time_to_wait} before generating a new code")
@@ -416,7 +420,6 @@ def _process_recovery_code_response(plaintext_code: str, request: HttpRequest, f
               OPERATION_SUCCESS, TITLE, MESSAGE, and ALERT_TEXT.
     """
     recovery_code      = RecoveryCode.get_by_code_and_user(plaintext_code, request.user)
-    REQUIRED_FUNC_KEYS = {"delete", "deactivate"}
     
     if recovery_code is None:
         response_data =  _make_response(

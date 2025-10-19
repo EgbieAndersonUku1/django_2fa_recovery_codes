@@ -19,7 +19,6 @@ T = TypeVar("T", bound=models.Model)
 
 cooldown_manager = RecoveryCooldownManager(multiplier=MULTIPLIER, cutoff=CUTOFF, logger=attempt_guard_logger)
 
-
 User = get_user_model()
 
 
@@ -161,7 +160,7 @@ class AttemptGuard(Generic[T]):
         data                       = get_cache_with_retry(cache_key, default={})
         attempts                   = data.get("attempts", 0)
         next_allowed_time          = data.get("remaining_seconds", 0)
-        
+            
         # Cached cooldown check
         if attempts > 0 and next_allowed_time > 0:
 

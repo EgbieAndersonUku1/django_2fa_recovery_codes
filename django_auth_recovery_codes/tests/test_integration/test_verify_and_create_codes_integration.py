@@ -23,10 +23,10 @@ class TestRecoveryCodeIntegration(TestCase):
         self.CODES_PER_BATCH              = 10
         self.user                         = create_user()
         settings.DJANGO_AUTH_RECOVERY_KEY = "deterministic-recovery-key"
-        self.url                          = reverse("recovery_codes_verify")  # from your urls.py
+        self.url                          = reverse("recovery_codes_verify")  # from the urls.py file
 
         # Create a recovery batch for this user
-        self.raw_codes, self.batch_instance = RecoveryCodesBatch.create_recovery_batch(user=self.user, batch_number=self.CODES_PER_BATCH)
+        self.raw_codes, self.batch_instance = RecoveryCodesBatch.create_recovery_batch(user=self.user, num_of_codes_per_batch=self.CODES_PER_BATCH)
         self.recovery_code_setup            = RecoveryCodeSetup.get_by_user(self.user)
 
         self.assertTrue(self.raw_codes, "No recovery codes created for user")

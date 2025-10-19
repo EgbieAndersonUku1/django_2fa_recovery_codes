@@ -41,7 +41,6 @@ from django_auth_recovery_codes.utils.cache.safe_cache import (
     get_cache_with_retry,
     set_cache_with_retry,
 )
-from django_auth_recovery_codes.utils.cooldown_period    import RecoveryCooldownManager
 from django_auth_recovery_codes.utils.security.generator import generate_2fa_secure_recovery_code
 from django_auth_recovery_codes.utils.security.hash      import is_already_hashed, make_lookup_hash
 from django_auth_recovery_codes.utils.utils              import (
@@ -58,15 +57,7 @@ from django_auth_recovery_codes.loggers.loggers              import default_logg
 User   = get_user_model()
 logger = logging.getLogger("auth_recovery_codes")
 
-
-MULTIPLIER                  = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER", 2)
-CUTOFF                      = getattr(settings, "DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_CUTOFF_POINT", 3600)
 CAN_GENERATE_CODE_CACHE_KEY = "can_generate_code:{}"
-CAN_LOGIN_CACHE_KEY         = "can_login_{}"
-
-
-cooldown_manager = RecoveryCooldownManager(multiplier=MULTIPLIER, cutoff=CUTOFF, logger=default_logger)
-
 
 
 class RecoveryCodeSetup(AbstractBaseModel):
@@ -515,6 +506,8 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
     DELETED_BY_FIELD         = "deleted_by"
     REQUEST_ATTEMPT_FIELD    = "requested_attempt"
     NUMBER_USED_FIELD        = "number_used"
+    NUMBER_REMOVE_FIELD      = "number_removed"
+    NUMBER_INVALIDATE_FIELD  = "number_invalidated"
     
     class Meta:
         ordering             = ["-created_at"]
@@ -594,7 +587,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
 
         >>> user = User.objects.get(username="eu") # assume that you already have a user model
         >>> can_generate_new_codes = Recovery.can_generate_new_code(user)
-        >>> True
+        >>> True, wait_time
         >>>
         """
         cls.is_user_valid(user)
@@ -802,9 +795,6 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
                 if `fields_list` is not a list or `save` is not a boolean.
             
         """
-        if not (days, int):
-            raise ValueError(f"Days must be an int. Expected an int got {type(int).__name__}")
-        
         return timezone.now() - timedelta(days=days) 
     
     @staticmethod
@@ -911,7 +901,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
         self.status = Status.INVALIDATE
         
         # Increment counter safely (atomic by default)
-        self._update_field_counter("number_invalidated", save=save, atomic=True)
+        self._update_field_counter(self.NUMBER_INVALIDATE_FIELD, save=save, atomic=True)
         return self
     
     def update_delete_code_count(self, save: bool = False) -> RecoveryCode:
@@ -961,7 +951,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
         self.status = Status.INVALIDATE
         
         # Increment counter safely (atomic by default)
-        self._update_field_counter("number_removed", save=save, atomic=True)
+        self._update_field_counter(self.NUMBER_REMOVE_FIELD, save=save, atomic=True)
         return self
        
     @enforce_types()
@@ -1195,7 +1185,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
 
     @classmethod
     @enforce_types()
-    def create_recovery_batch(cls, user: User, days_to_expire: int = 0, batch_number: int = 10):
+    def create_recovery_batch(cls, user: User, days_to_expire: int = 0, num_of_codes_per_batch: int = 10):
         """
         Creates a batch of recovery codes for a user, efficiently handling large batches.
         Uses async bulk_create if supported by the database.
@@ -1205,6 +1195,9 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
 
         if days_to_expire and days_to_expire < 0:
             raise ValueError("daysToExpiry must be a positive integer")
+        
+        if num_of_codes_per_batch <= 0:
+            raise ValueError("The batch number(size) cannot be less or equal to 0")
 
         cls._ensure_setup_for_user(user)
 
@@ -1220,7 +1213,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
          # if one fails none is created and the changes are rolled back
         with transaction.atomic(): 
             
-            batch_instance = cls(user=user, number_issued=batch_number)
+            batch_instance = cls(user=user, number_issued=num_of_codes_per_batch)
            
             if days_to_expire:
                 batch_instance.expiry_date = schedule_future_date(days=days_to_expire)
@@ -1235,7 +1228,7 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
 
             flush_cache_and_write_attempts_to_db(instance=batch_instance, field_name=cls.REQUEST_ATTEMPT_FIELD, cache_key=cache_key, logger=purge_code_logger)
           
-            for _ in range(batch_number):
+            for _ in range(num_of_codes_per_batch):
                 raw_code = generate_2fa_secure_recovery_code()
                 recovery_code = RecoveryCode(user=user, batch=batch_instance)
                 recovery_code.hash_raw_code(raw_code)
@@ -1367,16 +1360,16 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
             recovery_batch.deleted_by     = user
             recovery_batch.number_removed = recovery_batch.number_issued
 
-            recovery_batch.recovery_codes.update(status=Status.PENDING_DELETE, 
-                                                 is_deactivated=True,
-                                                 mark_for_deletion=True,
-                                                 )
-            recovery_batch.save()
-
-            delete_cache_with_retry(CAN_GENERATE_CODE_CACHE_KEY.format(user.id))
-            
 
             with transaction.atomic():
+                recovery_batch.recovery_codes.update(status=Status.PENDING_DELETE, 
+                                                 is_deactivated=True,
+                                                 mark_for_deletion=True,
+                                                 deleted_by=user,
+                                                 deleted_at=timezone.now()
+                                                 )
+                recovery_batch.save()
+
                 RecoveryCodeAudit.log_action(  user_issued_to=recovery_batch.user,
                                                 action=RecoveryCodeAudit.Action.BATCH_PURGED,
                                                 deleted_by=user,
@@ -1387,8 +1380,8 @@ class RecoveryCodesBatch(AbstractCooldownPeriod, AbstractRecoveryCodesBatch):
                                             )
               
                
-
-                                                
+        
+        delete_cache_with_retry(CAN_GENERATE_CODE_CACHE_KEY.format(user.id))                                        
         return recovery_batch
     
     @classmethod

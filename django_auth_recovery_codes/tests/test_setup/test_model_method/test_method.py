@@ -82,3 +82,4 @@ class RecoveryCodeMethodTestSetup(TestCase):
 
         self.assertEqual(str(context.exception), expected_msg)
 
+    
