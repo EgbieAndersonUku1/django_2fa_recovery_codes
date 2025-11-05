@@ -17,6 +17,9 @@ export function getCardFieldElements(cardElement) {
     
     checkIfHTMLElement(cardElement, "Card Element", true);
 
-    const attributesElements = cardElement.querySelectorAll('.card-head .info-box .value p');
-    return attributesElements;
+    if (cardElement) {
+        const attributesElements = cardElement.querySelectorAll('.card-head .info-box .value p');
+        return attributesElements;
+    }
+  
 }

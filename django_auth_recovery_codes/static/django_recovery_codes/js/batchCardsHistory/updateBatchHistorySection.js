@@ -238,6 +238,7 @@ export function updateBatchHistorySection(sectionElement,
 export function markCardFieldHelper(cardEement, className, value, classColourSelector = "text-green") {
     
     const fieldElements = getCardFieldElements(cardEement);
+    if (!fieldElements) return
 
     if (!fieldElements.length) return;
 
@@ -249,6 +250,7 @@ export function markCardFieldHelper(cardEement, className, value, classColourSel
         }
     }
 }
+
 
 
 

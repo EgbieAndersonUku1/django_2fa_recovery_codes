@@ -160,7 +160,7 @@ class TestRecoveryCodeBatcPostView(TestCase):
     
       
         # Simulate regenerating wait times after the user clicks the `regenerate` button.
-        # This will generate seven wait times. Each wait time is intended to be double
+        # This will generate five wait times. Each wait time is intended to be double
         # the previous one, based on the settings:
         # - DJANGO_AUTH_RECOVERY_CODES_BASE_COOLDOWN
         # - DJANGO_AUTH_RECOVERY_CODES_COOLDOWN_MULTIPLIER
