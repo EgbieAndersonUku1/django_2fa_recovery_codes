@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ---
 
 
+## [1.0.3] - 05/11/2025
+
+### Fixed
+
+* **Verification form display issue** Fixed a problem where the 2FA test verification form was not shown immediately after the user generated their recovery codes for the first time. The form previously appeared only after a manual page refresh.
+* **Error handling improvements**, Added defensive checks in `updatedBatchHistorySection.js` and `batchCardUtils.js` to prevent runtime errors caused by attempting to access the length of a `null` element.
+* The verification form now appears automatically on first setup and remains visible until the user successfully verifies their 2FA code.
+
+---
+
+### Technical details
+
+* Introduced early-return logic in `markCardFieldHelper()` to ensure code execution continues only if valid DOM elements are present.
+* Added conditional querying in `getCardFieldElements()` to avoid calling `.querySelectorAll()` on an undefined element.
+
+
+
 ## [1.0.1] - 7/10/25
 
 - Fixed an issue where `resp.BATCH` became undefined in `handleCanGenerateCodeSuccessUI` due to variable shadowing.

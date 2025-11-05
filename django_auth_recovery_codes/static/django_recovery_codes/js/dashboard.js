@@ -168,6 +168,7 @@ function handleEventDelegation(e) {
 
     switch (elementID) {
         case GENERATE_CODE_WITH_EXPIRY_BUTTON_ID:
+            
             appStateManager.setCodeGeneration(true);
             handleGenerateCodeWithExpiryClick(e, GENERATE_CODE_WITH_EXPIRY_BUTTON_ID);
 
