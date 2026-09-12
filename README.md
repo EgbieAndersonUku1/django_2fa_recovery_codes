@@ -1406,6 +1406,19 @@ DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER
 ### Hang on a minute, why can I email myself the code only once, and only if I haven’t logged out after generating it?
 ---
 
+### Using with `django-email-sender`
+
+`django-auth-recovery-codes` can be used alongside `django-email-sender`. The recovery-code package uses the `MYAPP_TEMPLATES_DIR` configuration to specify the location of its package-provided email templates.
+
+However, when both packages are used within the same application, the recovery-code package's email template location will override the application's configured email template path.
+
+This will prevent the application's own email templates from being resolved correctly.
+
+The two packages work as expected when used independently. This is a current configuration conflict when they are used together.
+
+
+---
+
 The way **Django Auth Recovery Code** works is that it never stores the plain text recovery codes in the database. Instead, it stores only their **hash values**.  
 
 A **hash** is a one-way function: it takes an input, applies a hashing algorithm, and produces an output that cannot be reversed to recover the original input. This is different from encryption/decryption, where data can be restored to its original form. Hashing is therefore safer for storing sensitive values such as recovery codes.  
