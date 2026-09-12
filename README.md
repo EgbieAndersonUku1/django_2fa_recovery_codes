@@ -1402,8 +1402,6 @@ DJANGO_AUTH_RECOVERY_CODE_PURGE_DELETE_SCHEDULER_USE_LOGGER
 * **`True`**: The application records details of the email process via `EmailSenderLogger`.
 * **`False`**: No logging takes place.
 
-
-### Hang on a minute, why can I email myself the code only once, and only if I haven’t logged out after generating it?
 ---
 
 ### Using with `django-email-sender`
@@ -1418,6 +1416,8 @@ The two packages work as expected when used independently. This is a current con
 
 
 ---
+
+### Hang on a minute, why can I email myself the code only once, and only if I haven’t logged out after generating it?
 
 The way **Django Auth Recovery Code** works is that it never stores the plain text recovery codes in the database. Instead, it stores only their **hash values**.  
 
